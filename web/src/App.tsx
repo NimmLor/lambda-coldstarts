@@ -63,8 +63,8 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
       <h1 className="text-3xl lg:col-span-12">Bun vs Node.js cold start benchmark</h1>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} ways to ship Bun against ${count('Node')} Node.js runtimes on AWS Lambda, with ${latest.rounds} cold starts per function every day. `
-          : 'On AWS Lambda, updated daily. '}
+          ? `${count('Bun')} ways to ship Bun against ${count('Node')} Node.js runtimes on AWS Lambda, with ${latest.rounds} cold starts per function every hour. `
+          : 'On AWS Lambda, updated hourly. '}
         The charts plot each run’s mean. The table below shows the mean over the selected range.
       </p>
       <nav className="flex flex-col gap-1.5 text-sm lg:col-span-4 lg:items-end">

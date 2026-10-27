@@ -18,9 +18,8 @@ const WARM = Number(process.env.PERF_WARM ?? 5)
  */
 const CONCURRENCY = Number(process.env.PERF_CONCURRENCY ?? 4)
 
-/** Every day at 11:00 UTC in production, as lambda-perf does; `PERF_SCHEDULE` overrides it on any stage. */
-const schedule = () =>
-  process.env.PERF_SCHEDULE ?? ($app.stage === 'production' ? 'cron(0 11 * * ? *)' : undefined)
+/** How often EventBridge Scheduler starts PerfRun, on every stage. */
+const SCHEDULE = 'rate(1 hour)'
 
 /** The site's domain: coldstarts.github.nimmervoll.work in production, `<stage>.` in front of it elsewhere. */
 const siteDomain = () => {
@@ -127,30 +126,27 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     definition: run.next(recordRun),
   })
 
-  const cron = schedule()
-  if (cron) {
-    const role = new aws.iam.Role('PerfScheduleRole', {
-      assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: 'scheduler.amazonaws.com',
-      }),
-      inlinePolicies: [
-        {
-          name: 'start-perf-run',
-          policy: $jsonStringify({
-            Version: '2012-10-17',
-            Statement: [
-              { Effect: 'Allow', Action: 'states:StartExecution', Resource: stateMachine.arn },
-            ],
-          }),
-        },
-      ],
-    })
-    new aws.scheduler.Schedule('PerfSchedule', {
-      scheduleExpression: cron,
-      flexibleTimeWindow: { mode: 'OFF' },
-      target: { arn: stateMachine.arn, roleArn: role.arn },
-    })
-  }
+  const role = new aws.iam.Role('PerfScheduleRole', {
+    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+      Service: 'scheduler.amazonaws.com',
+    }),
+    inlinePolicies: [
+      {
+        name: 'start-perf-run',
+        policy: $jsonStringify({
+          Version: '2012-10-17',
+          Statement: [
+            { Effect: 'Allow', Action: 'states:StartExecution', Resource: stateMachine.arn },
+          ],
+        }),
+      },
+    ],
+  })
+  new aws.scheduler.Schedule('PerfSchedule', {
+    scheduleExpression: SCHEDULE,
+    flexibleTimeWindow: { mode: 'OFF' },
+    target: { arn: stateMachine.arn, roleArn: role.arn },
+  })
 
   // One CloudFront distribution for the site and, under /api, PerfApi, so the page fetches its
   // own origin.

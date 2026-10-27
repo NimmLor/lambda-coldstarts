@@ -198,7 +198,7 @@ The stack also runs the benchmark on its own, the way
 The site is at `coldstarts.github.nimmervoll.work` in production and at
 `<stage>.coldstarts.github.nimmervoll.work` on every other stage, e.g. `dev.coldstarts…`.
 
-In production, the state machine runs every day at 11:00 UTC; on other stages, start it by hand:
+The state machine runs every hour on every stage; to start a run in between:
 
 ```sh
 bun run perf --stage dev            # starts a run and waits for it
@@ -213,7 +213,6 @@ machine, and prints the execution's console link.
 | `PERF_ROUNDS` | `10` | Cold starts per function and run |
 | `PERF_WARM` | `5` | Warm invocations after each cold start |
 | `PERF_CONCURRENCY` | `4` | Functions measured at once; each holds two of the account's concurrent executions |
-| `PERF_SCHEDULE` | `cron(0 11 * * ? *)` in production, none elsewhere | An EventBridge Scheduler expression |
 
 To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:
 `cd web && PERF_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.
