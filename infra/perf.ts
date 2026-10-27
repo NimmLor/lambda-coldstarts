@@ -1,12 +1,18 @@
 /**
  * A scheduled cold-start benchmark in the style of maxday/lambda-perf. The PerfRun state machine
- * goes through every function in parallel, forcing `PERF_ROUNDS` cold starts one after another
- * (src/perf/measure.ts stores each REPORT in PerfResults), then records the run. PerfApi serves
- * the results to the Vite site in web/.
+ * goes through `PERF_CONCURRENCY` functions at a time, forcing `PERF_ROUNDS` cold starts one after
+ * another (src/perf/measure.ts stores each REPORT in PerfResults), then records the run. PerfApi
+ * serves the results to the Vite site in web/.
  */
 import { RUNS_PK } from '../src/perf/keys'
 
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
+/**
+ * Functions measured at once. Each holds two concurrent executions, PerfMeasure waiting on its
+ * synchronous invoke of the target, so 4 stays within a new account's limit of 10 and leaves
+ * room for PerfApi.
+ */
+const CONCURRENCY = Number(process.env.PERF_CONCURRENCY ?? 4)
 
 /** Every day at 11:00 UTC in production, as lambda-perf does; `PERF_SCHEDULE` overrides it on any stage. */
 const schedule = () =>
@@ -83,6 +89,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   const run = sst.aws.StepFunctions.map({
     name: 'Functions',
     items: Object.entries(functions).map(([id, fn]) => ({ id, name: fn.name })),
+    maxConcurrency: CONCURRENCY,
     processor: rounds.catch(skipped),
     output: {},
   })

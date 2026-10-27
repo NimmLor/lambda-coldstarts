@@ -170,9 +170,10 @@ for GitHub OIDC.
 The stack also runs the benchmark on its own, the way
 [maxday/lambda-perf](https://github.com/maxday/lambda-perf) does, and keeps every result:
 
-- **`PerfRun`**, a Step Functions state machine, maps over every deployed function in parallel
-  and gives each `PERF_ROUNDS` cold starts, one after another. A function that keeps failing is
-  skipped, not the whole run. At the end, it writes the run to DynamoDB itself.
+- **`PerfRun`**, a Step Functions state machine, maps over the deployed functions,
+  `PERF_CONCURRENCY` at a time, and gives each `PERF_ROUNDS` cold starts, one after another. A
+  function that keeps failing is skipped, not the whole run. At the end, it writes the run to
+  DynamoDB itself.
 - **`PerfMeasure`** ([`src/perf/measure.ts`](src/perf/measure.ts)) does one round: changes the
   function's configuration so its warm environments retire, invokes it with `LogType: Tail`, and
   stores the `REPORT` numbers. An invocation without an `Init Duration` throws, so Step Functions
@@ -200,6 +201,7 @@ machine, and prints the execution's console link.
 | Variable | Default | |
 |---|---|---|
 | `PERF_ROUNDS` | `10` | Cold starts per function and run |
+| `PERF_CONCURRENCY` | `4` | Functions measured at once; each holds two of the account's concurrent executions |
 | `PERF_SCHEDULE` | `cron(0 11 * * ? *)` in production, none elsewhere | An EventBridge Scheduler expression |
 
 To work on the site against a deployed API:
