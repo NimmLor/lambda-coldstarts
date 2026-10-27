@@ -46,12 +46,51 @@ Bun 1.4.4 quietly builds a plain executable. The build therefore checks that `bu
 lists every flag a variant needs and skips that function with a warning otherwise, instead of
 deploying something mislabelled.
 
-To build them, point `BUN_AOT_BIN` at a build of that PR. `BunCompileTrim` builds anywhere; the
-`--aot` variants need **Linux** on the Lambda architecture, since `--aot` can't cross-compile:
+To build them, point `BUN_AOT_BIN` at a build of that PR. `BunCompileTrim` builds on any host;
+the two `--aot` variants need **Linux on the Lambda architecture**, because `--aot` can't
+cross-compile.
+
+### Installing the AOT build of Bun
+
+The pinned build is Buildkite build
+[#133641](https://buildkite.com/bun/bun/builds/133641) of oven-sh/bun#45631,
+`1.4.4-canary.1+72ab4f530`. Its artifacts expire around 2027-04-25.
+
+**Linux x64.** This installs it next to your normal Bun, without replacing it:
 
 ```sh
-bunx bun-pr 45631                       # downloads it as ~/.bun/bin/bun-45631
-BUN_AOT_BIN=~/.bun/bin/bun-45631 bunx sst deploy --stage dev
+mkdir -p ~/.bun-aot && cd ~/.bun-aot
+curl -fL -o bun-linux-x64.zip "https://buildkite.com/organizations/bun/pipelines/bun/builds/133641/jobs/01a17d0b-2f8a-4994-b0d1-5aefc929366e/artifacts/01a17d12-dc53-4bb8-9856-d357395550f1"
+echo "2bb09f3c5b9966dc5160ebc87e8bc981e7ea5dc6c511227943fb6065e06a7461  bun-linux-x64.zip" | sha256sum -c
+unzip -o bun-linux-x64.zip && chmod +x bun-linux-x64/bun
+~/.bun-aot/bun-linux-x64/bun --revision   # 1.4.4-canary.1+72ab4f530
+```
+
+Then deploy with it. Only the `--trim` and `--aot` variants use `BUN_AOT_BIN`; installs and the
+other variants stay on your normal Bun:
+
+```sh
+BUN_AOT_BIN=~/.bun-aot/bun-linux-x64/bun bunx sst deploy --stage dev
+```
+
+The deploy also needs a C compiler (`cc`, or set `$CC`) for the mincore shim. `sst deploy`
+prints `Skipping <Variant>: …` with the reason for every variant it can't build.
+
+**Linux arm64 and macOS.** The same build has `linux-aarch64` and `darwin-aarch64` binaries: on
+the [build page](https://buildkite.com/bun/bun/builds/133641), open the matching `build-bun` job's
+Artifacts tab. Install them the same way, with `LAMBDA_ARCH=arm64` on Linux arm64. A Mac can
+build `BunCompileTrim` but not the `--aot` variants, since `--aot` only builds for the machine it
+runs on; use the [Deploy and benchmark](.github/workflows/bench.yml) workflow, which runs on
+x86_64 Linux and installs the pinned build itself.
+
+**A newer build of the PR.** [`bun-pr`](https://www.npmjs.com/package/bun-pr), by Bun's author,
+downloads the latest finished build of a PR for your OS and architecture, next to the `bun` on
+your `PATH` (or into `$BUN_OUT_DIR`), and links it as `bun-45631`:
+
+```sh
+bunx bun-pr 45631
+export BUN_AOT_BIN="$(dirname "$(which bun)")/bun-45631"
+"$BUN_AOT_BIN" build --help | grep -E -- '--(aot|trim)\b'   # stock Bun prints nothing
 ```
 
 ### Why the mincore shim

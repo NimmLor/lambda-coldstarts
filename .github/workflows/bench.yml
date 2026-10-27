@@ -8,9 +8,10 @@ on:
       region:
         description: AWS region
         default: eu-central-1
-      bun_pr:
-        description: oven-sh/bun PR whose build compiles the --aot variants (empty skips them)
-        default: '45631'
+      aot:
+        description: Install the pinned AOT build of Bun (oven-sh/bun#45631); off skips the --trim and --aot variants
+        type: boolean
+        default: true
       rounds:
         default: '3'
       cold:
@@ -41,13 +42,16 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ inputs.region }}
       - run: bun install --frozen-lockfile
-      - name: Fetch the AOT build of Bun
-        if: inputs.bun_pr != ''
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      # oven-sh/bun#45631, Buildkite build #133641 (1.4.4-canary.1+72ab4f530); artifacts expire ~2027-04-25.
+      - name: Install the AOT build of Bun
+        if: inputs.aot
         run: |
-          bunx bun-pr ${{ inputs.bun_pr }}
-          echo "BUN_AOT_BIN=$HOME/.bun/bin/bun-${{ inputs.bun_pr }}" >> "$GITHUB_ENV"
+          mkdir -p ~/.bun-aot && cd ~/.bun-aot
+          curl -fL -o bun-linux-x64.zip "https://buildkite.com/organizations/bun/pipelines/bun/builds/133641/jobs/01a17d0b-2f8a-4994-b0d1-5aefc929366e/artifacts/01a17d12-dc53-4bb8-9856-d357395550f1"
+          echo "2bb09f3c5b9966dc5160ebc87e8bc981e7ea5dc6c511227943fb6065e06a7461  bun-linux-x64.zip" | sha256sum -c
+          unzip -o bun-linux-x64.zip && chmod +x bun-linux-x64/bun
+          bun-linux-x64/bun --revision
+          echo "BUN_AOT_BIN=$HOME/.bun-aot/bun-linux-x64/bun" >> "$GITHUB_ENV"
       - run: bunx sst deploy --stage bench
       - run: bun run bench --rounds ${{ inputs.rounds }} --cold ${{ inputs.cold }}
       - run: cat bench-results/*.md >> "$GITHUB_STEP_SUMMARY"
