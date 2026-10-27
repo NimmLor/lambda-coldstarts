@@ -83,12 +83,14 @@ export const VARIANTS: Record<string, Variant> = {
 }
 export const ORDER = Object.keys(VARIANTS)
 
-/** A deployed function: its variant, e.g. BunCompile, on one architecture. */
+/** A deployed function: its variant, e.g. BunCompile, on one architecture with one memory size. */
 export type Fn = Variant & {
+  /** `<variant>/<arch>/<memoryMb>`, the same across runs however the function was named. */
   id: string
   /** The variant's id. */
   base: string
   arch: string
+  memoryMb: number
   color: string
 }
 
@@ -114,14 +116,13 @@ export type RunPoints = {
   finishedAt: string
   rounds: number
   warmInvocations?: number
-  memoryMb?: number
   functions: Fn[]
   points: Map<string, Point>
 }
 
 const describe = (f: FunctionSummary): Fn => {
-  // With a single architecture, ids have no suffix; see infra/functions.ts.
-  const base = f.functionId.replace(/(Arm64|X64)$/, '')
+  // With a single architecture or memory size, ids go without that suffix; see infra/functions.ts.
+  const base = f.functionId.replace(/M\d+$/, '').replace(/(Arm64|X64)$/, '')
   const variant = VARIANTS[base] ?? {
     name: base,
     family: f.runtime.startsWith('nodejs') ? 'Node' : 'Bun',
@@ -130,39 +131,42 @@ const describe = (f: FunctionSummary): Fn => {
   }
   return {
     ...variant,
-    id: f.functionId,
+    id: `${base}/${f.arch}/${f.memoryMb}`,
     base,
     arch: f.arch,
+    memoryMb: f.memoryMb,
     color: `var(--color-line-${base}, var(--color-line-other))`,
   }
 }
 
-export const toPoints = (run: Run): RunPoints => ({
-  date: new Date(run.finishedAt),
-  finishedAt: run.finishedAt,
-  rounds: run.rounds,
-  warmInvocations: run.warmInvocations,
-  memoryMb: run.functions[0]?.memoryMb,
-  functions: run.functions.map(describe),
-  points: new Map(
-    run.functions.map((f) => [
-      f.functionId,
-      {
-        cold: f.initMs.avg,
-        p50: f.initMs.p50,
-        p90: f.initMs.p90,
-        initDurations: f.initDurations,
-        startup: f.startupMs?.avg,
-        warm: f.warmMs?.avg,
-        warmP90: f.warmMs?.p90,
-        mem: f.maxMemoryMbAvg,
-        dur: f.durationMsAvg,
-        size: f.codeSizeMb,
-        runtime: f.runtime,
-      },
-    ])
-  ),
-})
+export const toPoints = (run: Run): RunPoints => {
+  const functions = run.functions.map(describe)
+  return {
+    date: new Date(run.finishedAt),
+    finishedAt: run.finishedAt,
+    rounds: run.rounds,
+    warmInvocations: run.warmInvocations,
+    functions,
+    points: new Map(
+      run.functions.map((f, i) => [
+        functions[i]!.id,
+        {
+          cold: f.initMs.avg,
+          p50: f.initMs.p50,
+          p90: f.initMs.p90,
+          initDurations: f.initDurations,
+          startup: f.startupMs?.avg,
+          warm: f.warmMs?.avg,
+          warmP90: f.warmMs?.p90,
+          mem: f.maxMemoryMbAvg,
+          dur: f.durationMsAvg,
+          size: f.codeSizeMb,
+          runtime: f.runtime,
+        },
+      ])
+    ),
+  }
+}
 
 export const mean = (values: (number | undefined)[]) => {
   const present = values.filter((v) => v !== undefined)
@@ -181,11 +185,11 @@ export const niceMax = (value: number) => {
 export const day = (date: Date) =>
   date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
-/** What the charts and table show: the runs in range, on one architecture. */
+/** What the charts and table show: the runs in range, on one architecture with one memory size. */
 export type View = {
   runs: RunPoints[]
   latest: RunPoints
-  /** Every function on the architecture, in legend order. */
+  /** Every function on the architecture with the memory size, in legend order. */
   fns: Fn[]
   /** The ones not hidden, or all of them when every one is. */
   shown: Fn[]

@@ -6,6 +6,7 @@
  * serves the results to the React site in web/.
  */
 import { RUNS_PK } from '../src/perf/keys'
+import { BENCH_TAG } from './functions'
 
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
 /** Invocations after each round's cold start, which find its environment warm. */
@@ -41,6 +42,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     handler: 'src/perf/measure.handler',
     runtime: 'nodejs24.x',
     timeout: '3 minutes',
+    memory: "128 MB",
     // `link` grants access; the name comes through the environment, so the handlers don't depend on
     // sst-env.d.ts, which tsconfig.json doesn't include.
     link: [table],
@@ -54,7 +56,11 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
           'lambda:UpdateFunctionConfiguration',
           'lambda:InvokeFunction',
         ],
-        resources: Object.values(functions).map((fn) => fn.arn),
+        // Every function's ARN outgrows an inline policy, so the functions' tag picks them instead.
+        resources: ['arn:aws:lambda:*:*:function:*'],
+        conditions: [
+          { test: 'StringEquals', variable: `aws:ResourceTag/${BENCH_TAG.key}`, values: [BENCH_TAG.value] },
+        ],
       },
     ],
   })

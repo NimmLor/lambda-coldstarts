@@ -109,6 +109,8 @@ export const App = () => {
   const [error, setError] = useState<string>()
   const [family, setFamily] = useState<Family | 'All'>()
   const [arch, setArch] = useState('arm64')
+  // One full vCPU, and the only size before there were more.
+  const [memory, setMemory] = useState(1769)
   const [range, setRange] = useState(30)
   const [hover, setHover] = useState<number>()
   const [focus, setFocus] = useState<string>()
@@ -146,11 +148,13 @@ export const App = () => {
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
     const shownArch = archs.includes(arch) ? arch : archs[0]!
+    const memories = [...new Set(latest.functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
+    const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
     const since = latest.date.getTime() - range * DAY_MS
     const runs = history.filter((r) => r.date.getTime() > since)
     const hovered = hover !== undefined && hover < runs.length ? hover : undefined
     const fns = latest.functions
-      .filter((f) => f.arch === shownArch)
+      .filter((f) => f.arch === shownArch && f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
     const visible = fns.filter((f) => !hidden.has(f.base))
     const view: View = {
@@ -186,6 +190,16 @@ export const App = () => {
                 }}
               />
               <Segmented
+                label="Memory"
+                options={memories}
+                value={shownMemory}
+                text={(mb) => `${mb} MB`}
+                onPick={(mb) => {
+                  setMemory(mb)
+                  setHover(undefined)
+                }}
+              />
+              <Segmented
                 label="Range"
                 options={RANGES}
                 value={range}
@@ -201,10 +215,10 @@ export const App = () => {
             </div>
             <dl className="m-0 flex flex-wrap gap-y-4 border-t border-rule pt-4">
               <Fact term="Last run">{latest.finishedAt.replace(/\.\d+Z$/, 'Z')}</Fact>
-              <Fact term="Memory">{latest.memoryMb ?? '—'} MB</Fact>
               <Fact term="Rounds">{latest.rounds}</Fact>
               <Fact term="Functions">
-                {new Set(latest.functions.map((f) => f.base)).size} on {archs.length} architectures
+                {new Set(latest.functions.map((f) => f.base)).size} on {archs.length} architectures ×{' '}
+                {memories.length} memory sizes
               </Fact>
             </dl>
           </div>

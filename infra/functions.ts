@@ -30,16 +30,33 @@ export const VARIANTS: Variant[] = [
   { id: 'Node26', kind: 'node', runtime: 'nodejs26.x' },
 ]
 
-/** Settings every variant shares, so only the runtime differs between them. */
-const shared = (id: string, architecture: LambdaArch) => ({
+/** Tags every benchmarked function, which is how PerfMeasure's permissions pick them; see infra/perf.ts. */
+export const BENCH_TAG = { key: 'bench', value: 'target' }
+
+/** Settings every variant shares, so only the runtime and memory differ between them. */
+const shared = (id: string, architecture: LambdaArch, memoryMb: number) => ({
   architecture,
-  memory: `${Number(process.env.LAMBDA_MEMORY ?? 1769)} MB` as const,
+  memory: `${memoryMb} MB` as const,
   timeout: '10 seconds' as const,
   url: true,
   environment: { VARIANT: id },
+  tags: { [BENCH_TAG.key]: BENCH_TAG.value },
   // Live mode would route invocations to this machine, which measures nothing.
   dev: false as const,
 })
+
+/**
+ * `LAMBDA_MEMORY=512,1769` deploys every variant with each of those MB; unset, with all of these.
+ * 1769 MB is one full vCPU.
+ */
+const memorySizes = () => {
+  const sizes = (process.env.LAMBDA_MEMORY ?? '128,256,512,1024,1769')
+    .split(',')
+    .map((mb) => Number(mb.trim()))
+  const invalid = sizes.filter((mb) => !Number.isInteger(mb) || mb < 128 || mb > 10240)
+  if (invalid.length) throw new Error(`LAMBDA_MEMORY must list MB from 128 to 10240, not ${invalid.join(', ')}`)
+  return [...new Set(sizes)]
+}
 
 /** `VARIANTS=BunCompile,Node24` deploys just those; unset deploys all of them. */
 const selected = () => {
@@ -50,7 +67,10 @@ const selected = () => {
   return VARIANTS.filter((v) => only.includes(v.id))
 }
 
-/** With more than one architecture, each function's id says which it runs on: `BunCompileArm64`. */
+/**
+ * With more than one architecture, each function's id says which it runs on: `BunCompileArm64`. With
+ * more than one memory size, it then says how much it has: `BunCompileArm64M128`.
+ */
 const ARCH_SUFFIX: Record<LambdaArch, string> = { x86_64: 'X64', arm64: 'Arm64' }
 
 /**
@@ -78,33 +98,41 @@ const bunBundle = (id: string, variant: BunVariant, arch: LambdaArch) => {
 
 export const createFunctions = () => {
   const architectures = lambdaArchs()
+  const memories = memorySizes()
   const functions: Record<string, sst.aws.Function> = {}
 
   for (const architecture of architectures) {
     for (const v of selected()) {
-      const id = architectures.length > 1 ? `${v.id}${ARCH_SUFFIX[architecture]}` : v.id
+      // Built once, deployed at every memory size.
+      const { bundle, reason } =
+        v.kind === 'bun' ? bunBundle(v.id, v.variant, architecture) : { bundle: undefined, reason: undefined }
 
-      if (v.kind === 'node') {
+      for (const memoryMb of memories) {
+        const id =
+          (architectures.length > 1 ? `${v.id}${ARCH_SUFFIX[architecture]}` : v.id) +
+          (memories.length > 1 ? `M${memoryMb}` : '')
+
+        if (v.kind === 'node') {
+          functions[id] = new sst.aws.Function(id, {
+            ...shared(id, architecture, memoryMb),
+            handler: 'src/node.handler',
+            // SST's types stop at nodejs24.x; its builder passes any runtime through.
+            runtime: v.runtime as 'nodejs24.x',
+          })
+          continue
+        }
+
+        if (!bundle) {
+          console.warn(`Skipping ${id}: ${reason}`)
+          continue
+        }
         functions[id] = new sst.aws.Function(id, {
-          ...shared(id, architecture),
-          handler: 'src/node.handler',
-          // SST's types stop at nodejs24.x; its builder passes any runtime through.
-          runtime: v.runtime as 'nodejs24.x',
+          ...shared(id, architecture, memoryMb),
+          bundle,
+          handler: 'bootstrap',
+          runtime: 'provided.al2023',
         })
-        continue
       }
-
-      const { bundle, reason } = bunBundle(v.id, v.variant, architecture)
-      if (!bundle) {
-        console.warn(`Skipping ${id}: ${reason}`)
-        continue
-      }
-      functions[id] = new sst.aws.Function(id, {
-        ...shared(id, architecture),
-        bundle,
-        handler: 'bootstrap',
-        runtime: 'provided.al2023',
-      })
     }
   }
 

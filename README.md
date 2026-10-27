@@ -15,8 +15,9 @@ measures their cold and warm starts:
 | `Node24` | `nodejs24.x` | SST's esbuild bundle |
 | `Node26` | `nodejs26.x` (public preview) | SST's esbuild bundle |
 
-Every function runs the same handler ([`src/report.ts`](src/report.ts)), has the same memory
-(1769 MB, one full vCPU), architecture and timeout, and gets a public Function URL. The Bun
+Every function runs the same handler ([`src/report.ts`](src/report.ts)), has the same architecture
+and timeout, and gets a public Function URL. Each one is deployed at 128, 256, 512, 1024 and
+1769 MB (one full vCPU), as `BunCompileM128` and so on. The Bun
 variants serve invocations through a small custom runtime loop ([`src/runtime.ts`](src/runtime.ts));
 the Node variants use Lambda's managed runtime.
 
@@ -38,7 +39,7 @@ Settings, all through the environment of `sst deploy`:
 | Variable | Default | |
 |---|---|---|
 | `LAMBDA_ARCH` | build host's | `x86_64`, `arm64` or `x86_64,arm64`. The `--aot` variants only build on the host when it matches; with two, see [Both architectures](#both-architectures-built-in-docker). |
-| `LAMBDA_MEMORY` | `1769` | MB, for every function |
+| `LAMBDA_MEMORY` | `128,256,512,1024,1769` | MB; every variant is deployed once per size, its id ending in `M<MB>` when there is more than one |
 | `VARIANTS` | all | e.g. `BunCompile,Node24` |
 | `BUN_BIN` | `bun` | Bun for `BunRuntime` and `BunCompile` |
 | `BUN_AOT_BIN` | `$BUN_BIN` | Bun for `BunCompileCanary` and the `--trim` and `--aot` variants |
@@ -55,7 +56,8 @@ bun run deploy --stage dev   # bun run build, then deploys all 18 functions
 `bun run build` is [`scripts/build-docker.ts`](scripts/build-docker.ts). The Node variants need
 no build of their own: SST bundles them during the deploy. `deploy` deploys with
 `LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist`. With more than one architecture, every function's
-name ends in it: `BunCompileX64`, `BunCompileArm64`, `Node24Arm64`.
+name ends in it: `BunCompileX64`, `BunCompileArm64`, `Node24Arm64`, and then in its memory size:
+`BunCompileArm64M128`.
 
 Each architecture builds in an Amazon Linux 2023 container of that architecture, which is
 Lambda's `provided.al2023` OS. So `--aot` compiles natively, and the smoke test from
