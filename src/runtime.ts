@@ -83,6 +83,7 @@ export const startLambdaRuntime = async <TEvent, TResult>(
     } catch (error) {
       const payload = toErrorPayload(error)
       await post(`${base}/${awsRequestId}/error`, payload, {
+        'Content-Type': 'application/vnd.aws.lambda.error+json',
         'Lambda-Runtime-Function-Error-Type': payload.errorType,
       })
       continue

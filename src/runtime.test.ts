@@ -3,7 +3,12 @@ import { serve } from 'bun'
 import { startLambdaRuntime } from './runtime'
 
 type QueuedInvocation = { requestId: string; event: unknown; traceId?: string }
-type Posted = { path: string; errorType: string | null; body: unknown }
+type Posted = {
+  path: string
+  contentType: string | null
+  errorType: string | null
+  body: unknown
+}
 
 const FUNCTION_ARN = 'arn:aws:lambda:eu-central-1:123456789012:function:hello'
 const DEADLINE_MS = 1_700_000_000_000
@@ -37,6 +42,7 @@ const serveRuntimeApi = (queue: QueuedInvocation[]) => {
       }
       posted.push({
         path: pathname,
+        contentType: request.headers.get('content-type'),
         errorType: request.headers.get('lambda-runtime-function-error-type'),
         body: await request.json(),
       })
@@ -79,11 +85,13 @@ describe('startLambdaRuntime', () => {
     expect(posted).toEqual([
       {
         path: '/2018-06-01/runtime/invocation/req-1/response',
+        contentType: null,
         errorType: null,
         body: { greeting: 'Hello Ada' },
       },
       {
         path: '/2018-06-01/runtime/invocation/req-2/response',
+        contentType: null,
         errorType: null,
         body: { greeting: 'Hello Grace' },
       },
@@ -106,6 +114,7 @@ describe('startLambdaRuntime', () => {
     expect(posted).toEqual([
       {
         path: '/2018-06-01/runtime/invocation/req-1/error',
+        contentType: 'application/vnd.aws.lambda.error+json',
         errorType: 'TypeError',
         body: {
           errorType: 'TypeError',
@@ -115,6 +124,7 @@ describe('startLambdaRuntime', () => {
       },
       {
         path: '/2018-06-01/runtime/invocation/req-2/response',
+        contentType: null,
         errorType: null,
         body: 'ok',
       },
