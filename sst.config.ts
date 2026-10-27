@@ -15,6 +15,7 @@ export default $config({
   },
   async run() {
     const { createFunctions } = await import('./infra/functions')
+    const { createPerf } = await import('./infra/perf')
     const functions = createFunctions()
 
     return {
@@ -24,6 +25,7 @@ export default $config({
           { name: fn.name, url: fn.url },
         ])
       ),
+      perf: createPerf(functions),
     }
   },
 })

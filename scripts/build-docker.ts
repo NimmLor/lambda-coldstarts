@@ -1,6 +1,6 @@
 /**
  * Builds the Bun variants for each Lambda architecture into ./dist/<arch>/<Variant>, so one deploy
- * can ship both (`bun run deploy:docker`). Every architecture builds in an Amazon Linux 2023
+ * can ship both (`bun run deploy`). Every architecture builds in an Amazon Linux 2023
  * container of that architecture (scripts/docker.ts), which runs scripts/build-local.ts, smoke
  * test included.
  *

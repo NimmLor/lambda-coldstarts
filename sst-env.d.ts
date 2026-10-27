@@ -86,6 +86,27 @@ declare module "sst" {
       "type": "sst.aws.Function"
       "url": string
     }
+    "PerfApi": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "PerfMeasure": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "PerfResults": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "PerfRun": {
+      "arn": string
+      "type": "sst.aws.StepFunctions"
+    }
+    "PerfSite": {
+      "type": "sst.aws.StaticSite"
+      "url": string
+    }
   }
 }
 

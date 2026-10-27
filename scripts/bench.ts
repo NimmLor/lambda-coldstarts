@@ -18,6 +18,7 @@ import {
   UpdateFunctionConfigurationCommand,
   waitUntilFunctionUpdatedV2,
 } from '@aws-sdk/client-lambda'
+import { parseReport } from '../src/perf/report-line'
 
 const { values: args } = parseArgs({
   options: {
@@ -67,22 +68,6 @@ const EVENT = JSON.stringify({
   requestContext: { http: { method: 'GET' } },
 })
 
-const parseReport = (logResult: string | undefined) => {
-  const log = Buffer.from(logResult ?? '', 'base64').toString('utf8')
-  const report = log.split('\n').find((line) => line.startsWith('REPORT'))
-  if (!report) throw new Error(`No REPORT line in:\n${log}`)
-  const ms = (label: string) => {
-    const match = report.match(new RegExp(`${label}: ([\\d.]+) ms`))
-    return match ? Number(match[1]) : undefined
-  }
-  return {
-    initMs: ms('Init Duration'),
-    durationMs: ms('Duration') ?? Number.NaN,
-    billedMs: ms('Billed Duration') ?? Number.NaN,
-    maxMemoryMb: Number(report.match(/Max Memory Used: (\d+) MB/)?.[1]),
-  }
-}
-
 const invoke = async (target: (typeof targets)[number]): Promise<Sample> => {
   const started = performance.now()
   const result = await client(target.region).send(
@@ -97,7 +82,7 @@ const invoke = async (target: (typeof targets)[number]): Promise<Sample> => {
   if (result.FunctionError) {
     throw new Error(`${target.id} failed (${result.FunctionError}): ${payload}`)
   }
-  const report = parseReport(result.LogResult)
+  const report = parseReport(Buffer.from(result.LogResult ?? '', 'base64').toString('utf8'))
   const body = JSON.parse(JSON.parse(payload).body)
   return {
     ...report,

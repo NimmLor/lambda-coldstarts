@@ -24,9 +24,13 @@ the Node variants use Lambda's managed runtime.
 ```sh
 bun install
 cp .env.example .env   # then fill in AWS_PROFILE or access keys
-bunx sst deploy --stage dev
-curl "$(jq -r '.functions.BunCompile.url' .sst/outputs.json)"
+bun run deploy --stage dev   # every function on x86_64 and arm64, Bun variants built in Docker
+curl "$(jq -r '.functions.BunCompileX64.url' .sst/outputs.json)"
 ```
+
+`bun run deploy` is `bun run build` (see [Both architectures](#both-architectures-built-in-docker))
+and then `sst deploy` with `LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist`. A plain `bunx sst deploy`
+builds on the host instead, for its architecture only, and replaces the functions of the other.
 
 Settings, all through the environment of `sst deploy`:
 
@@ -43,12 +47,12 @@ Settings, all through the environment of `sst deploy`:
 ## Both architectures, built in Docker
 
 ```sh
-bun run build                       # every Bun variant for x86_64 and arm64, into dist/<arch>/<Variant>
-bun run deploy:docker --stage dev   # bun run build, then deploys all 16 functions
+bun run build                # every Bun variant for x86_64 and arm64, into dist/<arch>/<Variant>
+bun run deploy --stage dev   # bun run build, then deploys all 16 functions
 ```
 
 `bun run build` is [`scripts/build-docker.ts`](scripts/build-docker.ts). The Node variants need
-no build of their own: SST bundles them during the deploy. `deploy:docker` deploys with
+no build of their own: SST bundles them during the deploy. `deploy` deploys with
 `LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist`. With more than one architecture, every function's
 name ends in it: `BunCompileX64`, `BunCompileArm64`, `Node24Arm64`.
 
@@ -160,6 +164,46 @@ Results land in `bench-results/` as Markdown and raw JSON. The
 `ubuntu-24.04` and an `ubuntu-24.04-arm` runner, each for its own architecture, then one job that
 deploys all 16 functions from those bundles and benchmarks them. It needs an `AWS_ROLE_ARN` secret
 for GitHub OIDC.
+
+## Scheduled runs, like lambda-perf
+
+The stack also runs the benchmark on its own, the way
+[maxday/lambda-perf](https://github.com/maxday/lambda-perf) does, and keeps every result:
+
+- **`PerfRun`**, a Step Functions state machine, maps over every deployed function in parallel
+  and gives each `PERF_ROUNDS` cold starts, one after another. A function that keeps failing is
+  skipped, not the whole run. At the end, it writes the run to DynamoDB itself.
+- **`PerfMeasure`** ([`src/perf/measure.ts`](src/perf/measure.ts)) does one round: changes the
+  function's configuration so its warm environments retire, invokes it with `LogType: Tail`, and
+  stores the `REPORT` numbers. An invocation without an `Init Duration` throws, so Step Functions
+  retries it.
+- **`PerfResults`**, a DynamoDB table: one item per cold start under `run#<runId>`, one per
+  finished run under `runs` ([`src/perf/keys.ts`](src/perf/keys.ts)). A run's id is its
+  execution's start time.
+- **`PerfApi`** ([`src/perf/api.ts`](src/perf/api.ts)), a Function URL: `GET /runs`,
+  `GET /runs/latest`, `GET /runs/<runId>`, the last two with per-function init p50/p90/avg/min/max.
+- **`PerfSite`**, a bare Vite page in [`web/`](web/) that shows one run as a table.
+
+The site is at `coldstarts.github.nimmervoll.work` in production and at
+`<stage>.coldstarts.github.nimmervoll.work` on every other stage, e.g. `dev.coldstarts…`.
+
+In production, the state machine runs every day at 11:00 UTC; on other stages, start it by hand:
+
+```sh
+bun run perf --stage dev            # starts a run and waits for it
+bun run perf --stage dev --detach   # just starts it
+```
+
+[`scripts/perf-run.ts`](scripts/perf-run.ts) runs itself under `sst shell` to find the state
+machine, and prints the execution's console link.
+
+| Variable | Default | |
+|---|---|---|
+| `PERF_ROUNDS` | `10` | Cold starts per function and run |
+| `PERF_SCHEDULE` | `cron(0 11 * * ? *)` in production, none elsewhere | An EventBridge Scheduler expression |
+
+To work on the site against a deployed API:
+`cd web && VITE_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.
 
 ## Try it locally
 

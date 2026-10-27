@@ -2,22 +2,28 @@
   "name": "bun-aot-lambda",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "web"
+  ],
   "scripts": {
-    "deploy": "sst deploy",
+    "deploy": "bun run build && LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist sst deploy",
     "remove": "sst remove",
     "bench": "bun scripts/bench.ts",
+    "perf": "bun scripts/perf-run.ts",
     "build:local": "bun scripts/build-local.ts",
     "build": "bun scripts/build-docker.ts",
     "explain": "bun scripts/explain.ts",
-    "deploy:docker": "bun run build && LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist sst deploy",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web"
   },
   "dependencies": {
     "sst": "4.17.2"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1158.0",
     "@aws-sdk/client-lambda": "^3.1158.0",
+    "@aws-sdk/client-sfn": "^3.1158.0",
+    "@aws-sdk/lib-dynamodb": "^3.1158.0",
     "@types/aws-lambda": "^8.10.164",
     "@types/bun": "^1.4.4",
     "typescript": "^5.9.3"
