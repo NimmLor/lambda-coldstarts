@@ -2,9 +2,9 @@ import { niceMax, type Stat, type View, day } from './data'
 
 export type Metric = { key: Stat; title: string; unit: string; height: number; leader: string }
 
-/** About five dates under the chart, always including the last. */
-const dateTicks = (n: number) => {
-  const step = Math.max(1, Math.round((n - 1) / 4))
+/** About `segments` + 1 dates under the chart, always including the last. */
+const dateTicks = (n: number, segments: number) => {
+  const step = Math.max(1, Math.round((n - 1) / segments))
   const ticks: number[] = []
   for (let i = 0; i < n; i += step) ticks.push(i)
   if (ticks.at(-1) !== n - 1) {
@@ -31,27 +31,32 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
   const best = shown
     .filter((f) => agg(f, m.key) !== undefined)
     .sort((a, b) => agg(a, m.key)! - agg(b, m.key)!)[0]
-  const ticks = dateTicks(n)
+  // Three dates fit under a narrow chart without touching.
+  const ticks = dateTicks(n, wide ? 4 : 2)
 
   return (
     <article
-      className={`flex min-w-0 flex-col gap-[18px] rounded-2xl border border-white/8 bg-panel p-6 ${wide ? 'col-span-full' : ''}`}
+      className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${wide ? 'col-span-full' : ''}`}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 font-mono text-xs text-muted">
-        <div className="flex items-baseline gap-3">
-          <h2 className={`font-sans font-medium tracking-[-0.015em] text-ink ${wide ? 'text-2xl' : 'text-lg'}`}>
-            {m.title}
-          </h2>
-          {m.unit} · mean per run
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm text-muted">
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <h2 className={`text-ink ${wide ? 'text-xl' : 'text-lg'}`}>{m.title}</h2>
+          {m.unit}, mean per run
         </div>
-        {best && `${m.leader}: ${best.name}`}
+        {best && (
+          <span className="inline-flex items-center gap-2">
+            {m.leader}
+            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: best.color }} />
+            <span className="font-medium text-ink">{best.name}</span>
+          </span>
+        )}
       </div>
-      <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-x-2.5">
+      <div className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2">
         <div className="relative" style={{ height: m.height }}>
           {grid.map((g) => (
             <span
               key={g.top}
-              className="absolute right-0 -translate-y-1/2 font-mono text-[11px] text-faint"
+              className="measured absolute right-0 -translate-y-1/2 text-xs text-muted"
               style={{ top: `${g.top}%` }}
             >
               {g.label}
@@ -62,6 +67,8 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
           <svg
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
+            role="img"
+            aria-label={`${m.title} in ${m.unit}, one line per function`}
             className="absolute inset-0 size-full overflow-visible"
           >
             {grid.map((g, i) => (
@@ -71,7 +78,7 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
                 x2={100}
                 y1={g.top}
                 y2={g.top}
-                stroke={i === 0 ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.06)'}
+                className={i === 0 ? 'stroke-rule-2' : 'stroke-rule'}
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"
               />
@@ -80,9 +87,9 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
               <polyline
                 key={s.f.id}
                 fill="none"
-                stroke={s.f.color}
+                style={{ stroke: s.f.color }}
                 strokeOpacity={!focus || focus === s.f.base ? 1 : 0.15}
-                strokeWidth={focus === s.f.base ? 3 : m.key === 'cold' ? 2 : 1.75}
+                strokeWidth={focus === s.f.base ? 3 : 2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
@@ -93,13 +100,13 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
           </svg>
           {hover !== undefined && (
             <>
-              <div className="absolute inset-y-0 w-px bg-white/25" style={{ left: `${x(hover)}%` }} />
+              <div className="absolute inset-y-0 w-px bg-rule-2" style={{ left: `${x(hover)}%` }} />
               {series
                 .filter((s) => s.values[hover] !== undefined && (!focus || focus === s.f.base))
                 .map((s) => (
                   <div
                     key={s.f.id}
-                    className="absolute size-[9px] -translate-1/2 rounded-full border-2 border-panel"
+                    className="absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
                     style={{ left: `${x(hover)}%`, top: `${y(s.values[hover]!)}%`, background: s.f.color }}
                   />
                 ))}
@@ -111,11 +118,11 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
             ))}
           </div>
         </div>
-        <div className="relative col-start-2 mt-2 h-[22px]">
+        <div className="relative col-start-2 mt-2 h-5">
           {ticks.map((i, k) => (
             <span
               key={i}
-              className={`absolute font-mono text-[11px] whitespace-nowrap text-faint ${
+              className={`measured absolute text-xs whitespace-nowrap text-muted ${
                 ticks.length === 1 || (k > 0 && k < ticks.length - 1)
                   ? '-translate-x-1/2'
                   : k === 0

@@ -15,7 +15,6 @@ export type Family = 'Bun' | 'Node'
 type Variant = {
   name: string
   family: Family
-  hue: number
   /**
    * The command infra/build.ts builds it with, short of the entry point, `--outfile`, and for the
    * compiled ones `--target=bun-linux-<arch>` and the `--no-compile-autoload-*` flags.
@@ -30,26 +29,23 @@ type Variant = {
 
 const SST_BUNDLE = 'esbuild --bundle --format=esm --minify'
 
-/** Each variant in infra/functions.ts, in legend order, with the hue of its line. */
+/** Each variant in infra/functions.ts, in legend order; its line colour is `--color-line-<id>` in tokens.css. */
 export const VARIANTS: Record<string, Variant> = {
   BunRuntime: {
     name: 'Bun runtime',
     family: 'Bun',
-    hue: 85,
     build: 'bun build --target=bun --format=esm --minify',
     about: 'The bundle, run by a bun executable shipped next to it and started by a shell bootstrap',
   },
   BunCompile: {
     name: 'Bun executable',
     family: 'Bun',
-    hue: 60,
     build: 'bun build --compile --format=esm --minify --bytecode',
     about: 'A single-file executable as the bootstrap',
   },
   BunCompileCanary: {
     name: 'Bun executable, canary',
     family: 'Bun',
-    hue: 300,
     build: 'bun build --compile --format=esm --minify --bytecode',
     canary: true,
     about: 'The Bun executable, built by the canary Bun: the baseline for the trimmed and AOT ones',
@@ -57,7 +53,6 @@ export const VARIANTS: Record<string, Variant> = {
   BunCompileTrim: {
     name: 'Bun executable, trimmed',
     family: 'Bun',
-    hue: 35,
     build: 'bun build --compile --trim --format=esm --minify --bytecode',
     canary: true,
     about: 'A single-file executable without the parts of Bun the code doesn’t use',
@@ -65,7 +60,6 @@ export const VARIANTS: Record<string, Variant> = {
   BunCompileAot: {
     name: 'Bun AOT executable',
     family: 'Bun',
-    hue: 10,
     build: 'bun build --compile --aot',
     canary: true,
     about: 'An ahead-of-time compiled executable, behind a bootstrap that preloads the mincore shim',
@@ -73,17 +67,15 @@ export const VARIANTS: Record<string, Variant> = {
   BunCompileAotTrim: {
     name: 'Bun AOT executable, trimmed',
     family: 'Bun',
-    hue: 340,
     build: 'bun build --compile --aot --trim',
     canary: true,
     about: 'The AOT executable without the parts of Bun the code doesn’t use',
   },
-  Node22: { name: 'Node.js 22', family: 'Node', hue: 150, build: SST_BUNDLE, about: 'SST’s default bundle' },
-  Node24: { name: 'Node.js 24', family: 'Node', hue: 185, build: SST_BUNDLE, about: 'SST’s default bundle' },
+  Node22: { name: 'Node.js 22', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },
+  Node24: { name: 'Node.js 24', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },
   Node26: {
     name: 'Node.js 26',
     family: 'Node',
-    hue: 225,
     build: SST_BUNDLE,
     preview: true,
     about: 'SST’s default bundle, on a runtime in public preview',
@@ -92,7 +84,7 @@ export const VARIANTS: Record<string, Variant> = {
 export const ORDER = Object.keys(VARIANTS)
 
 /** A deployed function: its variant, e.g. BunCompile, on one architecture. */
-export type Fn = Omit<Variant, 'hue'> & {
+export type Fn = Variant & {
   id: string
   /** The variant's id. */
   base: string
@@ -130,14 +122,19 @@ export type RunPoints = {
 const describe = (f: FunctionSummary): Fn => {
   // With a single architecture, ids have no suffix; see infra/functions.ts.
   const base = f.functionId.replace(/(Arm64|X64)$/, '')
-  const { hue, ...variant } = VARIANTS[base] ?? {
+  const variant = VARIANTS[base] ?? {
     name: base,
     family: f.runtime.startsWith('nodejs') ? 'Node' : 'Bun',
-    hue: 270,
     build: '',
     about: '',
   }
-  return { ...variant, id: f.functionId, base, arch: f.arch, color: `oklch(0.78 0.13 ${hue})` }
+  return {
+    ...variant,
+    id: f.functionId,
+    base,
+    arch: f.arch,
+    color: `var(--color-line-${base}, var(--color-line-other))`,
+  }
 }
 
 export const toPoints = (run: Run): RunPoints => ({

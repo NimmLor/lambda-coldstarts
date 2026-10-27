@@ -27,6 +27,9 @@ const METRICS: Metric[] = [
   { key: 'dur', title: 'Duration', unit: 'ms', height: 180, leader: 'Fastest' },
 ]
 
+/** The page's one column: capped and centred, its gutters growing past 1440. */
+const WRAP = 'mx-auto w-full max-w-(--container) px-(--gutter)'
+
 const Segmented = <T extends string | number>({
   label,
   options,
@@ -40,16 +43,11 @@ const Segmented = <T extends string | number>({
   onPick: (v: T) => void
   text?: (v: T) => string
 }) => (
-  <div className="flex items-center gap-2.5 text-xs tracking-[0.04em] text-muted uppercase">
-    {label}
-    <div className="flex gap-0.5 rounded-full border border-white/6 bg-page p-[3px]">
+  <div className="flex flex-col gap-2">
+    <span className="text-sm font-medium text-muted">{label}</span>
+    <div className="cells" role="group" aria-label={label}>
       {options.map((v) => (
-        <button
-          key={v}
-          aria-pressed={v === value}
-          onClick={() => onPick(v)}
-          className="cursor-pointer rounded-full px-3.5 py-1.5 font-mono text-[13px] tracking-normal text-muted normal-case aria-pressed:bg-ink aria-pressed:text-page"
-        >
+        <button key={v} type="button" aria-pressed={v === value} onClick={() => onPick(v)}>
           {text(v)}
         </button>
       ))}
@@ -57,36 +55,24 @@ const Segmented = <T extends string | number>({
   </div>
 )
 
-const SectionHead = ({ children }: { children: ReactNode }) => (
-  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 text-[13px] text-muted">
-    {children}
-  </div>
-)
-
 const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
-  const archs = new Set(latest?.functions.map((f) => f.arch))
   const count = (family: Family) => [...variants].filter((b) => VARIANTS[b]?.family === family).length
   return (
-    <header className="flex flex-col gap-[18px]">
-      <div className="flex items-center gap-2.5 font-mono text-xs tracking-[0.08em] text-muted uppercase">
-        <span className="size-[7px] rounded-full bg-[oklch(0.78_0.13_150)]" />
-        AWS Lambda{latest && ` · ${variants.size} functions × ${archs.size} architectures`} · updated daily
-      </div>
-      <h1 className="max-w-[16ch] text-[clamp(40px,6vw,72px)]/[0.98] font-medium tracking-[-0.035em] text-balance">
-        Bun vs Node.js cold start benchmark
-      </h1>
-      <p className="max-w-[58ch] text-lg/normal text-pretty text-soft">
-        {latest &&
-          `${count('Bun')} ways to ship Bun against ${count('Node')} Node.js runtimes, with ${latest.rounds} cold starts per function every day. `}
-        The charts plot each run's mean. The table below shows the mean over the selected range.
+    <header className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}>
+      <h1 className="text-3xl lg:col-span-12">Bun vs Node.js cold start benchmark</h1>
+      <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
+        {latest
+          ? `${count('Bun')} ways to ship Bun against ${count('Node')} Node.js runtimes on AWS Lambda, with ${latest.rounds} cold starts per function every day. `
+          : 'On AWS Lambda, updated daily. '}
+        The charts plot each run’s mean. The table below shows the mean over the selected range.
       </p>
-      <nav className="flex flex-wrap gap-x-6 gap-y-2 text-[15px]">
-        <a href={`${REPO}#scheduled-runs-like-lambda-perf`}>How does it work →</a>
-        <a href={REPO}>Source on GitHub →</a>
+      <nav className="flex flex-col gap-1.5 text-sm lg:col-span-4 lg:items-end">
+        <a href={`${REPO}#scheduled-runs-like-lambda-perf`}>How does it work</a>
+        <a href={REPO}>Source on GitHub</a>
         <span className="text-muted">
           Inspired by{' '}
-          <a className="font-mono text-sm" href="https://github.com/maxday/lambda-perf">
+          <a className="whitespace-nowrap" href="https://github.com/maxday/lambda-perf">
             maxday/lambda-perf
           </a>
         </span>
@@ -94,6 +80,27 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
     </header>
   )
 }
+
+/** A fact of the latest run, parted from its neighbour by a hairline. */
+const Fact = ({ term, children }: { term: string; children: ReactNode }) => (
+  <div className="flex flex-col gap-1 border-l border-rule px-6 first:border-l-0 first:pl-0">
+    <dt className="text-xs text-muted">{term}</dt>
+    <dd className="measured m-0 text-sm text-ink">{children}</dd>
+  </div>
+)
+
+/** The first load, in the shape of the toolbar, the cold start chart and the board. */
+const Skeleton = () => (
+  <div aria-busy="true" aria-label="Loading runs" className={`${WRAP} flex flex-col gap-6`}>
+    <div className="skeleton h-28" />
+    <div className="skeleton h-96" />
+    <div className="flex flex-col gap-2">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="skeleton h-14" />
+      ))}
+    </div>
+  </div>
+)
 
 export const App = () => {
   /** Oldest first. */
@@ -165,110 +172,149 @@ export const App = () => {
 
     return (
       <>
-        <section className="flex flex-col gap-4 rounded-2xl border border-white/8 bg-panel p-5">
-          <div className="flex flex-wrap items-center gap-x-7 gap-y-3">
-            <Segmented label="Show" options={['All', 'Bun', 'Node'] as const} value={family} onPick={showFamily} />
-            <Segmented
-              label="Arch"
-              options={archs}
-              value={shownArch}
-              onPick={(a) => {
-                setArch(a)
-                setHover(undefined)
-              }}
-            />
-            <Segmented
-              label="Range"
-              options={RANGES}
-              value={range}
-              text={(r) => `${r}d`}
-              onPick={(r) => {
-                setRange(r)
-                setHover(undefined)
-              }}
-            />
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/6 pt-3.5">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 font-mono text-[13px] text-muted [&_b]:font-normal [&_b]:text-ink">
-              <span>
-                Last run <b>{latest.finishedAt.replace(/\.\d+Z$/, 'Z')}</b>
-              </span>
-              <span>
-                Memory <b>{latest.memoryMb ?? '—'} MB</b>
-              </span>
-              <span>
-                Rounds <b>{latest.rounds}</b>
-              </span>
+        <section className={`${WRAP} flex flex-col gap-6`}>
+          <div className="flex flex-col gap-5 rounded-card border border-rule bg-paper-2 p-5 sm:p-6">
+            <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
+              <Segmented label="Show" options={['All', 'Bun', 'Node'] as const} value={family} onPick={showFamily} />
+              <Segmented
+                label="Arch"
+                options={archs}
+                value={shownArch}
+                onPick={(a) => {
+                  setArch(a)
+                  setHover(undefined)
+                }}
+              />
+              <Segmented
+                label="Range"
+                options={RANGES}
+                value={range}
+                text={(r) => `${r}d`}
+                onPick={(r) => {
+                  setRange(r)
+                  setHover(undefined)
+                }}
+              />
+              <button type="button" onClick={load} aria-busy={loading} className="btn btn--primary hit relative sm:ml-auto">
+                {loading ? 'Refreshing…' : 'Refresh'}
+              </button>
             </div>
-            <button
-              onClick={load}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/12 px-3.5 py-2 text-sm hover:border-white/40"
-            >
-              <span className="text-base/none">↻</span>
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </button>
+            <dl className="m-0 flex flex-wrap gap-y-4 border-t border-rule pt-4">
+              <Fact term="Last run">{latest.finishedAt.replace(/\.\d+Z$/, 'Z')}</Fact>
+              <Fact term="Memory">{latest.memoryMb ?? '—'} MB</Fact>
+              <Fact term="Rounds">{latest.rounds}</Fact>
+              <Fact term="Functions">
+                {new Set(latest.functions.map((f) => f.base)).size} on {archs.length} architectures
+              </Fact>
+            </dl>
           </div>
-        </section>
 
-        <section className="flex flex-col gap-3">
-          <SectionHead>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <div className="flex flex-wrap gap-2">
               {fns.map((f) => {
                 const on = !hidden.has(f.base)
                 return (
                   <button
                     key={f.id}
+                    type="button"
                     aria-pressed={on}
                     onClick={() => toggle(f.base)}
                     onMouseEnter={() => on && setFocus(f.base)}
                     onMouseLeave={() => setFocus(undefined)}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/6 py-1.5 pr-3 pl-2 text-xs text-faint aria-pressed:border-white/12 aria-pressed:bg-white/4 aria-pressed:text-ink"
+                    className="hit relative inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-pill border border-rule px-2.5 text-sm font-medium text-muted hover:border-rule-2 hover:text-ink-2 active:translate-y-px aria-pressed:border-rule-2 aria-pressed:bg-paper-2 aria-pressed:text-ink"
                   >
-                    <span className="size-2.5 rounded-full" style={{ background: on ? f.color : 'transparent' }} />
+                    <span
+                      aria-hidden="true"
+                      className="size-2.5 shrink-0 rounded-full border-2"
+                      style={{ borderColor: f.color, background: on ? f.color : 'transparent' }}
+                    />
                     {f.name}
                   </button>
                 )
               })}
             </div>
-            Solid = Bun · dashed = Node.js
-          </SectionHead>
-          <div
-            onMouseLeave={() => setHover(undefined)}
-            className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3"
-          >
+            <div className="flex gap-5 text-sm text-muted">
+              {(['Bun', 'Node.js'] as const).map((name) => (
+                <span key={name} className="inline-flex items-center gap-2">
+                  <svg aria-hidden="true" width="24" height="4" className="stroke-ink-2">
+                    <line x1="0" x2="24" y1="2" y2="2" strokeWidth="2" strokeDasharray={name === 'Bun' ? undefined : '5 4'} />
+                  </svg>
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div onMouseLeave={() => setHover(undefined)} className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3">
             {METRICS.map((m, i) => (
               <Chart key={m.key} metric={m} wide={i === 0} view={view} />
             ))}
           </div>
         </section>
 
-        <section className="flex flex-col gap-3">
-          <SectionHead>
-            <h2 className="text-2xl font-medium tracking-[-0.015em] text-ink">
-              {hovered !== undefined ? `Run of ${day(runs[hovered]!.date)}` : `${range}-day mean`}
-            </h2>
-            Ticks = the {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts of{' '}
-            {hovered !== undefined ? 'that' : 'the latest'} run · warm = {latest.rounds} ×{' '}
-            {latest.warmInvocations ?? '—'} invocations · click a row to hide it
-          </SectionHead>
-          <Table view={view} />
+        <section className="band mt-16 py-12 sm:py-16">
+          <div className={`${WRAP} flex flex-col gap-8`}>
+            <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+              <h2 className="text-2xl">
+                {hovered !== undefined ? `Run of ${day(runs[hovered]!.date)}` : `${range}-day mean`}
+              </h2>
+              <p className="max-w-prose text-sm text-muted">
+                Ticks are the {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts of{' '}
+                {hovered !== undefined ? 'that' : 'the latest'} run. Warm is {latest.rounds} ×{' '}
+                {latest.warmInvocations ?? '—'} invocations. Click a row to hide it.
+              </p>
+            </div>
+            <Table view={view} />
+          </div>
         </section>
       </>
     )
   }
 
+  /** What stands in for the dashboard until there is a run to show. */
+  const pending = () => {
+    if (loading && !error) return <Skeleton />
+    return (
+      <div className={WRAP}>
+        <div
+          role={error ? 'alert' : undefined}
+          className="flex flex-col items-start gap-4 rounded-card border border-rule bg-paper-2 p-6"
+        >
+          <h2 className="text-lg">{error ? 'The runs didn’t load' : 'No runs yet.'}</h2>
+          {error && <p className="measured text-sm text-bad">{error}</p>}
+          <button type="button" onClick={load} aria-busy={loading} className="btn btn--primary hit relative">
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <main className="mx-auto flex max-w-[1200px] flex-col gap-10 px-4 *:min-w-0 pt-8 pb-16 sm:px-8 sm:pt-14 sm:pb-24">
+    <main>
       <Header latest={latest} />
-      {latest ? dashboard(latest) : <p className="text-muted">{error ?? (loading ? 'Loading…' : 'No runs yet.')}</p>}
-      <footer className="flex flex-wrap justify-between gap-x-5 gap-y-2 border-t border-white/8 pt-6 text-[13px] text-muted">
-        <span>
-          Cold start = Lambda init duration · warm start = handler duration on an already-initialised instance ·
-          duration = handler duration of the cold invocation · memory = max memory used · size = deployed code size.
-          Compiled builds also pass --target=bun-linux-{'<arch>'}, --no-compile-autoload-dotenv and
-          --no-compile-autoload-bunfig; “canary Bun” is the Bun build that --trim and --aot need.
-        </span>
-        <a href={REPO}>NimmLor/bun-aot-lambda</a>
+      {latest ? dashboard(latest) : pending()}
+      <footer className={`${WRAP} flex flex-col gap-6 pt-12 pb-16 text-sm text-muted ${latest ? '' : 'mt-16'}`}>
+        <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
+          <dt className="font-medium text-ink">Cold start</dt>
+          <dd className="m-0">Lambda init duration</dd>
+          <dt className="font-medium text-ink">Warm start</dt>
+          <dd className="m-0">handler duration on an already-initialised instance</dd>
+          <dt className="font-medium text-ink">Duration</dt>
+          <dd className="m-0">handler duration of the cold invocation</dd>
+          <dt className="font-medium text-ink">Memory</dt>
+          <dd className="m-0">max memory used</dd>
+          <dt className="font-medium text-ink">Size</dt>
+          <dd className="m-0">deployed code size</dd>
+        </dl>
+        <p className="max-w-prose">
+          Compiled builds also pass <code>--target=bun-linux-{'<arch>'}</code>, <code>--no-compile-autoload-dotenv</code>{' '}
+          and <code>--no-compile-autoload-bunfig</code>; “canary Bun” is the Bun build that <code>--trim</code> and{' '}
+          <code>--aot</code> need.
+        </p>
+        <a href={REPO} className="self-start">
+          NimmLor/bun-aot-lambda
+        </a>
       </footer>
     </main>
   )

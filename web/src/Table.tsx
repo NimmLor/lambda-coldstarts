@@ -1,26 +1,37 @@
+import type { ReactNode } from 'react'
 import { type Fn, fixed, niceMax, type View } from './data'
 
+/** Seven columns from `lg`; below it each row restacks as the name over labelled figures. */
 const ROW =
-  'grid grid-cols-[28px_minmax(0,1fr)_170px_100px_72px_72px_64px] items-center gap-4 px-5 py-3.5 text-right [&>:nth-child(-n+2)]:text-left'
+  'grid grid-cols-[2rem_minmax(0,1fr)] gap-x-4 gap-y-4 py-4 lg:grid-cols-[2rem_minmax(0,1fr)_11rem_7rem_6rem_6rem_5.5rem] lg:items-center'
 
-const Unit = ({ children, big }: { children: string; big?: boolean }) => (
-  <span className={`ml-[3px] text-muted ${big ? 'text-xs' : 'text-[11px]'}`}>{children}</span>
+const Unit = ({ children }: { children: string }) => <span className="ml-1 text-xs text-muted">{children}</span>
+
+/** What the run measured, in the instrument face; the words around it stay in the body face. */
+const Reading = ({ children, className = '' }: { children: string; className?: string }) => (
+  <span className={`font-mono slashed-zero ${className}`}>{children}</span>
 )
 
 const Badge = ({ children }: { children: string }) => (
-  <span className="rounded-full border border-white/16 px-[7px] py-0.5 text-[11px] font-normal text-soft">
+  <span className="rounded-chip border border-rule bg-cool-soft px-1.5 text-xs font-medium text-cool">{children}</span>
+)
+
+/** One figure: its label shows only once the head row is gone. */
+const Cell = ({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) => (
+  <div className={`flex min-w-0 flex-col items-start gap-1.5 lg:items-end lg:text-right ${className}`}>
+    <span className="font-body text-xs font-medium text-muted lg:hidden">{label}</span>
     {children}
-  </span>
+  </div>
 )
 
 /** `bun build --compile --aot`: the tool dim, each flag a token that wraps as a whole. */
 const Command = ({ build }: { build: string }) => {
   const [tool, ...flags] = build.split(/ (?=--)/)
   return (
-    <code className="flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-xs/[1.5] text-muted">
+    <code className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs/normal text-muted">
       <span>{tool}</span>
       {flags.map((flag) => (
-        <span key={flag} className="whitespace-nowrap text-soft">
+        <span key={flag} className="whitespace-nowrap text-ink-2">
           {flag}
         </span>
       ))}
@@ -44,104 +55,125 @@ export const Table = ({ view }: { view: View }) => {
       ['cold', 'p50', 'p90', 'startup', 'warm', 'warmP90', 'mem', 'dur'] as const
     ).map((k) => agg(f, k))
     const isBest = (k: keyof typeof mins, v: number | undefined) => on && v !== undefined && v === mins[k]
+    // The leader in a column is a reading, so it takes the instrument's cool tint.
+    const best = (k: keyof typeof mins, v: number | undefined) =>
+      isBest(k, v) ? 'rounded-chip bg-cool-soft px-1 text-cool [&>span]:text-cool' : ''
     const point = latest.points.get(f.id)!
     return (
       <div
         key={f.id}
-        className={`${ROW} cursor-pointer border-b border-white/5 font-mono text-sm text-value ${on ? '' : 'opacity-40'} ${focus === f.base ? 'bg-white/4' : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-pressed={on}
+        className={`${ROW} cursor-pointer border-b border-rule px-2 text-sm text-ink focus-visible:-outline-offset-2 sm:px-4 ${on ? '' : 'opacity-50'} ${focus === f.base ? 'bg-paper-2' : ''}`}
         onMouseEnter={() => view.setFocus(f.base)}
         onMouseLeave={() => view.setFocus(undefined)}
         onClick={() => view.toggle(f.base)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          view.toggle(f.base)
+        }}
       >
-        <span className="text-xs text-muted">{String(i + 1).padStart(2, '0')}</span>
-        <div
-          className="flex min-w-0 items-start gap-2.5"
-          title={[f.base, point.runtime, f.about].filter(Boolean).join(' · ')}
-        >
-          <span className="min-h-7 w-1 shrink-0 self-stretch rounded-xs" style={{ background: f.color }} />
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <div className="flex flex-wrap items-center gap-2 font-sans text-[15px] font-medium text-ink">
-              <img
-                src={`https://cdn.simpleicons.org/${f.family === 'Bun' ? 'bun/f3d9a4' : 'nodedotjs/7fd35b'}`}
-                alt=""
-                width={18}
-                height={18}
-                className="block shrink-0"
-              />
-              {f.name}
-              {f.canary && <Badge>canary Bun</Badge>}
-              {f.preview && <Badge>preview</Badge>}
+        <span className="measured pt-0.5 text-xs text-muted lg:pt-0">{String(i + 1).padStart(2, '0')}</span>
+        <div className="flex min-w-0 flex-col gap-2" title={[f.base, point.runtime, f.about].filter(Boolean).join('\n')}>
+          <div className="flex flex-wrap items-center gap-2 text-md font-medium">
+            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: f.color }} />
+            <img
+              src={`https://cdn.simpleicons.org/${f.family === 'Bun' ? 'bun/f3d9a4' : 'nodedotjs/7fd35b'}`}
+              alt=""
+              width={18}
+              height={18}
+              className="block shrink-0"
+            />
+            {f.name}
+            {f.canary && <Badge>canary Bun</Badge>}
+            {f.preview && <Badge>preview</Badge>}
+          </div>
+          <Command build={f.build} />
+        </div>
+        <div className="col-start-2 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 lg:contents">
+          <Cell label="Cold start" className="col-span-2 sm:col-span-4 lg:col-span-1">
+            <span className={`text-xl font-medium tracking-tight ${best('cold', cold)}`}>
+              <Reading>{fixed(cold, 1)}</Reading>
+              <Unit>ms</Unit>
+            </span>
+            <div
+              className="relative h-3 w-full max-w-64 before:absolute before:inset-x-0 before:top-[5px] before:h-0.5 before:bg-rule"
+              title={`${tickRun.rounds} cold starts`}
+            >
+              {(tickRun.points.get(f.id)?.initDurations ?? []).map((v, k) => (
+                <span
+                  key={k}
+                  className="absolute top-0 h-3 w-0.5 -translate-x-px"
+                  style={{ left: `${(v / tickMax) * 100}%`, background: f.color }}
+                  title={`${v.toFixed(2)} ms`}
+                />
+              ))}
             </div>
-            <Command build={f.build} />
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-lg tracking-[-0.02em]" style={isBest('cold', cold) ? { color: f.color } : undefined}>
-            {fixed(cold, 1)}
-            <Unit big>ms</Unit>
-          </span>
-          <div
-            className="relative h-3 before:absolute before:inset-x-0 before:top-[5px] before:h-0.5 before:rounded-[1px] before:bg-white/6"
-            title={`${tickRun.rounds} cold starts`}
-          >
-            {(tickRun.points.get(f.id)?.initDurations ?? []).map((v, k) => (
-              <span
-                key={k}
-                className="absolute top-0 h-3 w-0.5 -translate-x-px rounded-[1px] opacity-75"
-                style={{ left: `${(v / tickMax) * 100}%`, background: f.color }}
-                title={`${v.toFixed(2)} ms`}
-              />
-            ))}
-          </div>
-          <span className="text-[11px] text-muted">
-            p50 {fixed(p50, 1)} · p90{' '}
-            <span className={cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-warn' : ''}>
-              {fixed(p90, 1)}
+            <span className="flex gap-3 text-xs text-muted">
+              <span>
+                p50 <Reading>{fixed(p50, 1)}</Reading>
+              </span>
+              <span>
+                p90{' '}
+                <Reading className={cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-bad' : ''}>
+                  {fixed(p90, 1)}
+                </Reading>
+              </span>
             </span>
-          </span>
-          {startup !== undefined && (
-            <span className="text-[11px] text-muted" title="Of the cold start, the time spent inside the process">
-              in-process {fixed(startup, 1)}
+            {startup !== undefined && (
+              <span className="text-xs text-muted" title="Of the cold start, the time spent inside the process">
+                in-process <Reading>{fixed(startup, 1)}</Reading>
+              </span>
+            )}
+          </Cell>
+          <Cell label="Warm start">
+            <span className={`text-md ${best('warm', warm)}`}>
+              <Reading>{fixed(warm, 2)}</Reading>
+              <Unit>ms</Unit>
             </span>
-          )}
+            <span className="text-xs text-muted">
+              p90 <Reading>{fixed(warmP90, 2)}</Reading>
+            </span>
+          </Cell>
+          <Cell label="Memory">
+            <span className={best('mem', mem)}>
+              <Reading>{fixed(mem, 1)}</Reading>
+              <Unit>MB</Unit>
+            </span>
+          </Cell>
+          <Cell label="Duration">
+            <span className={best('dur', dur)}>
+              <Reading>{fixed(dur, 2)}</Reading>
+              <Unit>ms</Unit>
+            </span>
+          </Cell>
+          <Cell label="Size">
+            <span>
+              <Reading>{point.size ? point.size.toFixed(1) : '—'}</Reading>
+              <Unit>MB</Unit>
+            </span>
+          </Cell>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-base tracking-[-0.02em]" style={isBest('warm', warm) ? { color: f.color } : undefined}>
-            {fixed(warm, 2)}
-            <Unit>ms</Unit>
-          </span>
-          <span className="text-[11px] text-muted">p90 {fixed(warmP90, 2)}</span>
-        </div>
-        <span className={isBest('mem', mem) ? 'text-white' : ''}>
-          {fixed(mem, 1)}
-          <Unit>MB</Unit>
-        </span>
-        <span className={isBest('dur', dur) ? 'text-white' : ''}>
-          {fixed(dur, 2)}
-          <Unit>ms</Unit>
-        </span>
-        <span>
-          {point.size ? point.size.toFixed(1) : '—'}
-          <Unit>MB</Unit>
-        </span>
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/8 bg-panel">
-      <div className="min-w-[760px]">
-        <div className={`${ROW} border-b border-white/8 text-[11px] tracking-[0.06em] text-muted uppercase`}>
-          <span>#</span>
-          <span>Function · build</span>
-          <span>Cold start</span>
-          <span>Warm start</span>
-          <span>Memory</span>
-          <span>Duration</span>
-          <span>Size</span>
-        </div>
-        {rows.map(row)}
+    <div>
+      <div
+        className={`${ROW} hidden border-b border-rule-2 px-2 text-sm font-medium whitespace-nowrap text-muted sm:px-4 lg:grid [&>:nth-child(n+3)]:text-right`}
+      >
+        <span>#</span>
+        <span>Function and build</span>
+        <span>Cold start</span>
+        <span>Warm start</span>
+        <span>Memory</span>
+        <span>Duration</span>
+        <span>Size</span>
       </div>
+      {rows.map(row)}
     </div>
   )
 }
