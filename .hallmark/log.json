@@ -1,0 +1,47 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "console",
+  "axes": "dark/grotesk-sans/chromatic-amber",
+  "signature": "the cold start board on the deepest band",
+  "sections": [
+   "header",
+   "toolbar",
+   "legend",
+   "charts",
+   "board",
+   "footer"
+  ],
+  "waived": [
+   "39b"
+  ],
+  "prompt": "a public benchmark dashboard comparing Bun and Node.js cold starts on AWS Lambda, updated daily",
+  "date": "2026-10-27"
+ },
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "wayfind",
+  "axes": "light/mono/cool",
+  "signature": "the cold start board on the ink band",
+  "sections": [
+   "header",
+   "toolbar",
+   "legend",
+   "charts",
+   "board",
+   "footer"
+  ],
+  "waived": [
+   "64",
+   "39b"
+  ],
+  "prompt": "a public benchmark dashboard comparing Bun and Node.js cold starts on AWS Lambda, updated daily",
+  "date": "2026-10-27"
+ }
+]
