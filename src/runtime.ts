@@ -62,19 +62,21 @@ export const startLambdaRuntime = async <TEvent, TResult>(
       throw new Error(`Runtime API answered ${next.status} to ${base}/next`)
     }
 
-    const awsRequestId = next.headers.get('lambda-runtime-aws-request-id')
+    // Read once: every `next.headers` is a lookup by name on a built-in object in an --aot build.
+    const headers = next.headers
+    const awsRequestId = headers.get('lambda-runtime-aws-request-id')
     if (!awsRequestId) throw new Error('Invocation without a request id')
 
     // The X-Ray SDK and Powertools read the trace of the current invocation from here.
-    const traceId = next.headers.get('lambda-runtime-trace-id')
+    const traceId = headers.get('lambda-runtime-trace-id')
     if (traceId) process.env._X_AMZN_TRACE_ID = traceId
     else delete process.env._X_AMZN_TRACE_ID
 
     const context: LambdaContext = {
       awsRequestId,
       invokedFunctionArn:
-        next.headers.get('lambda-runtime-invoked-function-arn') ?? '',
-      deadlineMs: Number(next.headers.get('lambda-runtime-deadline-ms')),
+        headers.get('lambda-runtime-invoked-function-arn') ?? '',
+      deadlineMs: Number(headers.get('lambda-runtime-deadline-ms')),
     }
 
     let result: TResult
