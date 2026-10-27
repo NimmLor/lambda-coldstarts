@@ -1,0 +1,22 @@
+{
+  "name": "bun-aot-lambda",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "sst deploy",
+    "remove": "sst remove",
+    "bench": "bun scripts/bench.ts",
+    "build:local": "bun scripts/build-local.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "sst": "4.17.2"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-lambda": "^3.1158.0",
+    "@types/aws-lambda": "^8.10.164",
+    "@types/bun": "^1.4.4",
+    "typescript": "^5.9.3"
+  }
+}

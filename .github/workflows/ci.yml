@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx sst install --stage ci
+        env:
+          SST_TELEMETRY_DISABLED: '1'
+      - run: bun run typecheck
+      - run: bun test
+      # Builds the Bun variants and runs each bootstrap against a fake Runtime API.
+      - run: bun run build:local

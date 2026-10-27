@@ -1,0 +1,59 @@
+name: Deploy and benchmark
+
+# Deploys from an x86_64 Linux runner, which is what the --aot variants need, then benchmarks.
+# Needs the repository secret AWS_ROLE_ARN: a role this repo may assume through GitHub OIDC.
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: AWS region
+        default: eu-central-1
+      bun_pr:
+        description: oven-sh/bun PR whose build compiles the --aot variants (empty skips them)
+        default: '45631'
+      rounds:
+        default: '3'
+      cold:
+        description: Concurrent cold invocations per round
+        default: '10'
+      remove:
+        description: Remove the stack afterwards
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency: bench
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    env:
+      SST_TELEMETRY_DISABLED: '1'
+      AWS_REGION: ${{ inputs.region }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.region }}
+      - run: bun install --frozen-lockfile
+      - name: Fetch the AOT build of Bun
+        if: inputs.bun_pr != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          bunx bun-pr ${{ inputs.bun_pr }}
+          echo "BUN_AOT_BIN=$HOME/.bun/bin/bun-${{ inputs.bun_pr }}" >> "$GITHUB_ENV"
+      - run: bunx sst deploy --stage bench
+      - run: bun run bench --rounds ${{ inputs.rounds }} --cold ${{ inputs.cold }}
+      - run: cat bench-results/*.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench-results
+      - if: inputs.remove
+        run: bunx sst remove --stage bench
