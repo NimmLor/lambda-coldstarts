@@ -15,7 +15,7 @@ import {
 import path from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
 
-export type BunVariant = 'bun' | 'compile' | 'aot' | 'aot-trim'
+export type BunVariant = 'bun' | 'compile' | 'compile-trim' | 'aot' | 'aot-trim'
 export type LambdaArch = 'x86_64' | 'arm64'
 
 /** Relative to the repository root: SST bundles the config, so paths relative to this file don't survive. */
@@ -24,7 +24,7 @@ const MINCORE_SHIM_SOURCE = 'infra/mincore-shim.c'
 
 /** The Bun used for the `bun` and `compile` variants. */
 export const bunBin = () => process.env.BUN_BIN || 'bun'
-/** The Bun used for the `--aot` variants: one built from oven-sh/bun#45631 until that ships. */
+/** The Bun used for the `--trim` and `--aot` variants: a build of oven-sh/bun#45631 until that ships. */
 export const bunAotBin = () => process.env.BUN_AOT_BIN || bunBin()
 
 const run = (file: string, args: string[]) =>
@@ -48,37 +48,54 @@ export const lambdaArch = (): LambdaArch => {
   return toLambdaArch(process.arch)
 }
 
-const aotSupport = new Map<string, boolean>()
+const helpTexts = new Map<string, string>()
 
 /**
- * `bun build` accepts flags it doesn't know without a word, so `--aot` on a Bun that lacks it
- * quietly builds a plain executable. Its help lists `--aot` once the compiler is in.
+ * `bun build` accepts flags it doesn't know without a word, so `--aot` or `--trim` on a Bun that
+ * lacks them quietly builds a plain executable. Its help lists them once they're in.
  */
-const supportsAot = (bin: string) => {
-  let supported = aotSupport.get(bin)
-  if (supported === undefined) {
+const supportsFlag = (bin: string, flag: string) => {
+  let help = helpTexts.get(bin)
+  if (help === undefined) {
     // The AOT branch colors its help even when piped, so drop the ANSI codes before matching.
-    supported = /^\s+--aot\s/m.test(
-      stripVTControlCharacters(read(bin, ['build', '--help']))
-    )
-    aotSupport.set(bin, supported)
+    help = stripVTControlCharacters(read(bin, ['build', '--help']))
+    helpTexts.set(bin, help)
   }
-  return supported
+  return new RegExp(`^\\s+${flag}\\s`, 'm').test(help)
 }
 
-/** Why the `--aot` variants can't be built on this host for `arch`, or `undefined` when they can. */
-export const aotUnavailableReason = (arch: LambdaArch) => {
-  if (process.platform !== 'linux') {
-    return `--aot compiles for the build host only, and this host runs ${process.platform}`
-  }
-  if (toLambdaArch(process.arch) !== arch) {
-    return `--aot can't cross-compile from ${toLambdaArch(process.arch)} to ${arch}`
+/** The flags beyond `--compile` each variant needs from `bun build`. */
+const NEEDED_FLAGS: Record<BunVariant, string[]> = {
+  bun: [],
+  compile: [],
+  'compile-trim': ['--trim'],
+  aot: ['--aot'],
+  'aot-trim': ['--aot', '--trim'],
+}
+
+/** Why `variant` can't be built on this host for `arch`, or `undefined` when it can. */
+export const unavailableReason = (variant: BunVariant, arch: LambdaArch) => {
+  const needed = NEEDED_FLAGS[variant]
+  if (!needed.length) return undefined
+  if (needed.includes('--aot')) {
+    if (process.platform !== 'linux') {
+      return `--aot compiles for the build host only, and this host runs ${process.platform}`
+    }
+    if (toLambdaArch(process.arch) !== arch) {
+      return `--aot can't cross-compile from ${toLambdaArch(process.arch)} to ${arch}`
+    }
   }
   const bin = bunAotBin()
-  if (!supportsAot(bin)) {
-    return `${bin} (bun ${bunVersion(bin)}) has no --aot; point BUN_AOT_BIN at a build of oven-sh/bun#45631`
+  const missing = needed.filter((flag) => !supportsFlag(bin, flag))
+  if (missing.length) {
+    return `${bin} (bun ${bunVersion(bin)}) has no ${missing.join(' or ')}; point BUN_AOT_BIN at a build of oven-sh/bun#45631`
   }
   return undefined
+}
+
+const assertAvailable = (variant: BunVariant, arch: LambdaArch) => {
+  const reason = unavailableReason(variant, arch)
+  if (reason) throw new Error(`Can't build the ${variant} variant: ${reason}`)
 }
 
 const writeBootstrap = (bundle: string, script: string) =>
@@ -186,11 +203,15 @@ export const buildBunBundle = ({
       )
       break
     }
-    case 'compile': {
-      run(bunBin(), [
+    case 'compile':
+    case 'compile-trim': {
+      const trim = variant === 'compile-trim'
+      if (trim) assertAvailable(variant, arch)
+      run(trim ? bunAotBin() : bunBin(), [
         'build',
         entry,
         '--compile',
+        ...(trim ? ['--trim'] : []),
         '--format=esm',
         '--minify',
         '--bytecode',
@@ -203,8 +224,7 @@ export const buildBunBundle = ({
     }
     case 'aot':
     case 'aot-trim': {
-      const reason = aotUnavailableReason(arch)
-      if (reason) throw new Error(`Can't build the ${variant} variant: ${reason}`)
+      assertAvailable(variant, arch)
       run(bunAotBin(), [
         'build',
         entry,

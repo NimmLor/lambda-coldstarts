@@ -8,17 +8,16 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { serve } from 'bun'
 import {
-  aotUnavailableReason,
   buildBunBundle,
   lambdaArch,
   toLambdaArch,
+  unavailableReason,
 } from '../infra/build'
 import { VARIANTS } from '../infra/functions'
 
 const arch = lambdaArch()
 const canRun = process.platform === 'linux' && toLambdaArch(process.arch) === arch
 const wanted = process.argv.slice(2)
-const aotReason = aotUnavailableReason(arch)
 
 const dirSize = async (dir: string) => {
   let total = 0
@@ -90,8 +89,9 @@ const smokeTest = async (bootstrap: string) => {
 const rows: Record<string, unknown>[] = []
 for (const v of VARIANTS) {
   if (v.kind !== 'bun' || (wanted.length && !wanted.includes(v.id))) continue
-  if (v.variant.startsWith('aot') && aotReason) {
-    console.warn(`Skipping ${v.id}: ${aotReason}`)
+  const reason = unavailableReason(v.variant, arch)
+  if (reason) {
+    console.warn(`Skipping ${v.id}: ${reason}`)
     continue
   }
   const bundle = buildBunBundle({

@@ -1,12 +1,13 @@
 # bun-aot-lambda
 
-One SST stack, seven Lambdas that do the same thing on different runtimes, and a script that
+One SST stack, eight Lambdas that do the same thing on different runtimes, and a script that
 measures their cold and warm starts:
 
 | Function | Runtime | What ships |
 |---|---|---|
 | `BunRuntime` | `provided.al2023` | `bun` executable + bundled `index.js`, started by a shell `bootstrap` |
 | `BunCompile` | `provided.al2023` | `bun build --compile --minify --bytecode` executable as `bootstrap` |
+| `BunCompileTrim` | `provided.al2023` | same with `--trim`, which drops the parts of Bun the code doesn't use |
 | `BunCompileAot` | `provided.al2023` | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the mincore shim |
 | `BunCompileAotTrim` | `provided.al2023` | same with `--aot --trim` |
 | `Node22` | `nodejs22.x` | SST's esbuild bundle |
@@ -34,18 +35,19 @@ Settings, all through the environment of `sst deploy`:
 | `LAMBDA_MEMORY` | `1769` | MB, for every function |
 | `VARIANTS` | all | e.g. `BunCompile,Node24` |
 | `BUN_BIN` | `bun` | Bun for `BunRuntime` and `BunCompile` |
-| `BUN_AOT_BIN` | `$BUN_BIN` | Bun for the `--aot` variants |
+| `BUN_AOT_BIN` | `$BUN_BIN` | Bun for the `--trim` and `--aot` variants |
 | `CC` | `cc` | C compiler for the mincore shim |
 
-## `--aot` isn't released yet
+## `--aot` and `--trim` aren't released yet
 
 `--aot` and `--trim` only exist on [oven-sh/bun#45631](https://github.com/oven-sh/bun/pull/45631),
 which is still a draft. Released Bun **accepts unknown flags silently**, so `--compile --aot` on
 Bun 1.4.4 quietly builds a plain executable. The build therefore checks that `bun build --help`
-lists `--aot` and skips both AOT functions with a warning otherwise — instead of deploying
-something mislabelled.
+lists every flag a variant needs and skips that function with a warning otherwise, instead of
+deploying something mislabelled.
 
-To build them, run the deploy on **Linux** (`--aot` can't cross-compile) with a build of that PR:
+To build them, point `BUN_AOT_BIN` at a build of that PR. `BunCompileTrim` builds anywhere; the
+`--aot` variants need **Linux** on the Lambda architecture, since `--aot` can't cross-compile:
 
 ```sh
 bunx bun-pr 45631                       # downloads it as ~/.bun/bin/bun-45631
@@ -102,5 +104,8 @@ before a deploy.
   4.17.2 ships with rejects it. SST's own types stop at `nodejs24.x`, hence the cast in
   [`infra/functions.ts`](infra/functions.ts).
 - All functions set `dev: false`: `sst dev` would route them to your machine.
+- `BunCompileTrim` is `BunCompile` plus `--trim`, so the pair isolates what trimming does
+  without AOT. Whether `--trim` combines with `--bytecode` and a cross-compile `--target` is
+  untested; a failed build stops the deploy with Bun's error.
 - The compiled Bun variants are ~100 MB unzipped, against a few KB for Node. Lambda fetches that
   on every cold start, which is visible in the round trip even when init is fast.

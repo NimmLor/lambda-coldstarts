@@ -1,10 +1,10 @@
 import path from 'node:path'
 import {
-  aotUnavailableReason,
   type BunVariant,
   buildBunBundle,
   type LambdaArch,
   lambdaArch,
+  unavailableReason,
 } from './build'
 
 type NodeRuntime = 'nodejs22.x' | 'nodejs24.x' | 'nodejs26.x'
@@ -16,6 +16,7 @@ type Variant =
 export const VARIANTS: Variant[] = [
   { id: 'BunRuntime', kind: 'bun', variant: 'bun' },
   { id: 'BunCompile', kind: 'bun', variant: 'compile' },
+  { id: 'BunCompileTrim', kind: 'bun', variant: 'compile-trim' },
   { id: 'BunCompileAot', kind: 'bun', variant: 'aot' },
   { id: 'BunCompileAotTrim', kind: 'bun', variant: 'aot-trim' },
   { id: 'Node22', kind: 'node', runtime: 'nodejs22.x' },
@@ -47,7 +48,6 @@ const selected = () => {
 
 export const createFunctions = () => {
   const architecture = lambdaArch()
-  const aotReason = aotUnavailableReason(architecture)
   const functions: Record<string, sst.aws.Function> = {}
 
   for (const v of selected()) {
@@ -61,8 +61,9 @@ export const createFunctions = () => {
       continue
     }
 
-    if (v.variant.startsWith('aot') && aotReason) {
-      console.warn(`Skipping ${v.id}: ${aotReason}`)
+    const reason = unavailableReason(v.variant, architecture)
+    if (reason) {
+      console.warn(`Skipping ${v.id}: ${reason}`)
       continue
     }
     const bundle = buildBunBundle({
