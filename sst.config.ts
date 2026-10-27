@@ -9,7 +9,8 @@ export default $config({
       providers: {
         // 7.52.0 is the first aws provider whose runtime list includes nodejs26.x. SST 4.17.2
         // defaults to 7.20.0, which rejects it.
-        aws: { version: '7.52.0' },
+        // AWS_PROFILE comes from .env locally; CI leaves it unset and passes credentials instead.
+        aws: { version: '7.52.0', profile: process.env.AWS_PROFILE || undefined },
       },
     }
   },

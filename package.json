@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "deploy": "bun run build && LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist sst deploy",
+    "just-deploy": "LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist sst deploy",
     "remove": "sst remove",
     "bench": "bun scripts/bench.ts",
     "perf": "bun scripts/perf-run.ts",

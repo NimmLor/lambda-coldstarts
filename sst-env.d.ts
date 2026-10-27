@@ -6,92 +6,452 @@
 
 declare module "sst" {
   export interface Resource {
-    "BunCompileAotArm64": {
+    "BunCompileAotArm64M1024": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileAotTrimArm64": {
+    "BunCompileAotArm64M128": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileAotTrimX64": {
+    "BunCompileAotArm64M1769": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileAotX64": {
+    "BunCompileAotArm64M256": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileArm64": {
+    "BunCompileAotArm64M512": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileCanaryArm64": {
+    "BunCompileAotTrimArm64M1024": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileCanaryX64": {
+    "BunCompileAotTrimArm64M128": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileTrimArm64": {
+    "BunCompileAotTrimArm64M1769": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileTrimX64": {
+    "BunCompileAotTrimArm64M256": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunCompileX64": {
+    "BunCompileAotTrimArm64M512": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunRuntimeArm64": {
+    "BunCompileAotTrimX64M1024": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "BunRuntimeX64": {
+    "BunCompileAotTrimX64M128": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "Node22Arm64": {
+    "BunCompileAotTrimX64M1769": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "Node22X64": {
+    "BunCompileAotTrimX64M256": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "Node24Arm64": {
+    "BunCompileAotTrimX64M512": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "Node24X64": {
+    "BunCompileAotX64M1024": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "Node26Arm64": {
+    "BunCompileAotX64M128": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
     }
-    "Node26X64": {
+    "BunCompileAotX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileAotX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileAotX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileTrimX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunRuntimeX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22Arm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22Arm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22Arm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22Arm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22Arm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22X64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22X64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22X64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22X64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node22X64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24Arm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24Arm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24Arm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24Arm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24Arm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24X64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24X64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24X64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24X64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node24X64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26Arm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26Arm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26Arm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26Arm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26Arm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26X64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26X64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26X64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26X64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "Node26X64M512": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
@@ -108,6 +468,10 @@ declare module "sst" {
     "PerfResults": {
       "name": string
       "type": "sst.aws.Dynamo"
+    }
+    "PerfRouter": {
+      "type": "sst.aws.Router"
+      "url": string
     }
     "PerfRun": {
       "arn": string
