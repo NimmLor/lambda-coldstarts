@@ -1,6 +1,7 @@
 name: Deploy and benchmark
 
-# Deploys from an x86_64 Linux runner, which is what the --aot variants need, then benchmarks.
+# Builds the Bun variants natively on an x86_64 and an arm64 runner, which is what the --aot
+# variants need, then deploys every function on both architectures and benchmarks them.
 # Needs the repository secret AWS_ROLE_ARN: a role this repo may assume through GitHub OIDC.
 on:
   workflow_dispatch:
@@ -8,10 +9,6 @@ on:
       region:
         description: AWS region
         default: eu-central-1
-      aot:
-        description: Install the pinned AOT build of Bun (oven-sh/bun#45631); off skips the --trim and --aot variants
-        type: boolean
-        default: true
       rounds:
         default: '3'
       cold:
@@ -29,7 +26,30 @@ permissions:
 concurrency: bench
 
 jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          # GitHub's arm64 runners are Neoverse N2, Lambda's Graviton2 is N1. An --aot executable
+          # that dies with SIGILL on Lambda would point at that.
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      # In an Amazon Linux 2023 container with the pinned AOT build of Bun; see infra/build-image.sh.
+      - run: bun run build --arch ${{ matrix.arch }}
+      # Artifacts drop file modes, and every bootstrap must stay executable.
+      - run: tar -cf bundles-${{ matrix.arch }}.tar -C dist ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ matrix.arch }}
+          path: bundles-${{ matrix.arch }}.tar
+          retention-days: 3
+
   bench:
+    needs: build
     runs-on: ubuntu-24.04
     env:
       SST_TELEMETRY_DISABLED: '1'
@@ -42,17 +62,17 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ inputs.region }}
       - run: bun install --frozen-lockfile
-      # oven-sh/bun#45631, Buildkite build #133641 (1.4.4-canary.1+72ab4f530); artifacts expire ~2027-04-25.
-      - name: Install the AOT build of Bun
-        if: inputs.aot
-        run: |
-          mkdir -p ~/.bun-aot && cd ~/.bun-aot
-          curl -fL -o bun-linux-x64.zip "https://buildkite.com/organizations/bun/pipelines/bun/builds/133641/jobs/01a17d0b-2f8a-4994-b0d1-5aefc929366e/artifacts/01a17d12-dc53-4bb8-9856-d357395550f1"
-          echo "2bb09f3c5b9966dc5160ebc87e8bc981e7ea5dc6c511227943fb6065e06a7461  bun-linux-x64.zip" | sha256sum -c
-          unzip -o bun-linux-x64.zip && chmod +x bun-linux-x64/bun
-          bun-linux-x64/bun --revision
-          echo "BUN_AOT_BIN=$HOME/.bun-aot/bun-linux-x64/bun" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bundles-*
+          merge-multiple: true
+      - run: |
+          mkdir -p dist
+          for tar in bundles-*.tar; do tar -xf "$tar" -C dist; done
       - run: bunx sst deploy --stage bench
+        env:
+          LAMBDA_ARCH: x86_64,arm64
+          BUN_BUNDLES: dist
       - run: bun run bench --rounds ${{ inputs.rounds }} --cold ${{ inputs.cold }}
       - run: cat bench-results/*.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
@@ -61,3 +81,6 @@ jobs:
           path: bench-results
       - if: inputs.remove
         run: bunx sst remove --stage bench
+        env:
+          LAMBDA_ARCH: x86_64,arm64
+          BUN_BUNDLES: dist

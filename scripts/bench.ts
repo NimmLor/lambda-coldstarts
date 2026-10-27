@@ -182,8 +182,9 @@ const rows = targets.map(({ id }) => {
 })
 
 const first = rows[0]!
+const archs = [...new Set(rows.map((r) => r.arch))].join(' and ')
 const markdown = [
-  `${first.arch}, ${first.memory} MB, ${ROUNDS}×${COLD} cold + ${WARM} warm invocations per variant`,
+  `${archs}, ${first.memory} MB, ${ROUNDS}×${COLD} cold + ${WARM} warm invocations per variant`,
   '',
   '| Variant | Runtime | Code size | Init p50 | Init p90 | In-process startup p50 | Cold invoke p50 | Cold round trip p50 | Warm invoke p50 | Warm round trip p50 | Max memory p50 |',
   '|---|---|---|---|---|---|---|---|---|---|---|',

@@ -1,5 +1,5 @@
 /**
- * Builds every Bun variant into ./dist/<Variant> and, on Linux, runs each `bootstrap` against a
+ * Builds every Bun variant into ./dist/<arch>/<Variant> and, on Linux, runs each `bootstrap` against a
  * fake Lambda Runtime API: a quick check that a bundle starts and answers before deploying it.
  *
  *   bun scripts/build-local.ts [BunCompile ...]
@@ -96,7 +96,7 @@ for (const v of VARIANTS) {
   }
   const bundle = buildBunBundle({
     variant: v.variant,
-    bundle: path.resolve('dist', v.id),
+    bundle: path.resolve('dist', arch, v.id),
     arch,
     cacheDir: path.resolve('dist', '.cache'),
   })

@@ -7,6 +7,8 @@
     "remove": "sst remove",
     "bench": "bun scripts/bench.ts",
     "build:local": "bun scripts/build-local.ts",
+    "build": "bun scripts/build-docker.ts",
+    "deploy:docker": "bun run build && LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist sst deploy",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

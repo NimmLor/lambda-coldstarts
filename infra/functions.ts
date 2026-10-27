@@ -1,9 +1,10 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import {
   type BunVariant,
   buildBunBundle,
   type LambdaArch,
-  lambdaArch,
+  lambdaArchs,
   unavailableReason,
 } from './build'
 
@@ -46,38 +47,62 @@ const selected = () => {
   return VARIANTS.filter((v) => only.includes(v.id))
 }
 
+/** With more than one architecture, each function's id says which it runs on: `BunCompileArm64`. */
+const ARCH_SUFFIX: Record<LambdaArch, string> = { x86_64: 'X64', arm64: 'Arm64' }
+
+/**
+ * The bundle of a Bun variant: built on this host, or, with `BUN_BUNDLES`, the one
+ * scripts/build-docker.ts left in `$BUN_BUNDLES/<arch>/<Variant>`. A string says why there is none.
+ */
+const bunBundle = (id: string, variant: BunVariant, arch: LambdaArch) => {
+  const prebuilt = process.env.BUN_BUNDLES
+  if (prebuilt) {
+    const bundle = path.resolve(prebuilt, arch, id)
+    if (existsSync(path.join(bundle, 'bootstrap'))) return { bundle }
+    return { reason: `no ${path.join(bundle, 'bootstrap')}; bun run build builds it` }
+  }
+  const reason = unavailableReason(variant, arch)
+  if (reason) return { reason }
+  return {
+    bundle: buildBunBundle({
+      variant,
+      bundle: path.join($cli.paths.work, 'bun-lambda', arch, id),
+      arch,
+      cacheDir: path.join($cli.paths.work, 'bun-cache'),
+    }),
+  }
+}
+
 export const createFunctions = () => {
-  const architecture = lambdaArch()
+  const architectures = lambdaArchs()
   const functions: Record<string, sst.aws.Function> = {}
 
-  for (const v of selected()) {
-    if (v.kind === 'node') {
-      functions[v.id] = new sst.aws.Function(v.id, {
-        ...shared(v.id, architecture),
-        handler: 'src/node.handler',
-        // SST's types stop at nodejs24.x; its builder passes any runtime through.
-        runtime: v.runtime as 'nodejs24.x',
-      })
-      continue
-    }
+  for (const architecture of architectures) {
+    for (const v of selected()) {
+      const id = architectures.length > 1 ? `${v.id}${ARCH_SUFFIX[architecture]}` : v.id
 
-    const reason = unavailableReason(v.variant, architecture)
-    if (reason) {
-      console.warn(`Skipping ${v.id}: ${reason}`)
-      continue
+      if (v.kind === 'node') {
+        functions[id] = new sst.aws.Function(id, {
+          ...shared(id, architecture),
+          handler: 'src/node.handler',
+          // SST's types stop at nodejs24.x; its builder passes any runtime through.
+          runtime: v.runtime as 'nodejs24.x',
+        })
+        continue
+      }
+
+      const { bundle, reason } = bunBundle(v.id, v.variant, architecture)
+      if (!bundle) {
+        console.warn(`Skipping ${id}: ${reason}`)
+        continue
+      }
+      functions[id] = new sst.aws.Function(id, {
+        ...shared(id, architecture),
+        bundle,
+        handler: 'bootstrap',
+        runtime: 'provided.al2023',
+      })
     }
-    const bundle = buildBunBundle({
-      variant: v.variant,
-      bundle: path.join($cli.paths.work, 'bun-lambda', v.id),
-      arch: architecture,
-      cacheDir: path.join($cli.paths.work, 'bun-cache'),
-    })
-    functions[v.id] = new sst.aws.Function(v.id, {
-      ...shared(v.id, architecture),
-      bundle,
-      handler: 'bootstrap',
-      runtime: 'provided.al2023',
-    })
   }
 
   return functions

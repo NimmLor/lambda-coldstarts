@@ -19,7 +19,7 @@ export type BunVariant = 'bun' | 'compile' | 'compile-trim' | 'aot' | 'aot-trim'
 export type LambdaArch = 'x86_64' | 'arm64'
 
 /** Relative to the repository root: SST bundles the config, so paths relative to this file don't survive. */
-const ENTRY = 'src/bun.ts'
+export const ENTRY = 'src/bun.ts'
 const MINCORE_SHIM_SOURCE = 'infra/mincore-shim.c'
 
 /** The Bun used for the `bun` and `compile` variants. */
@@ -40,12 +40,30 @@ export const toLambdaArch = (arch: string): LambdaArch => {
   throw new Error(`No Lambda architecture for ${arch}`)
 }
 
+/** `x86_64`, `arm64` or `x86_64,arm64`. */
+export const parseLambdaArchs = (value: string): LambdaArch[] => {
+  const archs = value.split(',').map((arch) => arch.trim())
+  for (const arch of archs) {
+    if (arch !== 'x86_64' && arch !== 'arm64') {
+      throw new Error(`LAMBDA_ARCH must list x86_64 or arm64, not ${arch}`)
+    }
+  }
+  return [...new Set(archs as LambdaArch[])]
+}
+
 /** `LAMBDA_ARCH`, or the build host's architecture, which the `--aot` variants can't escape. */
-export const lambdaArch = (): LambdaArch => {
+export const lambdaArchs = (): LambdaArch[] => {
   const fromEnv = process.env.LAMBDA_ARCH
-  if (fromEnv === 'x86_64' || fromEnv === 'arm64') return fromEnv
-  if (fromEnv) throw new Error(`LAMBDA_ARCH must be x86_64 or arm64, not ${fromEnv}`)
-  return toLambdaArch(process.arch)
+  return fromEnv ? parseLambdaArchs(fromEnv) : [toLambdaArch(process.arch)]
+}
+
+/** The one architecture a build on this host is for. */
+export const lambdaArch = (): LambdaArch => {
+  const archs = lambdaArchs()
+  if (archs.length > 1) {
+    throw new Error(`Builds on this host take one LAMBDA_ARCH, not ${archs.join(',')}; bun run build builds both`)
+  }
+  return archs[0]!
 }
 
 const helpTexts = new Map<string, string>()
@@ -163,6 +181,16 @@ const addMincoreShim = (bundle: string) => {
 // Lambda's /var/task has neither, so a compiled executable shouldn't look for them on every cold start.
 const NO_AUTOLOAD = ['--no-compile-autoload-dotenv', '--no-compile-autoload-bunfig']
 
+/** The `bun build` arguments of an `--aot` variant, short of `--outfile`; scripts/explain.ts adds `--explain`. */
+export const aotBuildArgs = (variant: 'aot' | 'aot-trim', entry = path.resolve(ENTRY)) => [
+  'build',
+  entry,
+  '--compile',
+  '--aot',
+  ...(variant === 'aot-trim' ? ['--trim'] : []),
+  ...NO_AUTOLOAD,
+]
+
 /**
  * Builds `variant` into `bundle` (emptied first) and returns it. Every variant's `bootstrap` takes
  * its paths from `$0` rather than `$LAMBDA_TASK_ROOT`, so it runs outside Lambda as well.
@@ -225,16 +253,7 @@ export const buildBunBundle = ({
     case 'aot':
     case 'aot-trim': {
       assertAvailable(variant, arch)
-      run(bunAotBin(), [
-        'build',
-        entry,
-        '--compile',
-        '--aot',
-        ...(variant === 'aot-trim' ? ['--trim'] : []),
-        ...NO_AUTOLOAD,
-        '--outfile',
-        path.join(bundle, 'app'),
-      ])
+      run(bunAotBin(), [...aotBuildArgs(variant, entry), '--outfile', path.join(bundle, 'app')])
       addMincoreShim(bundle)
       break
     }

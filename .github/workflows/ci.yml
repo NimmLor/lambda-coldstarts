@@ -17,5 +17,17 @@ jobs:
           SST_TELEMETRY_DISABLED: '1'
       - run: bun run typecheck
       - run: bun test
-      # Builds the Bun variants and runs each bootstrap against a fake Runtime API.
-      - run: bun run build:local
+
+  # Builds the Bun variants natively per architecture and runs each bootstrap against a fake
+  # Runtime API, in the same container the deploy builds in.
+  build:
+    strategy:
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun run build --arch ${{ matrix.arch }}

@@ -23,6 +23,7 @@ the Node variants use Lambda's managed runtime.
 
 ```sh
 bun install
+cp .env.example .env   # then fill in AWS_PROFILE or access keys
 bunx sst deploy --stage dev
 curl "$(jq -r '.functions.BunCompile.url' .sst/outputs.json)"
 ```
@@ -31,12 +32,43 @@ Settings, all through the environment of `sst deploy`:
 
 | Variable | Default | |
 |---|---|---|
-| `LAMBDA_ARCH` | build host's | `x86_64` or `arm64`. The `--aot` variants only build when it matches the host. |
+| `LAMBDA_ARCH` | build host's | `x86_64`, `arm64` or `x86_64,arm64`. The `--aot` variants only build on the host when it matches; with two, see [Both architectures](#both-architectures-built-in-docker). |
 | `LAMBDA_MEMORY` | `1769` | MB, for every function |
 | `VARIANTS` | all | e.g. `BunCompile,Node24` |
 | `BUN_BIN` | `bun` | Bun for `BunRuntime` and `BunCompile` |
 | `BUN_AOT_BIN` | `$BUN_BIN` | Bun for the `--trim` and `--aot` variants |
 | `CC` | `cc` | C compiler for the mincore shim |
+| `BUN_BUNDLES` | unset | Deploy the Bun variants from `$BUN_BUNDLES/<arch>/<Variant>` instead of building them |
+
+## Both architectures, built in Docker
+
+```sh
+bun run build                       # every Bun variant for x86_64 and arm64, into dist/<arch>/<Variant>
+bun run deploy:docker --stage dev   # bun run build, then deploys all 16 functions
+```
+
+`bun run build` is [`scripts/build-docker.ts`](scripts/build-docker.ts). The Node variants need
+no build of their own: SST bundles them during the deploy. `deploy:docker` deploys with
+`LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist`. With more than one architecture, every function's
+name ends in it: `BunCompileX64`, `BunCompileArm64`, `Node24Arm64`.
+
+Each architecture builds in an Amazon Linux 2023 container of that architecture, which is
+Lambda's `provided.al2023` OS. So `--aot` compiles natively, and the smoke test from
+`build:local` runs against the glibc Lambda has. The container image installs released Bun
+1.4.4 and the pinned AOT build for its architecture, checksums verified
+([`infra/build-image.sh`](infra/build-image.sh)), and is cached until that script changes.
+`bun run build --arch arm64 BunCompileAot` builds just some of them.
+
+The architecture the host isn't runs under QEMU, which Docker Desktop brings along. A Docker
+Engine on Linux (WSL included) needs it registered once per boot:
+
+```sh
+docker run --privileged --rm tonistiigi/binfmt --install arm64   # amd64 on an arm64 host
+```
+
+Under QEMU, arm64 builds emulate a Neoverse N1, the core of Lambda's Graviton2, so nothing that
+tunes code to the build CPU uses features Lambda lacks. Expect the emulated build to take
+minutes rather than seconds.
 
 ## `--aot` and `--trim` aren't released yet
 
@@ -80,8 +112,8 @@ prints `Skipping <Variant>: …` with the reason for every variant it can't buil
 the [build page](https://buildkite.com/bun/bun/builds/133641), open the matching `build-bun` job's
 Artifacts tab. Install them the same way, with `LAMBDA_ARCH=arm64` on Linux arm64. A Mac can
 build `BunCompileTrim` but not the `--aot` variants, since `--aot` only builds for the machine it
-runs on; use the [Deploy and benchmark](.github/workflows/bench.yml) workflow, which runs on
-x86_64 Linux and installs the pinned build itself.
+runs on; use `bun run build` in Docker, or the [Deploy and benchmark](.github/workflows/bench.yml)
+workflow, which builds on native x86_64 and arm64 runners.
 
 **A newer build of the PR.** [`bun-pr`](https://www.npmjs.com/package/bun-pr), by Bun's author,
 downloads the latest finished build of a PR for your OS and architecture, next to the `bun` on
@@ -124,13 +156,15 @@ Lambda returns with `LogType: Tail`, so they are Lambda's own:
 - **Invoke / round trip** — Lambda's `Duration`, and what the client saw over the Invoke API.
 
 Results land in `bench-results/` as Markdown and raw JSON. The
-[Deploy and benchmark](.github/workflows/bench.yml) workflow does all of it from an x86_64 runner,
-AOT build included; it needs an `AWS_ROLE_ARN` secret for GitHub OIDC.
+[Deploy and benchmark](.github/workflows/bench.yml) workflow does all of it: `bun run build` on an
+`ubuntu-24.04` and an `ubuntu-24.04-arm` runner, each for its own architecture, then one job that
+deploys all 16 functions from those bundles and benchmarks them. It needs an `AWS_ROLE_ARN` secret
+for GitHub OIDC.
 
 ## Try it locally
 
 ```sh
-bun run build:local                 # builds the Bun variants into dist/ and smoke-tests them
+bun run build:local                 # builds the Bun variants into dist/<arch>/ and smoke-tests them
 bun test                            # runtime loop against a fake Runtime API
 ```
 
