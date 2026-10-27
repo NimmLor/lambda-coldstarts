@@ -222,10 +222,10 @@ export const App = () => {
                     onClick={() => toggle(f.base)}
                     onMouseEnter={() => on && setFocus(f.base)}
                     onMouseLeave={() => setFocus(undefined)}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/6 py-1.5 pr-3 pl-2 font-mono text-xs text-faint aria-pressed:border-white/12 aria-pressed:bg-white/4 aria-pressed:text-ink"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/6 py-1.5 pr-3 pl-2 text-xs text-faint aria-pressed:border-white/12 aria-pressed:bg-white/4 aria-pressed:text-ink"
                   >
                     <span className="size-2.5 rounded-full" style={{ background: on ? f.color : 'transparent' }} />
-                    {f.base}
+                    {f.name}
                   </button>
                 )
               })}
@@ -265,6 +265,8 @@ export const App = () => {
         <span>
           Cold start = Lambda init duration · warm start = handler duration on an already-initialised instance ·
           duration = handler duration of the cold invocation · memory = max memory used · size = deployed code size.
+          Compiled builds also pass --target=bun-linux-{'<arch>'}, --no-compile-autoload-dotenv and
+          --no-compile-autoload-bunfig; “canary Bun” is the Bun build that --trim and --aot need.
         </span>
         <a href={REPO}>NimmLor/bun-aot-lambda</a>
       </footer>

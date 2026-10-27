@@ -7,6 +7,27 @@ const Unit = ({ children, big }: { children: string; big?: boolean }) => (
   <span className={`ml-[3px] text-muted ${big ? 'text-xs' : 'text-[11px]'}`}>{children}</span>
 )
 
+const Badge = ({ children }: { children: string }) => (
+  <span className="rounded-full border border-white/16 px-[7px] py-0.5 text-[11px] font-normal text-soft">
+    {children}
+  </span>
+)
+
+/** `bun build --compile --aot`: the tool dim, each flag a token that wraps as a whole. */
+const Command = ({ build }: { build: string }) => {
+  const [tool, ...flags] = build.split(/ (?=--)/)
+  return (
+    <code className="flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-xs/[1.5] text-muted">
+      <span>{tool}</span>
+      {flags.map((flag) => (
+        <span key={flag} className="whitespace-nowrap text-soft">
+          {flag}
+        </span>
+      ))}
+    </code>
+  )
+}
+
 /** Every function on the architecture, fastest cold start first. */
 export const Table = ({ view }: { view: View }) => {
   const { runs, latest, fns, shown, hidden, hover, focus, agg } = view
@@ -33,10 +54,13 @@ export const Table = ({ view }: { view: View }) => {
         onClick={() => view.toggle(f.base)}
       >
         <span className="text-xs text-muted">{String(i + 1).padStart(2, '0')}</span>
-        <div className="flex min-w-0 items-start gap-2.5">
+        <div
+          className="flex min-w-0 items-start gap-2.5"
+          title={[f.base, point.runtime, f.about].filter(Boolean).join(' · ')}
+        >
           <span className="min-h-7 w-1 shrink-0 self-stretch rounded-xs" style={{ background: f.color }} />
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-2 font-medium wrap-anywhere text-ink">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-2 font-sans text-[15px] font-medium text-ink">
               <img
                 src={`https://cdn.simpleicons.org/${f.family === 'Bun' ? 'bun/f3d9a4' : 'nodedotjs/7fd35b'}`}
                 alt=""
@@ -44,17 +68,11 @@ export const Table = ({ view }: { view: View }) => {
                 height={18}
                 className="block shrink-0"
               />
-              {f.base}
-              {f.preview && (
-                <span className="rounded-full border border-white/16 px-[7px] py-0.5 font-sans text-[11px] font-normal text-soft">
-                  preview
-                </span>
-              )}
+              {f.name}
+              {f.canary && <Badge>canary Bun</Badge>}
+              {f.preview && <Badge>preview</Badge>}
             </div>
-            <span className="font-sans text-[13px]/[1.45] text-pretty text-muted">
-              <span className="font-mono text-xs text-soft">{point.runtime}</span>
-              {f.ships && ` · ${f.ships}`}
-            </span>
+            <Command build={f.build} />
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
@@ -115,7 +133,7 @@ export const Table = ({ view }: { view: View }) => {
       <div className="min-w-[760px]">
         <div className={`${ROW} border-b border-white/8 text-[11px] tracking-[0.06em] text-muted uppercase`}>
           <span>#</span>
-          <span>Function · what ships</span>
+          <span>Function · build</span>
           <span>Cold start</span>
           <span>Warm start</span>
           <span>Memory</span>

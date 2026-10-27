@@ -44,7 +44,7 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
           </h2>
           {m.unit} · mean per run
         </div>
-        {best && `${m.leader}: ${best.base}`}
+        {best && `${m.leader}: ${best.name}`}
       </div>
       <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-x-2.5">
         <div className="relative" style={{ height: m.height }}>
