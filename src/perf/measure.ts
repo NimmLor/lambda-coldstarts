@@ -1,7 +1,8 @@
 /**
  * One round of a run of the PerfRun state machine (infra/perf.ts), like lambda-perf's invoker:
- * forces a cold start of the target, invokes it once and stores Lambda's REPORT numbers in
- * PerfResults. The state machine calls it once per round and retries it when it throws.
+ * forces a cold start of the target, invokes it once, then `warm` more times in the environment
+ * that started, and stores Lambda's REPORT numbers in PerfResults. The state machine calls it once
+ * per round and retries it when it throws.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import {
@@ -19,6 +20,8 @@ export type MeasureEvent = {
   runId: string
   round: number
   target: { id: string; name: string }
+  /** Invocations after the cold one, which find its environment warm. */
+  warm: number
 }
 
 const lambda = new LambdaClient()
@@ -33,7 +36,19 @@ const EVENT = new TextEncoder().encode(
   JSON.stringify({ rawPath: '/perf', requestContext: { http: { method: 'GET' } } })
 )
 
-export const handler = async ({ runId, round, target }: MeasureEvent) => {
+const invoke = async (target: MeasureEvent['target']) => {
+  const result = await lambda.send(
+    new InvokeCommand({ FunctionName: target.name, LogType: 'Tail', Payload: EVENT })
+  )
+  const payload = new TextDecoder().decode(result.Payload)
+  if (result.FunctionError) {
+    throw new Error(`${target.id} failed (${result.FunctionError}): ${payload}`)
+  }
+  const report = parseReport(Buffer.from(result.LogResult ?? '', 'base64').toString('utf8'))
+  return { report, payload }
+}
+
+export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
   const config = await lambda.send(
     new GetFunctionConfigurationCommand({ FunctionName: target.name })
   )
@@ -54,17 +69,18 @@ export const handler = async ({ runId, round, target }: MeasureEvent) => {
     { FunctionName: target.name }
   )
 
-  const result = await lambda.send(
-    new InvokeCommand({ FunctionName: target.name, LogType: 'Tail', Payload: EVENT })
-  )
-  const payload = new TextDecoder().decode(result.Payload)
-  if (result.FunctionError) {
-    throw new Error(`${target.id} failed (${result.FunctionError}): ${payload}`)
-  }
-  const report = parseReport(Buffer.from(result.LogResult ?? '', 'base64').toString('utf8'))
+  const { report, payload } = await invoke(target)
   // Without an Init Duration the invocation found a warm environment after all; the retry gets a cold one.
   if (report.initMs === undefined) {
     throw new Error(`${target.id} started warm in round ${round}`)
+  }
+
+  // One after another, so each finds the environment the cold start left. Should Lambda start
+  // another one anyway, that invocation is a cold start, not a warm one, and is left out.
+  const warmMs: number[] = []
+  for (let i = 0; i < warm; i++) {
+    const { report: warmReport } = await invoke(target)
+    if (warmReport.initMs === undefined) warmMs.push(warmReport.durationMs)
   }
 
   const sample: Sample = {
@@ -78,6 +94,7 @@ export const handler = async ({ runId, round, target }: MeasureEvent) => {
     durationMs: report.durationMs,
     billedMs: report.billedMs,
     maxMemoryMb: report.maxMemoryMb,
+    warmMs,
     startupMs: JSON.parse(JSON.parse(payload).body).container?.startupMs,
     requestId: report.requestId,
     measuredAt: new Date().toISOString(),

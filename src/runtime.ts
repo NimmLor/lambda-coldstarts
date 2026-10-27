@@ -16,12 +16,27 @@ export type Handler<TEvent, TResult> = (
   context: LambdaContext
 ) => TResult | Promise<TResult>
 
+/** `text.split('\n')` without `String.prototype.split`, which keeps the regex engine in a `--trim` build. */
+const splitLines = (text: string) => {
+  const lines: string[] = []
+  let start = 0
+  for (let end = text.indexOf('\n'); end !== -1; end = text.indexOf('\n', start)) {
+    lines.push(text.slice(start, end))
+    start = end + 1
+  }
+  lines.push(text.slice(start))
+  return lines
+}
+
+// `String` proves to an --aot build that the fields of a built-in Error are strings. Without it,
+// they could be anything, and a `--trim` build keeps whatever they might be: the regex engine, or
+// the `indexOf` and `slice` of a Buffer or a Blob that `splitLines` might be calling.
 const toErrorPayload = (error: unknown) =>
   error instanceof Error
     ? {
-        errorType: error.name,
-        errorMessage: error.message,
-        stackTrace: error.stack?.split('\n') ?? [],
+        errorType: String(error.name),
+        errorMessage: String(error.message),
+        stackTrace: error.stack === undefined ? [] : splitLines(String(error.stack)),
       }
     : { errorType: 'Error', errorMessage: String(error), stackTrace: [] }
 

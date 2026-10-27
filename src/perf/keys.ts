@@ -13,7 +13,7 @@ export const samplesPk = (runId: string) => `run#${runId}`
 export const sampleSk = (functionId: string, round: number) =>
   `${functionId}#${String(round).padStart(3, '0')}`
 
-/** One cold start as stored, which is also what summary.ts aggregates. */
+/** One cold start and the warm invocations after it, as stored; what summary.ts aggregates. */
 export type Sample = {
   functionId: string
   round: number
@@ -25,6 +25,8 @@ export type Sample = {
   durationMs: number
   billedMs: number
   maxMemoryMb: number
+  /** Lambda's Duration of each warm invocation after the cold one. Missing from runs before they were measured. */
+  warmMs?: number[]
   /** The handler's own `startupMs`, see src/report.ts. */
   startupMs?: number
   requestId: string

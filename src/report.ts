@@ -3,8 +3,6 @@
  * Kept free of `node:fs` and other heavy imports: whatever this module pulls in stays in a
  * `--trim` build.
  */
-import { availableParallelism } from 'node:os'
-
 const round = (value: number) => Math.round(value * 100) / 100
 const toMb = (bytes: number) => round(bytes / 1024 / 1024)
 
@@ -22,11 +20,26 @@ const variant = process.env.VARIANT
 const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME
 const region = process.env.AWS_REGION
 const configuredMemoryMb = Number(process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE)
-const vcpus = availableParallelism()
+// What `os.availableParallelism()` returns, on Bun and on Node 21+, without the import: `node:os`
+// keeps all of itself and `node:path` in a `--trim` build.
+const vcpus = Number(navigator.hardwareConcurrency)
 
 type UrlEventLike = {
-  rawPath?: string
-  requestContext?: { http?: { method?: string } }
+  rawPath?: unknown
+  requestContext?: { http?: { method?: unknown } }
+}
+
+/**
+ * The method and path of a Function URL request, or `INVOKE` for a direct invocation. The event is
+ * parsed JSON, so its fields are checked here, once, and the report gets plain strings.
+ */
+const readRequest = (event: unknown) => {
+  const { rawPath, requestContext } = (event ?? {}) as UrlEventLike
+  const method = requestContext?.http?.method
+  return {
+    method: typeof method === 'string' ? method : 'INVOKE',
+    path: typeof rawPath === 'string' ? rawPath : null,
+  }
 }
 
 export type ReportInput = {
@@ -43,16 +56,12 @@ export const buildReport = ({
 }: ReportInput) => {
   const handlerStart = performance.now()
   invocations += 1
-  const { rss, heapUsed, heapTotal } = process.memoryUsage()
-  const urlEvent = (event ?? {}) as UrlEventLike
+  const memory = process.memoryUsage()
 
   const body = {
     variant,
     runtime,
-    request: {
-      method: urlEvent.requestContext?.http?.method ?? 'INVOKE',
-      path: urlEvent.rawPath ?? null,
-    },
+    request: readRequest(event),
     lambda: {
       functionName,
       region,
@@ -66,12 +75,14 @@ export const buildReport = ({
       startupMs,
       uptimeMs: round(performance.now()),
     },
+    // `Number` proves to an --aot build that what a built-in returned is a number, which spares
+    // this function a type guard on every invocation.
     memory: {
-      rssMb: toMb(rss),
+      rssMb: toMb(Number(memory.rss)),
       // `maxRSS` is in KiB: the peak Lambda reports as "Max Memory Used".
-      maxRssMb: toMb(process.resourceUsage().maxRSS * 1024),
-      heapUsedMb: toMb(heapUsed),
-      heapTotalMb: toMb(heapTotal),
+      maxRssMb: toMb(Number(process.resourceUsage().maxRSS) * 1024),
+      heapUsedMb: toMb(Number(memory.heapUsed)),
+      heapTotalMb: toMb(Number(memory.heapTotal)),
     },
     executable: {
       path: process.execPath,

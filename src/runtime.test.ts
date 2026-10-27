@@ -104,9 +104,10 @@ describe('startLambdaRuntime', () => {
       { requestId: 'req-2', event: { fail: false } },
     ])
 
+    const thrown = new TypeError('boom')
     await expect(
       startLambdaRuntime((event: { fail: boolean }) => {
-        if (event.fail) throw new TypeError('boom')
+        if (event.fail) throw thrown
         return 'ok'
       })
     ).rejects.toThrow('Runtime API answered 500')
@@ -119,7 +120,7 @@ describe('startLambdaRuntime', () => {
         body: {
           errorType: 'TypeError',
           errorMessage: 'boom',
-          stackTrace: expect.any(Array),
+          stackTrace: thrown.stack!.split('\n'),
         },
       },
       {

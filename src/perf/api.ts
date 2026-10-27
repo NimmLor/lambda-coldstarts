@@ -20,10 +20,17 @@ const json = (statusCode: number, body: unknown) => ({
   body: JSON.stringify(body),
 })
 
-type Run = { runId: string; finishedAt: string; rounds: number; functionCount: number }
+type Run = {
+  runId: string
+  finishedAt: string
+  rounds: number
+  /** Per round; missing from runs before warm invocations were measured. */
+  warmInvocations?: number
+  functionCount: number
+}
 
-const toRun = ({ sk, finishedAt, rounds, functionCount }: Record<string, unknown>) =>
-  ({ runId: sk, finishedAt, rounds, functionCount }) as Run
+const toRun = ({ sk, finishedAt, rounds, warmInvocations, functionCount }: Record<string, unknown>) =>
+  ({ runId: sk, finishedAt, rounds, warmInvocations, functionCount }) as Run
 
 const getRun = async (runId: string) => {
   const { Item } = await db.send(

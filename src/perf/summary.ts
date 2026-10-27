@@ -8,13 +8,27 @@ const percentile = (sorted: number[], p: number) =>
 const average = (values: number[]) =>
   round(values.reduce((sum, v) => sum + v, 0) / values.length)
 
-/** Per function: its configuration, the init durations of every round, and their statistics. Fastest first. */
+const stats = (values: number[]) => {
+  const sorted = values.toSorted((a, b) => a - b)
+  return {
+    p50: percentile(sorted, 50),
+    p90: percentile(sorted, 90),
+    avg: average(sorted),
+    min: sorted[0]!,
+    max: sorted.at(-1)!,
+  }
+}
+
+/**
+ * Per function: its configuration, the init durations of every round, and statistics of those and
+ * of the warm invocations' durations. Fastest cold start first.
+ */
 export const summarize = (samples: Sample[]) => {
   const byFunction = Map.groupBy(samples, (s) => s.functionId)
   return [...byFunction.values()]
     .map((all) => {
       const ordered = all.toSorted((a, b) => a.round - b.round)
-      const init = ordered.map((s) => s.initMs).toSorted((a, b) => a - b)
+      const warm = ordered.flatMap((s) => s.warmMs ?? [])
       const { functionId, runtime, arch, memoryMb, codeSizeMb } = ordered[0]!
       return {
         functionId,
@@ -23,13 +37,9 @@ export const summarize = (samples: Sample[]) => {
         memoryMb,
         codeSizeMb,
         samples: ordered.length,
-        initMs: {
-          p50: percentile(init, 50),
-          p90: percentile(init, 90),
-          avg: average(init),
-          min: init[0]!,
-          max: init.at(-1)!,
-        },
+        initMs: stats(ordered.map((s) => s.initMs)),
+        /** `null` for runs from before warm invocations were measured. */
+        warmMs: warm.length ? { ...stats(warm), samples: warm.length } : null,
         durationMsAvg: average(ordered.map((s) => s.durationMs)),
         maxMemoryMbAvg: average(ordered.map((s) => s.maxMemoryMb)),
         /** In round order, like lambda-perf's `i`. */
