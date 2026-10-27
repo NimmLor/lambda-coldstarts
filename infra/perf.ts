@@ -46,6 +46,8 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
       {
         actions: [
           'lambda:GetFunctionConfiguration',
+          // What waitUntilFunctionUpdatedV2 polls.
+          'lambda:GetFunction',
           'lambda:UpdateFunctionConfiguration',
           'lambda:InvokeFunction',
         ],
