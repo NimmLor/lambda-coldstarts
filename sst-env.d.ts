@@ -31,6 +31,16 @@ declare module "sst" {
       "type": "sst.aws.Function"
       "url": string
     }
+    "BunCompileCanaryArm64": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "BunCompileCanaryX64": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
     "BunCompileTrimArm64": {
       "name": string
       "type": "sst.aws.Function"

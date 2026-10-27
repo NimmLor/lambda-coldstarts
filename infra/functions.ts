@@ -17,6 +17,9 @@ type Variant =
 export const VARIANTS: Variant[] = [
   { id: 'BunRuntime', kind: 'bun', variant: 'bun' },
   { id: 'BunCompile', kind: 'bun', variant: 'compile' },
+  // BunCompile built by the Bun that builds the --trim and --aot variants, so comparing those with
+  // this one leaves out what that Bun itself changes.
+  { id: 'BunCompileCanary', kind: 'bun', variant: 'compile-canary' },
   { id: 'BunCompileTrim', kind: 'bun', variant: 'compile-trim' },
   { id: 'BunCompileAot', kind: 'bun', variant: 'aot' },
   { id: 'BunCompileAotTrim', kind: 'bun', variant: 'aot-trim' },

@@ -15,7 +15,7 @@ import {
 import path from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
 
-export type BunVariant = 'bun' | 'compile' | 'compile-trim' | 'aot' | 'aot-trim'
+export type BunVariant = 'bun' | 'compile' | 'compile-canary' | 'compile-trim' | 'aot' | 'aot-trim'
 export type LambdaArch = 'x86_64' | 'arm64'
 
 /** Relative to the repository root: SST bundles the config, so paths relative to this file don't survive. */
@@ -24,7 +24,7 @@ const MINCORE_SHIM_SOURCE = 'infra/mincore-shim.c'
 
 /** The Bun used for the `bun` and `compile` variants. */
 export const bunBin = () => process.env.BUN_BIN || 'bun'
-/** The Bun used for the `--trim` and `--aot` variants: a build of oven-sh/bun#45631 until that ships. */
+/** The Bun used for the `canary`, `--trim` and `--aot` variants: a build of oven-sh/bun#45631 until that ships. */
 export const bunAotBin = () => process.env.BUN_AOT_BIN || bunBin()
 
 const run = (file: string, args: string[]) =>
@@ -82,10 +82,15 @@ const supportsFlag = (bin: string, flag: string) => {
   return new RegExp(`^\\s+${flag}\\s`, 'm').test(help)
 }
 
-/** The flags beyond `--compile` each variant needs from `bun build`. */
+/**
+ * The flags beyond `--compile` each variant needs from `bun build`. `compile-canary` passes none,
+ * but needs `--trim` all the same: it's how a build of oven-sh/bun#45631 tells itself apart from a
+ * release, without which that variant would be BunCompile under another name.
+ */
 const NEEDED_FLAGS: Record<BunVariant, string[]> = {
   bun: [],
   compile: [],
+  'compile-canary': ['--trim'],
   'compile-trim': ['--trim'],
   aot: ['--aot'],
   'aot-trim': ['--aot', '--trim'],
@@ -232,10 +237,11 @@ export const buildBunBundle = ({
       break
     }
     case 'compile':
+    case 'compile-canary':
     case 'compile-trim': {
       const trim = variant === 'compile-trim'
-      if (trim) assertAvailable(variant, arch)
-      run(trim ? bunAotBin() : bunBin(), [
+      if (variant !== 'compile') assertAvailable(variant, arch)
+      run(variant === 'compile' ? bunBin() : bunAotBin(), [
         'build',
         entry,
         '--compile',

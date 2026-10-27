@@ -1,13 +1,14 @@
 # bun-aot-lambda
 
-One SST stack, eight Lambdas that do the same thing on different runtimes, and a script that
+One SST stack, nine Lambdas that do the same thing on different runtimes, and a script that
 measures their cold and warm starts:
 
 | Function | Runtime | What ships |
 |---|---|---|
 | `BunRuntime` | `provided.al2023` | `bun` executable + bundled `index.js`, started by a shell `bootstrap` |
 | `BunCompile` | `provided.al2023` | `bun build --compile --minify --bytecode` executable as `bootstrap` |
-| `BunCompileTrim` | `provided.al2023` | same with `--trim`, which drops the parts of Bun the code doesn't use |
+| `BunCompileCanary` | `provided.al2023` | the same executable, built by the Bun build that `--trim` and `--aot` need |
+| `BunCompileTrim` | `provided.al2023` | `BunCompileCanary` with `--trim`, which drops the parts of Bun the code doesn't use |
 | `BunCompileAot` | `provided.al2023` | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the mincore shim |
 | `BunCompileAotTrim` | `provided.al2023` | same with `--aot --trim` |
 | `Node22` | `nodejs22.x` | SST's esbuild bundle |
@@ -40,7 +41,7 @@ Settings, all through the environment of `sst deploy`:
 | `LAMBDA_MEMORY` | `1769` | MB, for every function |
 | `VARIANTS` | all | e.g. `BunCompile,Node24` |
 | `BUN_BIN` | `bun` | Bun for `BunRuntime` and `BunCompile` |
-| `BUN_AOT_BIN` | `$BUN_BIN` | Bun for the `--trim` and `--aot` variants |
+| `BUN_AOT_BIN` | `$BUN_BIN` | Bun for `BunCompileCanary` and the `--trim` and `--aot` variants |
 | `CC` | `cc` | C compiler for the mincore shim |
 | `BUN_BUNDLES` | unset | Deploy the Bun variants from `$BUN_BUNDLES/<arch>/<Variant>` instead of building them |
 
@@ -48,7 +49,7 @@ Settings, all through the environment of `sst deploy`:
 
 ```sh
 bun run build                # every Bun variant for x86_64 and arm64, into dist/<arch>/<Variant>
-bun run deploy --stage dev   # bun run build, then deploys all 16 functions
+bun run deploy --stage dev   # bun run build, then deploys all 18 functions
 ```
 
 `bun run build` is [`scripts/build-docker.ts`](scripts/build-docker.ts). The Node variants need
@@ -102,8 +103,8 @@ unzip -o bun-linux-x64.zip && chmod +x bun-linux-x64/bun
 ~/.bun-aot/bun-linux-x64/bun --revision   # 1.4.4-canary.1+72ab4f530
 ```
 
-Then deploy with it. Only the `--trim` and `--aot` variants use `BUN_AOT_BIN`; installs and the
-other variants stay on your normal Bun:
+Then deploy with it. Only `BunCompileCanary` and the `--trim` and `--aot` variants use
+`BUN_AOT_BIN`; installs and the other variants stay on your normal Bun:
 
 ```sh
 BUN_AOT_BIN=~/.bun-aot/bun-linux-x64/bun bunx sst deploy --stage dev
@@ -162,7 +163,7 @@ Lambda returns with `LogType: Tail`, so they are Lambda's own:
 Results land in `bench-results/` as Markdown and raw JSON. The
 [Deploy and benchmark](.github/workflows/bench.yml) workflow does all of it: `bun run build` on an
 `ubuntu-24.04` and an `ubuntu-24.04-arm` runner, each for its own architecture, then one job that
-deploys all 16 functions from those bundles and benchmarks them. It needs an `AWS_ROLE_ARN` secret
+deploys all 18 functions from those bundles and benchmarks them. It needs an `AWS_ROLE_ARN` secret
 for GitHub OIDC.
 
 ## Scheduled runs, like lambda-perf
@@ -227,8 +228,10 @@ before a deploy.
   4.17.2 ships with rejects it. SST's own types stop at `nodejs24.x`, hence the cast in
   [`infra/functions.ts`](infra/functions.ts).
 - All functions set `dev: false`: `sst dev` would route them to your machine.
-- `BunCompileTrim` is `BunCompile` plus `--trim`, so the pair isolates what trimming does
-  without AOT. Whether `--trim` combines with `--bytecode` and a cross-compile `--target` is
-  untested; a failed build stops the deploy with Bun's error.
+- `BunCompileCanary` is `BunCompile` built by the PR's Bun instead of a release. Compare the
+  `--trim` and `--aot` variants with it, not with `BunCompile`, or the difference includes what
+  that Bun build changes. `BunCompileTrim` is `BunCompileCanary` plus `--trim`, so that pair
+  isolates what trimming does without AOT. Whether `--trim` combines with `--bytecode` and a
+  cross-compile `--target` is untested; a failed build stops the deploy with Bun's error.
 - The compiled Bun variants are ~100 MB unzipped, against a few KB for Node. Lambda fetches that
   on every cold start, which is visible in the round trip even when init is fast.

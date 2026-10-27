@@ -24,10 +24,15 @@ export const VARIANTS: Record<string, { family: Family; hue: number; ships: stri
     hue: 60,
     ships: 'bun build --compile --minify --bytecode executable as bootstrap',
   },
+  BunCompileCanary: {
+    family: 'Bun',
+    hue: 300,
+    ships: 'Same, built by the Bun build that --trim and --aot need, the baseline for those',
+  },
   BunCompileTrim: {
     family: 'Bun',
     hue: 35,
-    ships: 'Same with --trim, dropping the parts of Bun the code doesn’t use',
+    ships: 'BunCompileCanary with --trim, dropping the parts of Bun the code doesn’t use',
   },
   BunCompileAot: {
     family: 'Bun',
