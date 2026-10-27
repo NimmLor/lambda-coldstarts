@@ -19,8 +19,8 @@ export const Table = ({ view }: { view: View }) => {
 
   const row = (f: Fn, i: number) => {
     const on = !hidden.has(f.base)
-    const [cold, p50, p90, warm, warmP90, mem, dur] = (
-      ['cold', 'p50', 'p90', 'warm', 'warmP90', 'mem', 'dur'] as const
+    const [cold, p50, p90, startup, warm, warmP90, mem, dur] = (
+      ['cold', 'p50', 'p90', 'startup', 'warm', 'warmP90', 'mem', 'dur'] as const
     ).map((k) => agg(f, k))
     const isBest = (k: keyof typeof mins, v: number | undefined) => on && v !== undefined && v === mins[k]
     const point = latest.points.get(f.id)!
@@ -81,6 +81,11 @@ export const Table = ({ view }: { view: View }) => {
               {fixed(p90, 1)}
             </span>
           </span>
+          {startup !== undefined && (
+            <span className="text-[11px] text-muted" title="Of the cold start, the time spent inside the process">
+              in-process {fixed(startup, 1)}
+            </span>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-base tracking-[-0.02em]" style={isBest('warm', warm) ? { color: f.color } : undefined}>

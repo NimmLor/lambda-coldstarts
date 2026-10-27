@@ -183,7 +183,9 @@ The stack also runs the benchmark on its own, the way
   execution's start time.
 - **`PerfApi`** ([`src/perf/api.ts`](src/perf/api.ts)), a Function URL: `GET /runs`,
   `GET /runs/history?limit=90`, `GET /runs/latest`, `GET /runs/<runId>`, all but the first with
-  per-function init p50/p90/avg/min/max.
+  per-function p50/p90/avg/min/max of the cold starts' init and in-process startup, and of the
+  warm invocations' duration. Percentiles interpolate between samples, so p90 of ten cold starts
+  isn't simply the slowest.
 - **`PerfSite`**, a React and Tailwind page in [`web/`](web/), bundled by Bun, that charts the
   last 14, 30 or 90 days of runs per architecture and tables their means, or a hovered run.
 

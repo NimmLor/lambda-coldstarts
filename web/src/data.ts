@@ -59,6 +59,7 @@ export type Point = {
   p90: number
   initDurations: number[]
   /** The part of a cold start spent inside the process; missing from older runs. */
+  startup?: number
   warm?: number
   warmP90?: number
   mem: number
@@ -66,7 +67,7 @@ export type Point = {
   size: number
   runtime: string
 }
-export type Stat = 'cold' | 'p50' | 'p90' | 'warm' | 'warmP90' | 'mem' | 'dur'
+export type Stat = 'cold' | 'p50' | 'p90' | 'startup' | 'warm' | 'warmP90' | 'mem' | 'dur'
 
 export type RunPoints = {
   date: Date
@@ -112,6 +113,7 @@ export const toPoints = (run: Run): RunPoints => ({
         p50: f.initMs.p50,
         p90: f.initMs.p90,
         initDurations: f.initDurations,
+        startup: f.startupMs?.avg,
         warm: f.warmMs?.avg,
         warmP90: f.warmMs?.p90,
         mem: f.maxMemoryMbAvg,
