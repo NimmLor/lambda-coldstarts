@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot ./index.html",
+    "dev": "bun --hot dev.ts",
     "build": "bun build.ts"
   },
   "dependencies": {

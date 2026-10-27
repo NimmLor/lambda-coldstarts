@@ -172,23 +172,26 @@ The stack also runs the benchmark on its own, the way
 [maxday/lambda-perf](https://github.com/maxday/lambda-perf) does, and keeps every result:
 
 - **`PerfRun`**, a Step Functions state machine, maps over the deployed functions,
-  `PERF_CONCURRENCY` at a time, and gives each `PERF_ROUNDS` cold starts, one after another. A
+  `PERF_CONCURRENCY` at a time, and gives each `PERF_ROUNDS` rounds, one after another. A
   function that keeps failing is skipped, not the whole run. At the end, it writes the run to
   DynamoDB itself.
 - **`PerfMeasure`** ([`src/perf/measure.ts`](src/perf/measure.ts)) does one round: changes the
-  function's configuration so its warm environments retire, invokes it with `LogType: Tail`, and
-  stores the `REPORT` numbers. An invocation without an `Init Duration` throws, so Step Functions
-  retries it.
-- **`PerfResults`**, a DynamoDB table: one item per cold start under `run#<runId>`, one per
+  function's configuration so its warm environments retire, invokes it with `LogType: Tail`, then
+  invokes it `PERF_WARM` more times in a row, which find the environment warm, and stores the
+  `REPORT` numbers: `Init Duration` of the cold start, `Duration` of each warm invocation. A first
+  invocation without an `Init Duration` throws, so Step Functions retries the round.
+- **`PerfResults`**, a DynamoDB table: one item per round under `run#<runId>`, one per
   finished run under `runs` ([`src/perf/keys.ts`](src/perf/keys.ts)). A run's id is its
   execution's start time.
-- **`PerfApi`** ([`src/perf/api.ts`](src/perf/api.ts)), a Function URL: `GET /runs`,
+- **`PerfApi`** ([`src/perf/api.ts`](src/perf/api.ts)), served under the site's `/api`: `GET /runs`,
   `GET /runs/history?limit=90`, `GET /runs/latest`, `GET /runs/<runId>`, all but the first with
   per-function p50/p90/avg/min/max of the cold starts' init and in-process startup, and of the
   warm invocations' duration. Percentiles interpolate between samples, so p90 of ten cold starts
   isn't simply the slowest.
 - **`PerfSite`**, a React and Tailwind page in [`web/`](web/), bundled by Bun, that charts the
   last 14, 30 or 90 days of runs per architecture and tables their means, or a hovered run.
+- **`PerfRouter`**, the CloudFront distribution in front of both: `/api/*` goes to PerfApi's
+  Function URL without the `/api`, everything else to PerfSite.
 
 The site is at `coldstarts.github.nimmervoll.work` in production and at
 `<stage>.coldstarts.github.nimmervoll.work` on every other stage, e.g. `dev.coldstarts…`.
@@ -206,11 +209,12 @@ machine, and prints the execution's console link.
 | Variable | Default | |
 |---|---|---|
 | `PERF_ROUNDS` | `10` | Cold starts per function and run |
+| `PERF_WARM` | `5` | Warm invocations after each cold start |
 | `PERF_CONCURRENCY` | `4` | Functions measured at once; each holds two of the account's concurrent executions |
 | `PERF_SCHEDULE` | `cron(0 11 * * ? *)` in production, none elsewhere | An EventBridge Scheduler expression |
 
-To work on the site against a deployed API:
-`cd web && BUN_PUBLIC_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.
+To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:
+`cd web && PERF_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.
 
 ## Try it locally
 

@@ -1,4 +1,3 @@
-# For `bun run dev`, which serves index.html with Bun's own bundler.
+# For dev.ts, which serves index.html with Bun's own bundler.
 [serve.static]
 plugins = ["bun-plugin-tailwind"]
-env = "BUN_PUBLIC_*"

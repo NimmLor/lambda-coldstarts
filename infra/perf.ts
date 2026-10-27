@@ -1,12 +1,15 @@
 /**
  * A scheduled cold-start benchmark in the style of maxday/lambda-perf. The PerfRun state machine
  * goes through `PERF_CONCURRENCY` functions at a time, forcing `PERF_ROUNDS` cold starts one after
- * another (src/perf/measure.ts stores each REPORT in PerfResults), then records the run. PerfApi
+ * another, each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs
+ * in PerfResults), then records the run. PerfApi
  * serves the results to the React site in web/.
  */
 import { RUNS_PK } from '../src/perf/keys'
 
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
+/** Invocations after each round's cold start, which find its environment warm. */
+const WARM = Number(process.env.PERF_WARM ?? 5)
 /**
  * Functions measured at once. Each holds two concurrent executions, PerfMeasure waiting on its
  * synchronous invoke of the target, so 4 stays within a new account's limit of 10 and leaves
@@ -65,6 +68,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
       runId,
       target: '{% $states.input.target %}',
       round: '{% $states.input.round %}',
+      warm: WARM,
     },
     output: {},
   }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
@@ -106,6 +110,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
         sk: { S: runId },
         finishedAt: { S: '{% $now() %}' },
         rounds: { N: String(ROUNDS) },
+        warmInvocations: { N: String(WARM) },
         functionCount: { N: String(Object.keys(functions).length) },
       },
     },
@@ -141,10 +146,17 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     })
   }
 
+  // One CloudFront distribution for the site and, under /api, PerfApi, so the page fetches its
+  // own origin.
+  const router = new sst.aws.Router('PerfRouter', { domain: siteDomain() })
+
   const api = new sst.aws.Function('PerfApi', {
     handler: 'src/perf/api.handler',
     runtime: 'nodejs24.x',
-    url: true,
+    url: {
+      // The handler's routes start at /runs.
+      router: { instance: router, path: '/api', rewrite: { regex: '^/api/(.*)$', to: '/$1' } },
+    },
     link: [table],
     environment: { PERF_TABLE: table.name },
   })
@@ -152,8 +164,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   const site = new sst.aws.StaticSite('PerfSite', {
     path: 'web',
     build: { command: 'bun run build', output: 'dist' },
-    environment: { BUN_PUBLIC_API_URL: api.url },
-    domain: siteDomain(),
+    router: { instance: router },
   })
 
   return { api: api.url, site: site.url, stateMachine: stateMachine.arn }

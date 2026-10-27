@@ -8,6 +8,4 @@ await Bun.build({
   plugins: [tailwind],
   minify: true,
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-  // Inlines BUN_PUBLIC_API_URL, which infra/perf.ts sets.
-  env: 'BUN_PUBLIC_*',
 })

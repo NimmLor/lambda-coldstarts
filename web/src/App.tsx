@@ -15,7 +15,8 @@ import {
 import { Table } from './Table'
 
 const REPO = 'https://github.com/NimmLor/bun-aot-lambda'
-const API = process.env.BUN_PUBLIC_API_URL.replace(/\/$/, '')
+/** PerfApi, behind the same CloudFront distribution; see infra/perf.ts and dev.ts. */
+const API = '/api'
 const DAY_MS = 864e5
 const RANGES = [14, 30, 90]
 
