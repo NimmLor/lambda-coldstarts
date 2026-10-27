@@ -3,13 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lambda cold starts</title>
+    <title>Bun vs Node.js cold starts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <h1>Lambda cold starts</h1>
-    <label>Run <select id="runs"></select></label>
-    <p id="meta"></p>
-    <table id="results"></table>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app"></div>
+    <script type="module" src="./src/frontend.tsx"></script>
   </body>
 </html>

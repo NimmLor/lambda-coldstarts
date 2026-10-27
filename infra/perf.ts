@@ -2,7 +2,7 @@
  * A scheduled cold-start benchmark in the style of maxday/lambda-perf. The PerfRun state machine
  * goes through `PERF_CONCURRENCY` functions at a time, forcing `PERF_ROUNDS` cold starts one after
  * another (src/perf/measure.ts stores each REPORT in PerfResults), then records the run. PerfApi
- * serves the results to the Vite site in web/.
+ * serves the results to the React site in web/.
  */
 import { RUNS_PK } from '../src/perf/keys'
 
@@ -152,7 +152,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   const site = new sst.aws.StaticSite('PerfSite', {
     path: 'web',
     build: { command: 'bun run build', output: 'dist' },
-    environment: { VITE_API_URL: api.url },
+    environment: { BUN_PUBLIC_API_URL: api.url },
     domain: siteDomain(),
   })
 

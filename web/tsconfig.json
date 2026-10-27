@@ -4,10 +4,11 @@
     "module": "Preserve",
     "moduleResolution": "bundler",
     "lib": ["ESNext", "DOM"],
-    "types": ["vite/client"],
+    "jsx": "react-jsx",
+    "types": ["bun"],
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "build.ts"]
 }

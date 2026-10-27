@@ -2,6 +2,7 @@
  * The read side of PerfResults for the site in web/, behind a Function URL:
  *
  *   GET /runs              the latest finished runs, newest first
+ *   GET /runs/history      the summaries of the latest `?limit=` runs (30, at most 90), newest first
  *   GET /runs/latest       the summary of the newest one
  *   GET /runs/<runId>      the summary of that one
  */
@@ -70,16 +71,26 @@ const listSamples = async (runId: string) => {
   return samples
 }
 
+const withFunctions = async (run: Run) => ({
+  ...run,
+  functions: summarize(await listSamples(run.runId)),
+})
+
 export const handler = async (event: LambdaFunctionURLEvent) => {
   if (event.requestContext.http.method !== 'GET') return json(405, { error: 'GET only' })
   const path = event.rawPath.replace(/\/+$/, '')
 
   if (path === '/runs') return json(200, { runs: await listRuns() })
 
+  if (path === '/runs/history') {
+    const limit = Math.min(Math.max(Number(event.queryStringParameters?.limit) || 30, 1), 90)
+    return json(200, { runs: await Promise.all((await listRuns(limit)).map(withFunctions)) })
+  }
+
   const id = path.match(/^\/runs\/([^/]+)$/)?.[1]
   if (!id) return json(404, { error: `No route for ${path}` })
   const run = id === 'latest' ? (await listRuns(1))[0] : await getRun(decodeURIComponent(id))
   if (!run) return json(404, { error: 'No such run' })
 
-  return json(200, { ...run, functions: summarize(await listSamples(run.runId)) })
+  return json(200, await withFunctions(run))
 }

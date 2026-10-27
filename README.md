@@ -182,8 +182,10 @@ The stack also runs the benchmark on its own, the way
   finished run under `runs` ([`src/perf/keys.ts`](src/perf/keys.ts)). A run's id is its
   execution's start time.
 - **`PerfApi`** ([`src/perf/api.ts`](src/perf/api.ts)), a Function URL: `GET /runs`,
-  `GET /runs/latest`, `GET /runs/<runId>`, the last two with per-function init p50/p90/avg/min/max.
-- **`PerfSite`**, a bare Vite page in [`web/`](web/) that shows one run as a table.
+  `GET /runs/history?limit=90`, `GET /runs/latest`, `GET /runs/<runId>`, all but the first with
+  per-function init p50/p90/avg/min/max.
+- **`PerfSite`**, a React and Tailwind page in [`web/`](web/), bundled by Bun, that charts the
+  last 14, 30 or 90 days of runs per architecture and tables their means, or a hovered run.
 
 The site is at `coldstarts.github.nimmervoll.work` in production and at
 `<stage>.coldstarts.github.nimmervoll.work` on every other stage, e.g. `dev.coldstarts…`.
@@ -205,7 +207,7 @@ machine, and prints the execution's console link.
 | `PERF_SCHEDULE` | `cron(0 11 * * ? *)` in production, none elsewhere | An EventBridge Scheduler expression |
 
 To work on the site against a deployed API:
-`cd web && VITE_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.
+`cd web && BUN_PUBLIC_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.
 
 ## Try it locally
 

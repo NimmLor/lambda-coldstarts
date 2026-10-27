@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Instrument Sans', Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-page: #0e0f12;
+  --color-panel: #16181d;
+  --color-ink: #f2f3f5;
+  --color-value: #dfe2e8;
+  --color-soft: #b4b8c2;
+  --color-muted: #8b909c;
+  --color-faint: #6b707c;
+  --color-warn: oklch(0.78 0.13 25);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-page text-ink font-sans antialiased;
+  }
+
+  a {
+    @apply underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white;
+  }
+}
