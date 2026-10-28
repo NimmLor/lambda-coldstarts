@@ -11,9 +11,16 @@ const say = (line: string) => {
   log.textContent = `${log.textContent}${line}\n`
 }
 
+/**
+ * PerfRouter signs requests to PerfApi with Origin Access Control, which can't hash a POST body
+ * itself: the sender gives the SHA-256 of it, here of the empty one.
+ */
+const EMPTY_BODY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
 const post = async (secret: string, action: string) => {
   const response = await fetch(`/api/admin/${encodeURIComponent(secret)}/${action}`, {
     method: 'POST',
+    headers: { 'x-amz-content-sha256': EMPTY_BODY_SHA256 },
   })
   const body = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(response.status === 405 ? 'Wrong secret' : JSON.stringify(body))

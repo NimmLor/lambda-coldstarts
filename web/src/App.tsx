@@ -299,7 +299,7 @@ export const App = () => {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch(`${API}/runs/history?limit=${Math.max(...RANGES)}`)
+      const response = await fetch(`${API}/runs/history`)
       if (!response.ok) throw new Error(`/runs/history: ${response.status}`)
       const { runs } = (await response.json()) as { runs: Run[] }
       setHistory(runs.map(toPoints).reverse())

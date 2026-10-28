@@ -187,9 +187,20 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   const router = new sst.aws.Router('PerfRouter', {
     domain: siteDomain(),
     ...($app.stage !== 'production' && { edge: NO_INDEX }),
+    // PerfApi's Function URL takes requests from the distribution only, so none skip its cache.
+    protection: 'oac',
     transform: {
       cdn: (args) => {
         args.wait = false
+      },
+      // Neither the site nor PerfApi reads a query string, so one can't make a request miss the cache.
+      cachePolicy: (args) => {
+        args.parametersInCacheKeyAndForwardedToOrigin = $output(
+          args.parametersInCacheKeyAndForwardedToOrigin
+        ).apply((parameters) => ({
+          ...parameters,
+          queryStringsConfig: { queryStringBehavior: 'none' },
+        }))
       },
     },
   })

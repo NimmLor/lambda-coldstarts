@@ -162,7 +162,7 @@ flowchart LR
 | --------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
 | `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm invokes |
 | `PerfSummarize` | [`src/perf/summarize.ts`](src/perf/summarize.ts) | Per-function p50/p90/avg/min/max, stored with the run                   |
-| `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs`, `/runs/history?limit=`, `/runs/latest`, `/runs/<runId>`    |
+| `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs/history`: the latest 90 runs, the one request the site makes |
 | `PerfSite`      | [`web/`](web/)                                   | The charts at [coldstarts.github.nimmervoll.work][site]                 |
 
 Other stages live at `<stage>.coldstarts.github.nimmervoll.work` and tell search engines to stay
@@ -184,7 +184,9 @@ bun scripts/perf-summarize.ts --stage production [--all]   # summarize runs that
 
 With `PERF_ADMIN_SECRET` set, PerfApi takes `POST /api/admin/$PERF_ADMIN_SECRET/<action>`.
 Without it, these paths 404. The unlinked `/admin` page ([`web/admin.html`](web/admin.html)) has a
-button for each.
+button for each. PerfApi only answers through PerfRouter, whose Origin Access Control needs the
+body's hash on a POST: `curl` one with
+`-H 'x-amz-content-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'`.
 
 | Action   | Does                                                                                |
 | -------- | ----------------------------------------------------------------------------------- |

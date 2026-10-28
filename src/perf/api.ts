@@ -1,10 +1,10 @@
 /**
- * The read side of PerfResults for the site in web/, behind a Function URL:
+ * The read side of PerfResults for the site in web/, behind PerfRouter:
  *
- *   GET /runs              the latest finished runs, newest first
- *   GET /runs/history      the summaries of the latest `?limit=` runs (30, at most 90), newest first
- *   GET /runs/latest       the summary of the newest one
- *   GET /runs/<runId>      the summary of that one
+ *   GET /runs/history      the summaries of the latest `HISTORY_RUNS` runs, newest first
+ *
+ * That is all the site asks for, and all anyone gets: no parameters, so every request is the same
+ * one CloudFront answers from its cache, which leaves query strings out of the key (infra/perf.ts).
  *
  * And, only when PERF_ADMIN_SECRET is set, routes under it that 404 like any other otherwise:
  *
@@ -26,12 +26,11 @@ import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn'
 import {
   BatchWriteCommand,
   DynamoDBDocumentClient,
-  GetCommand,
   QueryCommand,
   ScanCommand,
 } from '@aws-sdk/lib-dynamodb'
 import type { LambdaFunctionURLEvent } from 'aws-lambda'
-import { RUNS_PK, SUMMARIES_PK } from './keys'
+import { SUMMARIES_PK } from './keys'
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient())
 const sfn = new SFNClient()
@@ -40,6 +39,8 @@ const TABLE = process.env.PERF_TABLE
 const STATE_MACHINE = process.env.PERF_STATE_MACHINE
 const SCHEDULE = process.env.PERF_SCHEDULE
 const ADMIN_SECRET = process.env.PERF_ADMIN_SECRET
+/** What /runs/history returns: the site's longest range. */
+const HISTORY_RUNS = 90
 /** Leaves room under PerfRouter's 20 s origin timeout, which is also the function's. */
 const PURGE_BUDGET_MS = 15_000
 
@@ -49,45 +50,7 @@ const json = (statusCode: number, body: unknown, cacheControl = 'max-age=60') =>
   body: JSON.stringify(body),
 })
 
-type Run = {
-  runId: string
-  finishedAt: string
-  rounds: number
-  /** Per round; missing from runs before warm invocations were measured. */
-  warmInvocations?: number
-  functionCount: number
-}
-
-const toRun = ({
-  sk,
-  finishedAt,
-  rounds,
-  warmInvocations,
-  functionCount,
-}: Record<string, unknown>) =>
-  ({ runId: sk, finishedAt, rounds, warmInvocations, functionCount }) as Run
-
-const listRuns = async (limit = 30) => {
-  const { Items = [] } = await db.send(
-    new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'pk = :pk',
-      ExpressionAttributeValues: { ':pk': RUNS_PK },
-      ScanIndexForward: false,
-      Limit: limit,
-    })
-  )
-  return Items.map(toRun)
-}
-
 const toSummary = ({ pk, sk, ...summary }: Record<string, unknown>) => summary
-
-const getSummary = async (runId: string) => {
-  const { Item } = await db.send(
-    new GetCommand({ TableName: TABLE, Key: { pk: SUMMARIES_PK, sk: runId } })
-  )
-  return Item && toSummary(Item)
-}
 
 /** Newest first. Pages, since a Query stops at 1 MB and each summary is tens of KB. */
 const listSummaries = async (limit: number) => {
@@ -187,25 +150,14 @@ const admin = async (method: string, action: string) => {
 
 export const handler = async (event: LambdaFunctionURLEvent) => {
   const { method } = event.requestContext.http
-  const path = event.rawPath.replace(/\/+$/, '')
+  // Matched exactly: every spelling of a path is its own CloudFront cache key.
+  const path = event.rawPath
 
   const [, secret, action] = path.match(/^\/admin\/([^/]+)\/([^/]+)$/) ?? []
   if (secret && isSecret(secret)) return admin(method, action)
 
   if (method !== 'GET') return json(405, { error: 'GET only' })
+  if (path !== '/runs/history') return json(404, { error: `No route for ${path}` })
 
-  if (path === '/runs') return json(200, { runs: await listRuns() })
-
-  if (path === '/runs/history') {
-    const limit = Math.min(Math.max(Number(event.queryStringParameters?.limit) || 30, 1), 90)
-    return json(200, { runs: await listSummaries(limit) })
-  }
-
-  const id = path.match(/^\/runs\/([^/]+)$/)?.[1]
-  if (!id) return json(404, { error: `No route for ${path}` })
-  const summary =
-    id === 'latest' ? (await listSummaries(1))[0] : await getSummary(decodeURIComponent(id))
-  if (!summary) return json(404, { error: 'No such run' })
-
-  return json(200, summary)
+  return json(200, { runs: await listSummaries(HISTORY_RUNS) })
 }
