@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- Linked from nowhere; PerfApi's admin routes check the secret, this page only sends it. -->
     <meta name="robots" content="noindex, nofollow" />
+    <!-- Same origin only: no fonts, scripts, styles or images from third parties. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <!-- Self-hosted fonts, inline so the bundler leaves their URLs alone; build.ts and dev.ts serve /fonts. -->
     <style>
       @font-face {
