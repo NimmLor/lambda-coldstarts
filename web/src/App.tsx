@@ -111,29 +111,28 @@ const Segmented = <T extends string | number>({
   </>
 )
 
-/** A choice among too many for cells: the system picker at every width, its label shortened on a phone. */
+/** A choice among too many for cells: the system picker at every width, as wide as its value. */
 const Picker = ({
   label,
-  short,
   options,
   value,
   onPick,
   text,
 }: {
   label: string
-  short: string
   options: readonly string[]
   value: string
   onPick: (v: string) => void
   text: (v: string) => string
 }) => (
   <label className="flex shrink-0 items-center gap-2.5">
-    <span className="text-xs font-medium text-muted">
-      <span className="max-sm:hidden">{label}</span>
-      <span className="sm:hidden">{short}</span>
-    </span>
+    <span className="text-xs font-medium text-muted">{label}</span>
     <span className="select">
-      <select value={value} onChange={(e) => onPick(e.target.value)}>
+      <select
+        value={value}
+        onChange={(e) => onPick(e.target.value)}
+        className="field-sizing-content"
+      >
         {options.map((o) => (
           <option key={o} value={o}>
             {text(o)}
@@ -421,14 +420,6 @@ export const App = () => {
                     onPick={pickRange}
                   />
                 )}
-                <Picker
-                  label="Compare with"
-                  short="vs"
-                  options={['', ...fns.map((f) => f.base)]}
-                  value={fns.some((f) => f.base === compare) ? compare : ''}
-                  text={(b) => (b ? (VARIANTS[b]?.name ?? b) : 'None')}
-                  onPick={setCompare}
-                />
               </div>
             </div>
             <p className="measured m-0 flex shrink-0 items-center gap-x-4 text-xs text-muted">
@@ -443,29 +434,39 @@ export const App = () => {
         </div>
 
         <section className={`${WRAP} mt-6 flex flex-col gap-6`}>
-          <div className="flex justify-end gap-5 text-sm text-muted">
-            {(
-              [
-                ['Bun', 'Bun'],
-                ['LLRT', 'LLRT'],
-                ['Node', 'Node.js'],
-              ] as const
-            ).map(([family, name]) => (
-              <span key={family} className="inline-flex items-center gap-2">
-                <svg aria-hidden="true" width="24" height="4" className="stroke-ink-2">
-                  <line
-                    x1="1"
-                    x2="23"
-                    y1="2"
-                    y2="2"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeDasharray={DASHES[family]}
-                  />
-                </svg>
-                {name}
-              </span>
-            ))}
+          {/* Above the charts, which alone it changes: the toolbar has no room left for it. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 text-sm text-muted">
+            <Picker
+              label="Compare with"
+              options={['', ...fns.map((f) => f.base)]}
+              value={fns.some((f) => f.base === compare) ? compare : ''}
+              text={(b) => (b ? (VARIANTS[b]?.name ?? b) : 'None')}
+              onPick={setCompare}
+            />
+            <div className="ml-auto flex gap-5">
+              {(
+                [
+                  ['Bun', 'Bun'],
+                  ['LLRT', 'LLRT'],
+                  ['Node', 'Node.js'],
+                ] as const
+              ).map(([family, name]) => (
+                <span key={family} className="inline-flex items-center gap-2">
+                  <svg aria-hidden="true" width="24" height="4" className="stroke-ink-2">
+                    <line
+                      x1="1"
+                      x2="23"
+                      y1="2"
+                      y2="2"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeDasharray={DASHES[family]}
+                    />
+                  </svg>
+                  {name}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div
