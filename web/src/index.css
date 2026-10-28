@@ -129,6 +129,7 @@
     color: var(--color-muted);
   }
 
+  /* The list takes a system face at body size: Chrome measures it here but draws it without the page's webfont, which clipped it. */
   .pick > select {
     position: absolute;
     inset: 0;
@@ -136,6 +137,7 @@
     opacity: 0;
     cursor: pointer;
     appearance: none;
+    font: 400 var(--text-md) / 1.4 system-ui, sans-serif;
   }
 
   /* The open list is drawn by the browser from these, not from the invisible select's own look. */
