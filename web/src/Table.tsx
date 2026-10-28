@@ -6,9 +6,12 @@ import nodeIcon from './icons/nodejs.svg'
 
 const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
 
-/** Seven columns from `lg`; below it each row restacks as the name over labelled figures. */
+/**
+ * Seven columns from `lg`; below it each row is a card: the name with its cold start at the end,
+ * then the ticks, the percentiles and one line of the other figures under it.
+ */
 const ROW =
-  'grid grid-cols-[2rem_minmax(0,1fr)] gap-x-4 gap-y-4 py-4 lg:grid-cols-[2rem_minmax(0,1fr)_13rem_7rem_6rem_6rem_5.5rem] lg:items-center'
+  'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 py-4 lg:grid-cols-[2rem_minmax(0,1fr)_13rem_7rem_6rem_6rem_5.5rem] lg:items-center lg:gap-4'
 
 const Unit = ({ children }: { children: string }) => (
   <span className="ml-1 text-xs text-muted">{children}</span>
@@ -136,6 +139,7 @@ export const Table = ({ view }: { view: View }) => {
 
   const row = (f: Fn, i: number) => {
     const on = !hidden.has(f.base)
+    const rank = String(i + 1).padStart(2, '0')
     const [cold, p50, p90, startup, warm, warmP90, mem, dur] = (
       ['cold', 'p50', 'p90', 'startup', 'warm', 'warmP90', 'mem', 'dur'] as const
     ).map((k) => agg(f, k))
@@ -161,65 +165,73 @@ export const Table = ({ view }: { view: View }) => {
           view.toggle(f.base)
         }}
       >
-        <span className="measured pt-0.5 text-xs text-muted lg:pt-0">
-          {String(i + 1).padStart(2, '0')}
-        </span>
+        <span className="measured text-xs text-muted max-lg:hidden">{rank}</span>
         <div
           className="flex min-w-0 flex-col gap-2"
           title={[f.base, f.about].filter(Boolean).join('\n')}
         >
-          <div className="flex flex-wrap items-center gap-2 text-md font-medium">
+          {/* The name wraps beside the logo, not under it. */}
+          <div className="flex items-center gap-2 text-md font-medium">
+            {/* The card has no column for the rank, so it leads the name. */}
+            <span className="measured text-xs font-normal text-muted lg:hidden">{rank}</span>
             <img src={ICONS[f.family]} alt="" width={18} height={18} className="block shrink-0" />
-            {f.name}
-            {f.canary && <Badge tone="outline">canary Bun</Badge>}
-            {f.preview && <Badge tone="amber">preview</Badge>}
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              {f.name}
+              {f.canary && <Badge tone="outline">canary Bun</Badge>}
+              {f.preview && <Badge tone="amber">preview</Badge>}
+            </span>
           </div>
           <div className="flex flex-col gap-1 text-xs/normal">
             <Command build={f.build} />
             {tickRun.points.has(f.id) && <Versions point={tickRun.points.get(f.id)!} />}
           </div>
         </div>
-        <div className="col-start-2 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 lg:contents">
-          <Cell label="Cold start" className="col-span-2 sm:col-span-4 lg:col-span-1">
+        {/* Its own column from `lg`; below it, its parts sit in the card's grid. */}
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:items-end lg:gap-1.5 lg:text-right">
+          <div className="flex flex-col items-end gap-0.5 lg:block">
+            <span className="text-xs font-medium text-muted lg:hidden">Cold start</span>
             <span className={`text-xl font-medium tracking-tight ${best('cold', cold)}`}>
               <Reading>{fixed(cold, 1)}</Reading>
               <Unit>ms</Unit>
             </span>
-            <div
-              className="relative h-3 w-full max-w-64 before:absolute before:inset-x-0 before:top-[5px] before:h-0.5 before:bg-rule"
-              title={`${tickRun.rounds} cold starts`}
+          </div>
+          <div
+            className="relative col-span-full h-3 w-full before:absolute before:inset-x-0 before:top-[5px] before:h-0.5 before:bg-rule lg:max-w-64"
+            title={`${tickRun.rounds} cold starts`}
+          >
+            {(tickRun.points.get(f.id)?.initDurations ?? []).map((v, k) => (
+              <span
+                key={k}
+                className="absolute top-0 h-3 w-0.5 -translate-x-px"
+                style={{ left: `${(v / tickMax) * 100}%`, background: f.color }}
+                title={`${v.toFixed(2)} ms`}
+              />
+            ))}
+          </div>
+          <dl className="col-span-full grid w-full grid-cols-3 gap-x-3 lg:max-w-64">
+            <Figure label="p50">{fixed(p50, 1)}</Figure>
+            <Figure
+              label="p90"
+              className={
+                cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-bad' : ''
+              }
             >
-              {(tickRun.points.get(f.id)?.initDurations ?? []).map((v, k) => (
-                <span
-                  key={k}
-                  className="absolute top-0 h-3 w-0.5 -translate-x-px"
-                  style={{ left: `${(v / tickMax) * 100}%`, background: f.color }}
-                  title={`${v.toFixed(2)} ms`}
-                />
-              ))}
-            </div>
-            <dl className="grid w-full max-w-64 grid-cols-3 gap-x-3">
-              <Figure label="p50">{fixed(p50, 1)}</Figure>
+              {fixed(p90, 1)}
+            </Figure>
+            {startup !== undefined && (
               <Figure
-                label="p90"
-                className={
-                  cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-bad' : ''
-                }
+                label="to handler"
+                title="From process start until the handler was loaded, timed by the process itself"
               >
-                {fixed(p90, 1)}
+                {fixed(startup, 1)}
               </Figure>
-              {startup !== undefined && (
-                <Figure
-                  label="to handler"
-                  title="From process start until the handler was loaded, timed by the process itself"
-                >
-                  {fixed(startup, 1)}
-                </Figure>
-              )}
-            </dl>
-          </Cell>
-          <Cell label="Warm start">
-            <span className={`text-md ${best('warm', warm)}`}>
+            )}
+          </dl>
+        </div>
+        {/* One line of four on a phone, their labels short to fit; two by two on the narrowest. */}
+        <div className="col-span-full grid grid-cols-2 gap-3 min-[22rem]:grid-cols-4 lg:contents">
+          <Cell label="Warm">
+            <span className={`lg:text-md ${best('warm', warm)}`}>
               <Reading>{fixed(warm, 2)}</Reading>
               <Unit>ms</Unit>
             </span>
@@ -227,7 +239,7 @@ export const Table = ({ view }: { view: View }) => {
               p90 <Reading>{fixed(warmP90, 2)}</Reading>
             </span>
           </Cell>
-          <Cell label="Memory used">
+          <Cell label="Memory">
             <span className={best('mem', mem)}>
               <Reading>{fixed(mem, 1)}</Reading>
               <Unit>MB</Unit>

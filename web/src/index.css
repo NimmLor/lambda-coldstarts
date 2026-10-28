@@ -150,6 +150,46 @@
     color: var(--color-ink);
   }
 
+  /* A choice set as one cell, the system's own picker: the toolbar's on a phone. The caret is a
+     sibling, not a background image, which the same-origin CSP would block as a data: URL. */
+  .select {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .select > select {
+    min-height: 34px;
+    padding: 0 calc(var(--space-sm) + 14px) 0 var(--space-sm);
+    border: var(--rule-hair) solid var(--color-rule-2);
+    border-radius: var(--radius-pill);
+    background: var(--color-cool-soft);
+    color: var(--color-cool);
+    font-weight: 500;
+    font-size: var(--text-sm);
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .select option {
+    background-color: var(--color-paper-2);
+    color: var(--color-ink);
+  }
+
+  .select > select:focus-visible {
+    outline-offset: 0;
+  }
+
+  .select__caret {
+    position: absolute;
+    top: 50%;
+    right: var(--space-sm);
+    width: 10px;
+    translate: 0 -50%;
+    color: var(--color-cool);
+    pointer-events: none;
+  }
+
   .btn {
     display: inline-flex;
     align-items: center;

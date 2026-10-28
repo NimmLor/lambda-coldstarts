@@ -37,23 +37,45 @@ const Segmented = <T extends string | number>({
   value,
   onPick,
   text = String,
+  unit,
 }: {
   label: string
   options: readonly T[]
   value: T | undefined
   onPick: (v: T) => void
   text?: (v: T) => string
+  /** After each option in the phone's picker, which has no label to carry it. */
+  unit?: string
 }) => (
-  <div className="flex shrink-0 items-center gap-2.5">
-    <span className="text-xs font-medium text-muted">{label}</span>
-    <div className="cells" role="group" aria-label={label}>
-      {options.map((v) => (
-        <button key={v} type="button" aria-pressed={v === value} onClick={() => onPick(v)}>
-          {text(v)}
-        </button>
-      ))}
+  <>
+    <div className="flex shrink-0 items-center gap-2.5 max-sm:hidden">
+      <span className="text-xs font-medium text-muted">{label}</span>
+      <div className="cells" role="group" aria-label={label}>
+        {options.map((v) => (
+          <button key={v} type="button" aria-pressed={v === value} onClick={() => onPick(v)}>
+            {text(v)}
+          </button>
+        ))}
+      </div>
     </div>
-  </div>
+    {/* A phone has no room for every cell: the system picker, its value saying what it is. */}
+    <span className="select sm:hidden">
+      <select
+        aria-label={label}
+        value={String(value)}
+        onChange={(e) => onPick(options.find((o) => String(o) === e.target.value)!)}
+      >
+        {options.map((o) => (
+          <option key={o} value={String(o)}>
+            {unit ? `${text(o)} ${unit}` : text(o)}
+          </option>
+        ))}
+      </select>
+      <svg aria-hidden="true" viewBox="0 0 10 6" className="select__caret">
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    </span>
+  </>
 )
 
 /** A choice inside running text: the word it shows, over a transparent native select. */
@@ -307,11 +329,12 @@ export const App = () => {
         {/* Across the page and over the charts and the board below, which both follow it. */}
         <div className="sticky top-0 z-(--z-sticky) mt-12 border-y border-rule bg-paper/85 backdrop-blur-md">
           <div className={`${WRAP} flex flex-wrap items-center gap-x-8 gap-y-1 py-2`}>
-            <div className="flex min-w-0 flex-auto items-center gap-x-6">
+            <div className="flex min-w-0 flex-auto flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-x-6">
               {/* Outside the scroller, which would clip its panel. */}
               <Functions view={view} setHidden={setHidden} />
-              {/* One line however narrow: the choices scroll sideways instead of stacking. */}
-              <div className="-my-1 flex min-w-0 flex-auto items-center gap-x-6 overflow-x-auto py-2 [scrollbar-width:none]">
+              {/* One line however narrow: the choices scroll sideways instead of stacking. A phone's
+                  pickers are small enough to wrap beside Functions instead, so none hides off the edge. */}
+              <div className="-my-1 flex min-w-0 flex-auto items-center gap-x-6 overflow-x-auto py-2 [scrollbar-width:none] max-sm:contents">
                 <Segmented
                   label="Arch"
                   options={archs}
@@ -325,6 +348,7 @@ export const App = () => {
                   label="Memory, MB"
                   options={memories}
                   value={shownMemory}
+                  unit="MB"
                   onPick={pickMemory}
                 />
                 {ranges.length > 1 && (

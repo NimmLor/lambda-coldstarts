@@ -10,6 +10,16 @@ export type Metric = {
   icon: ChartIconName
 }
 
+/**
+ * The value labels in a column left of the plot; on a phone they sit inside it, over their
+ * gridlines, so the plot takes the card's width and lines up under its heading.
+ */
+export const AXES = 'relative grid grid-cols-1 sm:grid-cols-[2.75rem_minmax(0,1fr)] sm:gap-x-2'
+export const Y_LABELS = 'max-sm:pointer-events-none max-sm:absolute max-sm:inset-x-0 max-sm:z-1'
+export const Y_LABEL =
+  'measured absolute text-xs text-muted max-sm:left-0 max-sm:-translate-y-full max-sm:rounded-chip max-sm:bg-paper-2/85 max-sm:pr-1 sm:right-0 sm:-translate-y-1/2'
+export const X_LABELS = 'relative mt-2 h-5 sm:col-start-2'
+
 /** About `segments` + 1 dates under the chart, always including the last. */
 const dateTicks = (n: number, segments: number) => {
   const step = Math.max(1, Math.round((n - 1) / segments))
@@ -51,8 +61,10 @@ export const Chart = ({
   const best = shown
     .filter((f) => agg(f, m.key) !== undefined)
     .sort((a, b) => agg(a, m.key)! - agg(b, m.key)!)[0]
-  // Three dates fit under a narrow chart without touching.
-  const ticks = dateTicks(n, wide ? 4 : 2)
+  // Three dates fit under a narrow chart without touching; a date shows once, however many runs fall on it.
+  const ticks = dateTicks(n, wide ? 4 : 2).filter(
+    (i, k, all) => k === 0 || day(runs[i]!.date) !== day(runs[all[k - 1]!]!.date)
+  )
 
   return (
     <article className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
@@ -76,14 +88,10 @@ export const Chart = ({
           </span>
         )}
       </div>
-      <div className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2">
-        <div className="relative" style={{ height: m.height }}>
+      <div className={AXES}>
+        <div className={`relative ${Y_LABELS}`} style={{ height: m.height }}>
           {grid.map((g) => (
-            <span
-              key={g.top}
-              className="measured absolute right-0 -translate-y-1/2 text-xs text-muted"
-              style={{ top: `${g.top}%` }}
-            >
+            <span key={g.top} className={Y_LABEL} style={{ top: `${g.top}%` }}>
               {g.label}
             </span>
           ))}
@@ -149,12 +157,12 @@ export const Chart = ({
             ))}
           </div>
         </div>
-        <div className="relative col-start-2 mt-2 h-5">
+        <div className={X_LABELS}>
           {ticks.map((i, k) => (
             <span
               key={i}
               className={`measured absolute text-xs whitespace-nowrap text-muted ${
-                ticks.length === 1 || (k > 0 && k < ticks.length - 1)
+                n === 1 || (k > 0 && k < ticks.length - 1)
                   ? '-translate-x-1/2'
                   : k === 0
                     ? ''

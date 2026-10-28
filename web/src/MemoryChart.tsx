@@ -1,3 +1,4 @@
+import { AXES, X_LABELS, Y_LABEL, Y_LABELS } from './Chart'
 import { ChartIcon } from './ChartIcon'
 import { DASHES, type Fn, niceMax, type View } from './data'
 
@@ -50,14 +51,10 @@ export const MemoryChart = ({
         <ChartIcon name="sizes" className="size-5" />
         Cold start by memory
       </h2>
-      <div className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2">
-        <div className="relative" style={{ height: HEIGHT }}>
+      <div className={AXES}>
+        <div className={`relative ${Y_LABELS}`} style={{ height: HEIGHT }}>
           {grid.map((g) => (
-            <span
-              key={g.top}
-              className="measured absolute right-0 -translate-y-1/2 text-xs text-muted"
-              style={{ top: `${g.top}%` }}
-            >
+            <span key={g.top} className={Y_LABEL} style={{ top: `${g.top}%` }}>
               {g.label}
             </span>
           ))}
@@ -126,14 +123,16 @@ export const MemoryChart = ({
             ))}
           </div>
         </div>
-        <div className="relative col-start-2 mt-2 h-5">
+        <div className={X_LABELS}>
           {memories.map((mb, i) => (
             <span
               key={mb}
               className={`measured absolute -translate-x-1/2 text-xs whitespace-nowrap ${mb === memoryMb ? 'text-cool' : 'text-muted'}`}
               style={{ left: `${x(i)}%` }}
             >
-              {mb} MB
+              {/* Five sizes with their unit don't fit under a phone-wide chart. */}
+              {mb}
+              <span className="max-sm:hidden"> MB</span>
             </span>
           ))}
         </div>

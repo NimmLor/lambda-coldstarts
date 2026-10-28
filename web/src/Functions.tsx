@@ -72,17 +72,18 @@ export const Functions = ({
 
   return (
     <div ref={root} className="relative flex shrink-0 items-center gap-2.5">
-      <span className="text-xs font-medium text-muted">Functions</span>
+      <span className="text-xs font-medium text-muted max-sm:sr-only">Functions</span>
       <div className="cells">
+        {/* On a phone, just the count: it shares a line with the other pickers. */}
         <button
           ref={trigger}
           type="button"
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen(!open)}
-          className="inline-flex min-w-[180px] items-center gap-2.5 aria-expanded:bg-paper-2 aria-expanded:text-ink"
+          className="inline-flex items-center gap-2.5 aria-expanded:bg-paper-2 aria-expanded:text-ink sm:min-w-[180px]"
         >
-          <span aria-hidden="true" className="flex -space-x-1">
+          <span aria-hidden="true" className="flex -space-x-1 max-sm:hidden">
             {shown.map((f) => (
               <span
                 key={f.id}
