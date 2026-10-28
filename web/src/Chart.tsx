@@ -27,6 +27,29 @@ export const X_LABELS = 'relative mt-2 h-5 sm:col-start-2'
 const READOUT_GAP = 12
 
 /**
+ * How many times lower `value` is than the baseline's, so 2.00× is twice as fast: greener above 1,
+ * redder below, fully saturated from twice either way.
+ */
+export const Versus = ({ value, baseline }: { value?: number; baseline?: number }) => {
+  if (value === undefined || baseline === undefined || !(value > 0) || !(baseline > 0)) return null
+  const times = baseline / value
+  const tone = times >= 1 ? 'ok' : 'bad'
+  // The root lifts small differences off the neutral grey; oklab, as oklch would pass through other hues on the way.
+  const strength = Math.sqrt(Math.min(1, Math.abs(Math.log2(times)))) * 100
+  return (
+    <span
+      className="measured rounded-chip px-1 text-xs"
+      style={{
+        color: `color-mix(in oklab, var(--color-${tone}) ${strength}%, var(--color-muted))`,
+        background: `color-mix(in oklab, var(--color-${tone}-soft) ${strength}%, transparent)`,
+      }}
+    >
+      {times.toFixed(2)}×
+    </span>
+  )
+}
+
+/**
  * The values under the pointer, lowest first, beside the crosshair at `left`% of the plot: right
  * of it if it fits, else left, else as near it as the plot allows, so the card never clips it.
  */
@@ -37,6 +60,7 @@ export const Readout = ({
   unit,
   digits,
   focus,
+  baseline,
 }: {
   left: number
   title: string
@@ -44,6 +68,8 @@ export const Readout = ({
   unit: string
   digits: number
   focus?: string
+  /** The compared function's value, which each row's badge is against. */
+  baseline?: number
 }) => {
   const ref = useRef<HTMLDivElement>(null)
   // Its width changes with every run, so it's placed after every render, before paint.
@@ -85,8 +111,17 @@ export const Readout = ({
               {f.name}
             </span>
             <span className="measured ml-auto pl-4 text-ink">
-              {fixed(value, digits)} <span className="text-muted">{unit}</span>
+              {fixed(value, digits)}{' '}
+              {/* A phone-wide plot has room for the badge or the unit, and the chart's heading already names it. */}
+              <span className={`text-muted ${baseline !== undefined ? 'max-sm:hidden' : ''}`}>
+                {unit}
+              </span>
             </span>
+            {baseline !== undefined && (
+              <span className="w-12 text-right">
+                <Versus value={value} baseline={baseline} />
+              </span>
+            )}
           </span>
         ))}
     </div>
@@ -117,7 +152,7 @@ export const Chart = ({
   view: View
   className?: string
 }) => {
-  const { runs, memoryMb, shown, hover, focus, agg } = view
+  const { runs, memoryMb, shown, hover, focus, agg, baseline } = view
   // Every chart follows the hovered run; only the one under the pointer reads it out.
   const [inside, setInside] = useState(false)
   const n = runs.length
@@ -160,6 +195,9 @@ export const Chart = ({
               style={{ background: best.color }}
             />
             <span className="font-medium text-ink">{best.name}</span>
+            {baseline && baseline.base !== best.base && (
+              <Versus value={agg(best, m.key)} baseline={agg(baseline, m.key)} />
+            )}
           </span>
         )}
       </div>
@@ -232,6 +270,7 @@ export const Chart = ({
                   unit={m.unit}
                   digits={m.digits}
                   focus={focus}
+                  baseline={baseline && runs[hover]!.points.get(baseline.id)?.[m.key]}
                 />
               )}
             </>

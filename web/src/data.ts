@@ -238,6 +238,8 @@ export type View = {
   /** Index of the hovered or picked run within `runs`. */
   hover?: number
   focus?: string
+  /** The function every other is compared with, from `fns`; none when the picked variant isn't there. */
+  baseline?: Fn
   /** The hovered or picked run's value, or the mean over the range. */
   agg: (f: Fn, key: Stat) => number | undefined
   setHover: (i: number | undefined) => void

@@ -24,18 +24,16 @@ export const MemoryChart = ({
   onPick: (memoryMb: number) => void
   className?: string
 }) => {
-  const { runs, hover, shown, memoryMb, focus, agg } = view
+  const { runs, hover, shown, memoryMb, focus, agg, baseline } = view
   /** Index of the size column under the pointer. */
   const [pointed, setPointed] = useState<number>()
   // Each size sits in the middle of its column, so the columns double as its hit areas.
   const x = (i: number) => ((i + 0.5) / memories.length) * 100
-  const series = shown.map((f) => ({
-    f,
-    values: memories.map((mb) => {
-      const at = sized.find((s) => s.base === f.base && s.memoryMb === mb)
-      return at && agg(at, 'cold')
-    }),
-  }))
+  const at = (base: string, mb: number) => {
+    const fn = sized.find((s) => s.base === base && s.memoryMb === mb)
+    return fn && agg(fn, 'cold')
+  }
+  const series = shown.map((f) => ({ f, values: memories.map((mb) => at(f.base, mb)) }))
   const max = niceMax(
     Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== undefined)))
   )
@@ -108,6 +106,7 @@ export const MemoryChart = ({
               unit="ms"
               digits={1}
               focus={focus}
+              baseline={baseline && at(baseline.base, memories[pointed]!)}
             />
           )}
           {series

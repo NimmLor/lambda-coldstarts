@@ -111,6 +111,42 @@ const Segmented = <T extends string | number>({
   </>
 )
 
+/** A choice among too many for cells: the system picker at every width, its label shortened on a phone. */
+const Picker = ({
+  label,
+  short,
+  options,
+  value,
+  onPick,
+  text,
+}: {
+  label: string
+  short: string
+  options: readonly string[]
+  value: string
+  onPick: (v: string) => void
+  text: (v: string) => string
+}) => (
+  <label className="flex shrink-0 items-center gap-2.5">
+    <span className="text-xs font-medium text-muted">
+      <span className="max-sm:hidden">{label}</span>
+      <span className="sm:hidden">{short}</span>
+    </span>
+    <span className="select">
+      <select value={value} onChange={(e) => onPick(e.target.value)}>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {text(o)}
+          </option>
+        ))}
+      </select>
+      <svg aria-hidden="true" viewBox="0 0 10 6" className="select__caret">
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    </span>
+  </label>
+)
+
 /** A choice inside running text: the word it shows, over a transparent native select. */
 const InlinePick = <T extends string | number>({
   label,
@@ -257,6 +293,8 @@ export const App = () => {
   const [pinned, setPinned] = useState<string>()
   const [focus, setFocus] = useState<string>()
   const [hidden, setHidden] = useState(new Set<string>())
+  /** The variant the readouts measure every other against, or '' for none. */
+  const [compare, setCompare] = useState('Node24')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -311,6 +349,7 @@ export const App = () => {
       hidden,
       hover: hovered,
       focus,
+      baseline: fns.find((f) => f.base === compare),
       agg: (f, key: Stat) =>
         hovered !== undefined
           ? runs[hovered]!.points.get(f.id)?.[key]
@@ -382,6 +421,14 @@ export const App = () => {
                     onPick={pickRange}
                   />
                 )}
+                <Picker
+                  label="Compare with"
+                  short="vs"
+                  options={['', ...fns.map((f) => f.base)]}
+                  value={fns.some((f) => f.base === compare) ? compare : ''}
+                  text={(b) => (b ? (VARIANTS[b]?.name ?? b) : 'None')}
+                  onPick={setCompare}
+                />
               </div>
             </div>
             <p className="measured m-0 flex shrink-0 items-center gap-x-4 text-xs text-muted">
