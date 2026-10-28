@@ -1,0 +1,283 @@
+name: 🚀 Deploy
+
+# Checks, builds the Bun and LLRT variants natively per architecture, then deploys every function on
+# both architectures to the production stage, coldstarts.github.nimmervoll.work.
+# Needs the secret AWS_ROLE_ARN on the production environment: a role that environment may assume
+# through GitHub OIDC. `bun run bootstrap:aws` sets up both. PERF_ADMIN_SECRET on the same
+# environment turns on PerfApi's admin routes; without it they stay off.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SST_TELEMETRY_DISABLED: '1'
+
+jobs:
+  check:
+    name: 🔬 Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: 🚚 Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: 🔧 Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: 🔗 Install Dependencies
+        run: bun ci
+
+      # Writes .sst/platform, whose types sst.config.ts and infra/ compile against.
+      - name: 🧩 Install SST Platform
+        run: bun sst install --stage ci
+
+      - name: 🔎 Typecheck
+        run: bun run typecheck
+
+      - name: 🧹 Lint
+        run: bun lint --max-warnings 0
+
+      - name: 💅 Format
+        run: bun fmt --check
+
+      - name: 🧪 Test
+        run: bun test
+
+  build:
+    name: 🏗️ Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          # GitHub's arm64 runners are Neoverse N2, Lambda's Graviton2 is N1. An --aot executable
+          # that dies with SIGILL on Lambda would point at that.
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+
+    steps:
+      - name: 🚚 Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: 🔧 Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # In an Amazon Linux 2023 container with the pinned AOT build of Bun; see infra/build-image.sh.
+      - name: 🐳 Build bundles
+        run: bun run build --arch ${{ matrix.arch }}
+
+      # Artifacts drop file modes, and every bootstrap must stay executable.
+      - name: 📦 Pack bundles
+        run: tar -cf bundles-${{ matrix.arch }}.tar -C dist ${{ matrix.arch }}
+
+      - name: 📤 Upload bundles
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: bundles-${{ matrix.arch }}
+          path: bundles-${{ matrix.arch }}.tar
+          retention-days: 3
+
+  deploy:
+    name: 🚀 Production
+    needs: [check, build]
+    # Pinned, not `ubuntu-latest`: this image ships the pulumi sst deploys with.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    concurrency:
+      group: sst-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    # The role's trust policy accepts only this environment's OIDC tokens.
+    environment:
+      name: production
+      url: ${{ steps.outputs.outputs.site }}
+    env:
+      AWS_REGION: eu-central-1
+      # pulumi asks GitHub for a newer release on every command.
+      PULUMI_SKIP_UPDATE_CHECK: 'true'
+
+    steps:
+      - name: 🚚 Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: 🔧 Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: 🔗 Install Dependencies
+        run: bun ci
+
+      - name: 📥 Download bundles
+        uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: bundles-*
+          merge-multiple: true
+
+      - name: 📦 Unpack bundles
+        run: |
+          mkdir -p dist
+          for tar in bundles-*.tar; do tar -xf "$tar" -C dist; done
+
+      - name: 🗝️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Point sst at the runner's own binaries instead of downloading them. A pulumi major bump in
+      # the image fails here rather than quietly deploying through an untested pulumi.
+      - name: 🔎 Link bun and pulumi for SST
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config/sst/bin"
+          ln -sfn "${{ steps.setup-bun.outputs.bun-path }}" "$HOME/.config/sst/bin/bun"
+
+          pulumi_path="$(command -v pulumi 2>/dev/null || true)"
+          if [ -z "$pulumi_path" ]; then
+            echo "pulumi was not found; SST will resolve it normally"
+            exit 0
+          fi
+
+          version="$(pulumi version | sed 's/^v//')"
+          echo "pulumi $version at $pulumi_path"
+          if [ "${version%%.*}" != "3" ]; then
+            echo "Expected pulumi 3.x.x on ubuntu-24.04, found $version" >&2
+            exit 1
+          fi
+          ln -sfn "$pulumi_path" "$HOME/.config/sst/bin/pulumi"
+          echo "SST_SKIP_DEPENDENCY_CHECK=true" >> "$GITHUB_ENV"
+
+      - name: 🚀 Deploy
+        run: |
+          # Two failures earn a second attempt; any other stays red on the first try, since a
+          # deploy that fails on the change itself has to fail visibly.
+          #
+          # 1. A Lambda concurrent-update race. SST creates a function's URL, its permissions and
+          #    its config in parallel, and Lambda can reject the overlapping writes with a 409.
+          #    Nothing is wrong with the state or the change, so the retry is a plain re-run.
+          # 2. A failed provider plugin download from GitHub releases. GITHUB_TOKEN below lifts
+          #    the anonymous rate limit; a transient error is a plain re-run like the race above.
+          #
+          # A failed sst run can leave the stage locked, which fails the next one with
+          # "Concurrent update detected", so each failure is followed by an unlock.
+          unlock() {
+            bun sst unlock --stage production || true
+          }
+
+          deploy() {
+            bun run just-deploy --stage production ${{ runner.debug == '1' && '--print-logs' || '' }}
+          }
+
+          deploy_log="$RUNNER_TEMP/sst-deploy.log"
+
+          set +e
+          deploy 2>&1 | tee "$deploy_log"
+          deploy_exit=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$deploy_exit" -eq 0 ]; then
+            exit 0
+          fi
+
+          unlock
+
+          if grep -qE 'ResourceConflictException: The function could not be updated due to a concurrent update operation' "$deploy_log"; then
+            echo "🔁 Deploy failed on a Lambda concurrent update race. Retrying once..."
+          elif grep -qE 'Could not automatically download and install resource plugin' "$deploy_log"; then
+            echo "🔁 Deploy failed downloading a provider plugin. Retrying once..."
+            sleep 30
+          else
+            echo "❌ Deploy failed on neither a Lambda concurrent update race nor a plugin download, not retrying." >&2
+            exit "$deploy_exit"
+          fi
+
+          set +e
+          deploy
+          deploy_exit=$?
+          set -e
+          [ "$deploy_exit" -eq 0 ] || unlock
+
+          exit "$deploy_exit"
+        env:
+          # Authenticates sst's plugin downloads from GitHub releases.
+          GITHUB_TOKEN: ${{ github.token }}
+          PERF_ADMIN_SECRET: ${{ secrets.PERF_ADMIN_SECRET }}
+
+      - name: 🧮 Read SST Outputs
+        id: outputs
+        run: |
+          site=$(jq -r '.perf.site // empty' .sst/outputs.json)
+          if [ -z "$site" ]; then
+            echo "Failed to read perf.site from .sst/outputs.json" >&2
+            exit 1
+          fi
+          printf 'site=%s\n' "$site" >> "$GITHUB_OUTPUT"
+
+      - name: 📋 Deployment summary
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          site: ${{ steps.outputs.outputs.site }}
+        run: |
+          api=$(jq -r '.perf.api' .sst/outputs.json)
+          count=$(jq '.functions | length' .sst/outputs.json)
+          timestamp=$(TZ='Europe/Vienna' date +'%Y-%m-%d %H:%M:%S %Z')
+          {
+            echo "### 🚀 Deployment / \`production\`"
+            echo
+            echo "- 🌐 **Site:** [$site]($site)"
+            echo "- 🔌 **API:** $api"
+            echo "- λ **Functions:** $count"
+            echo "- 🕒 **Deployed:** $timestamp"
+            echo "- 🔖 **Commit:** \`${GITHUB_SHA::7}\`${COMMIT_MESSAGE:+ — ${COMMIT_MESSAGE%%$'\n'*}}"
+            echo
+            echo "<details><summary>λ Function URLs</summary>"
+            echo
+            echo "| Function | URL |"
+            echo "| --- | --- |"
+            jq -r '.functions | to_entries | sort_by(.key)[] | "| `\(.key)` | \(.value.url) |"' .sst/outputs.json
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 📥 Upload SST Outputs
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: sst-outputs-production
+          path: .sst/outputs.json
+
+      # sst logs the pulumi command line, credentials included, and GitHub masks secrets in the
+      # console but not inside an artifact. The values are known here, so they're cut out and
+      # checked for.
+      - name: 🙈 Redact SST Logs
+        id: redact
+        if: always()
+        run: |
+          set -euo pipefail
+          [ -d .sst/log ] || exit 0
+          for value in "${AWS_ACCESS_KEY_ID:-}" "${AWS_SECRET_ACCESS_KEY:-}" "${AWS_SESSION_TOKEN:-}" "${PERF_ADMIN_SECRET:-}"; do
+            [ -n "$value" ] || continue
+            find .sst/log -type f -print0 | SECRET="$value" xargs -0 -r perl -pi -e 's/\Q$ENV{SECRET}\E/***/g'
+            if grep -rqF -- "$value" .sst/log; then
+              echo "A secret survived redaction, refusing to upload the logs" >&2
+              exit 1
+            fi
+          done
+        env:
+          PERF_ADMIN_SECRET: ${{ secrets.PERF_ADMIN_SECRET }}
+
+      # Deliberately not `always()` alone: a failed scrub must not publish raw logs.
+      - name: 📜 Upload SST Logs
+        if: always() && steps.redact.outcome == 'success'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: sst-logs-production
+          path: .sst/log
+          retention-days: 7

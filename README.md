@@ -186,19 +186,22 @@ deploys all 22 functions from those bundles and benchmarks them. That job runs i
 GitHub environment and assumes an AWS role through GitHub OIDC. `bun run bootstrap:aws`, with
 admin credentials for the account and a logged-in `gh`, sets it up and is safe to re-run
 ([`scripts/bootstrap-aws.ts`](scripts/bootstrap-aws.ts)): the account's GitHub OIDC provider, the
-role `bun-aot-lambda-github` that only `repo:<owner>/<repo>:environment:bench` may assume, with
-an inline policy for the services the stack uses, and the `bench` environment with the role's ARN
-as its `AWS_ROLE_ARN` secret.
+role `bun-aot-lambda-github` that only the `bench` and `production` environments of
+`<owner>/<repo>` may assume, with an inline policy for the services the stack uses, and both
+environments with the role's ARN as their `AWS_ROLE_ARN` secret.
+
+Every push to main runs [Deploy](.github/workflows/deploy.yml): the checks, the same two native
+builds, then `sst deploy --stage production` from those bundles in the `production` environment.
+A `PERF_ADMIN_SECRET` secret on that environment turns on PerfApi's admin routes.
 
 ## Scheduled runs, like lambda-perf
 
 The stack also runs the benchmark on its own, the way
 [maxday/lambda-perf](https://github.com/maxday/lambda-perf) does, and keeps every result:
 
-- **`PerfRun`**, a Step Functions state machine, maps over the deployed functions,
-  `PERF_CONCURRENCY` at a time, and gives each `PERF_ROUNDS` rounds, one after another. A
-  function that keeps failing is skipped, not the whole run. At the end, it writes the run to
-  DynamoDB itself.
+- **`PerfRun`**, a Step Functions state machine, maps over every deployed function in parallel
+  and gives each `PERF_ROUNDS` rounds, one after another. A function that keeps failing is
+  skipped, not the whole run. At the end, it writes the run to DynamoDB itself.
 - **`PerfMeasure`** ([`src/perf/measure.ts`](src/perf/measure.ts)) does one round: changes the
   function's configuration so its warm environments retire, invokes it with `LogType: Tail`, then
   invokes it `PERF_WARM` more times in a row, which find the environment warm, and stores the
@@ -257,7 +260,6 @@ from a secret field and two buttons, repeating `purge` until it's done.
 | ------------------- | ------- | --------------------------------------------------------------------------------- |
 | `PERF_ROUNDS`       | `10`    | Cold starts per function and run                                                  |
 | `PERF_WARM`         | `5`     | Warm invocations after each cold start                                            |
-| `PERF_CONCURRENCY`  | `4`     | Functions measured at once; each holds two of the account's concurrent executions |
 | `PERF_ADMIN_SECRET` | unset   | Path segment that turns on PerfApi's `run` and `purge`; URL-safe characters only  |
 
 To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:

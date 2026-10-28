@@ -1,8 +1,7 @@
 name: CI
 
+# Pull requests only: on main, deploy.yml runs the same checks and builds before it deploys.
 on:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:

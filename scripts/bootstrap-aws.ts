@@ -1,23 +1,23 @@
 /**
- * Lets the bench workflow (.github/workflows/bench.yml) deploy to the AWS account the current
- * credentials belong to. Creates or updates, idempotently:
+ * Lets the bench and deploy workflows (.github/workflows/bench.yml, deploy.yml) deploy to the AWS
+ * account the current credentials belong to. Creates or updates, idempotently:
  *
  * - the GitHub OIDC identity provider of the account,
- * - the role GitHub Actions assumes, trusted only from this repository's GitHub environment,
+ * - the role GitHub Actions assumes, trusted only from this repository's GitHub environments,
  *   with an inline policy for what `sst deploy` and the benchmark touch,
- * - that GitHub environment, deployable from main only, with the role's ARN as its AWS_ROLE_ARN
- *   secret.
+ * - those GitHub environments, deployable from main only, with the role's ARN as their
+ *   AWS_ROLE_ARN secret.
  *
  * Needs admin credentials for the account (AWS_PROFILE from .env works) and a logged-in `gh`.
  *
- *   bun scripts/bootstrap-aws.ts [--environment bench] [--repo owner/name]
+ *   bun scripts/bootstrap-aws.ts [--environment bench,production] [--repo owner/name]
  */
 import { parseArgs } from 'node:util'
 import { $ } from 'bun'
 
 const { values: args } = parseArgs({
   options: {
-    environment: { type: 'string', default: 'bench' },
+    environment: { type: 'string', default: 'bench,production' },
     repo: { type: 'string' },
   },
 })
@@ -31,8 +31,8 @@ const AUDIENCE = 'sts.amazonaws.com'
 
 const repo =
   args.repo ?? (await $`gh repo view --json nameWithOwner -q .nameWithOwner`.text()).trim()
-const environment = args.environment!
-const subject = `repo:${repo}:environment:${environment}`
+const environments = args.environment!.split(',').map((name) => name.trim())
+const subjects = environments.map((name) => `repo:${repo}:environment:${name}`)
 
 const aws = async <T>(cmd: string[]): Promise<T> => {
   const out = (await $`aws ${cmd} --output json`.quiet()).stdout.toString().trim()
@@ -40,7 +40,7 @@ const aws = async <T>(cmd: string[]): Promise<T> => {
 }
 
 const { Account: accountId } = await aws<{ Account: string }>(['sts', 'get-caller-identity'])
-console.log(`Account ${accountId}, trusting ${subject}`)
+console.log(`Account ${accountId}, trusting ${subjects.join(', ')}`)
 
 const providerArn = `arn:aws:iam::${accountId}:oidc-provider/${OIDC_HOST}`
 const { OpenIDConnectProviderList: providers = [] } = await aws<{
@@ -88,7 +88,7 @@ const trustPolicy = JSON.stringify({
       Principal: { Federated: providerArn },
       Action: 'sts:AssumeRoleWithWebIdentity',
       Condition: {
-        StringEquals: { [`${OIDC_HOST}:aud`]: AUDIENCE, [`${OIDC_HOST}:sub`]: subject },
+        StringEquals: { [`${OIDC_HOST}:aud`]: AUDIENCE, [`${OIDC_HOST}:sub`]: subjects },
       },
     },
   ],
@@ -149,7 +149,7 @@ try {
     '--assume-role-policy-document',
     trustPolicy,
     '--description',
-    `GitHub Actions in ${repo}, environment ${environment}. Managed by scripts/bootstrap-aws.ts`,
+    `GitHub Actions in ${repo}, environments ${environments.join(', ')}. Managed by scripts/bootstrap-aws.ts`,
   ])
   console.log(`Created ${ROLE_NAME}`)
 }
@@ -165,20 +165,22 @@ await aws([
 ])
 console.log(`Put the ${POLICY_NAME} policy on ${ROLE_NAME}`)
 
-// Only main may deploy to the environment, so only main's runs get a token the role trusts.
-const env = `repos/${repo}/environments/${environment}`
+// Only main may deploy to the environments, so only main's runs get a token the role trusts.
 const branchPolicy = [
   '-F',
   'deployment_branch_policy[protected_branches]=false',
   '-F',
   'deployment_branch_policy[custom_branch_policies]=true',
 ]
-await $`gh api --silent -X PUT ${env} ${branchPolicy}`
-const branches =
-  await $`gh api ${env}/deployment-branch-policies -q ${'.branch_policies[] | select(.type == "branch") | .name'}`.text()
-if (!branches.split('\n').includes('main')) {
-  await $`gh api --silent -X POST ${env}/deployment-branch-policies -f name=main -f type=branch`
+for (const environment of environments) {
+  const env = `repos/${repo}/environments/${environment}`
+  await $`gh api --silent -X PUT ${env} ${branchPolicy}`
+  const branches =
+    await $`gh api ${env}/deployment-branch-policies -q ${'.branch_policies[] | select(.type == "branch") | .name'}`.text()
+  if (!branches.split('\n').includes('main')) {
+    await $`gh api --silent -X POST ${env}/deployment-branch-policies -f name=main -f type=branch`
+  }
+  console.log(`Restricted the ${environment} environment of ${repo} to main`)
+  await $`gh secret set AWS_ROLE_ARN --repo ${repo} --env ${environment} --body ${roleArn}`.quiet()
+  console.log(`Set AWS_ROLE_ARN=${roleArn} on the ${environment} environment of ${repo}`)
 }
-console.log(`Restricted the ${environment} environment of ${repo} to main`)
-await $`gh secret set AWS_ROLE_ARN --repo ${repo} --env ${environment} --body ${roleArn}`.quiet()
-console.log(`Set AWS_ROLE_ARN=${roleArn} on the ${environment} environment of ${repo}`)
