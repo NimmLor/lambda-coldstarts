@@ -55,9 +55,12 @@ const Segmented = <T extends string | number>({
 
 const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
-  const count = (family: Family) => [...variants].filter((b) => VARIANTS[b]?.family === family).length
+  const count = (family: Family) =>
+    [...variants].filter((b) => VARIANTS[b]?.family === family).length
   return (
-    <header className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}>
+    <header
+      className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}
+    >
       <h1 className="text-3xl lg:col-span-12">Bun vs Node.js cold start benchmark</h1>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
@@ -184,7 +187,12 @@ export const App = () => {
         <section className={`${WRAP} flex flex-col gap-6`}>
           <div className="flex flex-col gap-5 rounded-card border border-rule bg-paper-2 p-5 sm:p-6">
             <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-              <Segmented label="Show" options={['All', 'Bun', 'Node'] as const} value={family} onPick={showFamily} />
+              <Segmented
+                label="Show"
+                options={['All', 'Bun', 'Node'] as const}
+                value={family}
+                onPick={showFamily}
+              />
               <Segmented
                 label="Arch"
                 options={archs}
@@ -210,7 +218,12 @@ export const App = () => {
                   setHover(undefined)
                 }}
               />
-              <button type="button" onClick={load} aria-busy={loading} className="btn btn--primary hit relative sm:ml-auto">
+              <button
+                type="button"
+                onClick={load}
+                aria-busy={loading}
+                className="btn btn--primary hit relative sm:ml-auto"
+              >
                 {loading ? 'Refreshing…' : 'Refresh'}
               </button>
             </div>
@@ -218,8 +231,8 @@ export const App = () => {
               <Fact term="Last run">{latest.finishedAt.replace(/\.\d+Z$/, 'Z')}</Fact>
               <Fact term="Rounds">{latest.rounds}</Fact>
               <Fact term="Functions">
-                {new Set(latest.functions.map((f) => f.base)).size} on {archs.length} architectures ×{' '}
-                {memories.length} memory sizes
+                {new Set(latest.functions.map((f) => f.base)).size} on {archs.length} architectures
+                × {memories.length} memory sizes
               </Fact>
             </dl>
           </div>
@@ -252,7 +265,14 @@ export const App = () => {
               {(['Bun', 'Node.js'] as const).map((name) => (
                 <span key={name} className="inline-flex items-center gap-2">
                   <svg aria-hidden="true" width="24" height="4" className="stroke-ink-2">
-                    <line x1="0" x2="24" y1="2" y2="2" strokeWidth="2" strokeDasharray={name === 'Bun' ? undefined : '5 4'} />
+                    <line
+                      x1="0"
+                      x2="24"
+                      y1="2"
+                      y2="2"
+                      strokeWidth="2"
+                      strokeDasharray={name === 'Bun' ? undefined : '5 4'}
+                    />
                   </svg>
                   {name}
                 </span>
@@ -260,7 +280,10 @@ export const App = () => {
             </div>
           </div>
 
-          <div onMouseLeave={() => setHover(undefined)} className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3">
+          <div
+            onMouseLeave={() => setHover(undefined)}
+            className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3"
+          >
             <Chart
               metric={cold!}
               wide
@@ -286,12 +309,12 @@ export const App = () => {
           <div className={`${WRAP} flex flex-col gap-8`}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
               <h2 className="text-2xl">
-                {hovered !== undefined ? `Run of ${day(runs[hovered]!.date)}` : `${range}-day mean`} at{' '}
-                {shownMemory} MB
+                {hovered !== undefined ? `Run of ${day(runs[hovered]!.date)}` : `${range}-day mean`}{' '}
+                at {shownMemory} MB
               </h2>
               <p className="max-w-prose text-sm text-muted">
-                Ticks are the {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts of{' '}
-                {hovered !== undefined ? 'that' : 'the latest'} run. Warm is {latest.rounds} ×{' '}
+                Ticks are the {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts
+                of {hovered !== undefined ? 'that' : 'the latest'} run. Warm is {latest.rounds} ×{' '}
                 {latest.warmInvocations ?? '—'} invocations. Click a row to hide it.
               </p>
             </div>
@@ -313,7 +336,12 @@ export const App = () => {
         >
           <h2 className="text-lg">{error ? 'The runs didn’t load' : 'No runs yet.'}</h2>
           {error && <p className="measured text-sm text-bad">{error}</p>}
-          <button type="button" onClick={load} aria-busy={loading} className="btn btn--primary hit relative">
+          <button
+            type="button"
+            onClick={load}
+            aria-busy={loading}
+            className="btn btn--primary hit relative"
+          >
             {loading ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
@@ -325,7 +353,9 @@ export const App = () => {
     <main>
       <Header latest={latest} />
       {latest ? dashboard(latest) : pending()}
-      <footer className={`${WRAP} flex flex-col gap-6 pt-12 pb-16 text-sm text-muted ${latest ? '' : 'mt-16'}`}>
+      <footer
+        className={`${WRAP} flex flex-col gap-6 pt-12 pb-16 text-sm text-muted ${latest ? '' : 'mt-16'}`}
+      >
         <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
           <dt className="font-medium text-ink">Cold start</dt>
           <dd className="m-0">Lambda init duration</dd>
@@ -339,9 +369,9 @@ export const App = () => {
           <dd className="m-0">deployed code size</dd>
         </dl>
         <p className="max-w-prose">
-          Compiled builds also pass <code>--target=bun-linux-{'<arch>'}</code>, <code>--no-compile-autoload-dotenv</code>{' '}
-          and <code>--no-compile-autoload-bunfig</code>; “canary Bun” is the Bun build that <code>--trim</code> and{' '}
-          <code>--aot</code> need.
+          Compiled builds also pass <code>--target=bun-linux-{'<arch>'}</code>,{' '}
+          <code>--no-compile-autoload-dotenv</code> and <code>--no-compile-autoload-bunfig</code>;
+          “canary Bun” is the Bun build that <code>--trim</code> and <code>--aot</code> need.
         </p>
         <SiteLinks />
       </footer>

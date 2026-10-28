@@ -7,7 +7,9 @@ import nodeIcon from './icons/nodejs.svg'
 const ROW =
   'grid grid-cols-[2rem_minmax(0,1fr)] gap-x-4 gap-y-4 py-4 lg:grid-cols-[2rem_minmax(0,1fr)_11rem_7rem_6rem_6rem_5.5rem] lg:items-center'
 
-const Unit = ({ children }: { children: string }) => <span className="ml-1 text-xs text-muted">{children}</span>
+const Unit = ({ children }: { children: string }) => (
+  <span className="ml-1 text-xs text-muted">{children}</span>
+)
 
 /** What the run measured, in the instrument face; the words around it stay in the body face. */
 const Reading = ({ children, className = '' }: { children: string; className?: string }) => (
@@ -15,12 +17,24 @@ const Reading = ({ children, className = '' }: { children: string; className?: s
 )
 
 const Badge = ({ children }: { children: string }) => (
-  <span className="rounded-chip border border-rule bg-cool-soft px-1.5 text-xs font-medium text-cool">{children}</span>
+  <span className="rounded-chip border border-rule bg-cool-soft px-1.5 text-xs font-medium text-cool">
+    {children}
+  </span>
 )
 
 /** One figure: its label shows only once the head row is gone. */
-const Cell = ({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) => (
-  <div className={`flex min-w-0 flex-col items-start gap-1.5 lg:items-end lg:text-right ${className}`}>
+const Cell = ({
+  label,
+  children,
+  className = '',
+}: {
+  label: string
+  children: ReactNode
+  className?: string
+}) => (
+  <div
+    className={`flex min-w-0 flex-col items-start gap-1.5 lg:items-end lg:text-right ${className}`}
+  >
     <span className="font-body text-xs font-medium text-muted lg:hidden">{label}</span>
     {children}
   </div>
@@ -45,9 +59,14 @@ const Command = ({ build }: { build: string }) => {
 export const Table = ({ view }: { view: View }) => {
   const { runs, latest, fns, shown, hidden, hover, focus, agg } = view
   const tickRun = hover !== undefined ? runs[hover]! : latest
-  const tickMax = niceMax(Math.max(0, ...fns.flatMap((f) => tickRun.points.get(f.id)?.initDurations ?? [])))
+  const tickMax = niceMax(
+    Math.max(0, ...fns.flatMap((f) => tickRun.points.get(f.id)?.initDurations ?? []))
+  )
   const mins = Object.fromEntries(
-    (['cold', 'warm', 'mem', 'dur'] as const).map((k) => [k, Math.min(...shown.map((f) => agg(f, k) ?? Infinity))])
+    (['cold', 'warm', 'mem', 'dur'] as const).map((k) => [
+      k,
+      Math.min(...shown.map((f) => agg(f, k) ?? Infinity)),
+    ])
   )
   const rows = fns.toSorted((a, b) => (agg(a, 'cold') ?? Infinity) - (agg(b, 'cold') ?? Infinity))
 
@@ -56,7 +75,8 @@ export const Table = ({ view }: { view: View }) => {
     const [cold, p50, p90, startup, warm, warmP90, mem, dur] = (
       ['cold', 'p50', 'p90', 'startup', 'warm', 'warmP90', 'mem', 'dur'] as const
     ).map((k) => agg(f, k))
-    const isBest = (k: keyof typeof mins, v: number | undefined) => on && v !== undefined && v === mins[k]
+    const isBest = (k: keyof typeof mins, v: number | undefined) =>
+      on && v !== undefined && v === mins[k]
     // The leader in a column is a reading, so it takes the instrument's cool tint.
     const best = (k: keyof typeof mins, v: number | undefined) =>
       isBest(k, v) ? 'rounded-chip bg-cool-soft px-1 text-cool [&>span]:text-cool' : ''
@@ -77,10 +97,19 @@ export const Table = ({ view }: { view: View }) => {
           view.toggle(f.base)
         }}
       >
-        <span className="measured pt-0.5 text-xs text-muted lg:pt-0">{String(i + 1).padStart(2, '0')}</span>
-        <div className="flex min-w-0 flex-col gap-2" title={[f.base, point.runtime, f.about].filter(Boolean).join('\n')}>
+        <span className="measured pt-0.5 text-xs text-muted lg:pt-0">
+          {String(i + 1).padStart(2, '0')}
+        </span>
+        <div
+          className="flex min-w-0 flex-col gap-2"
+          title={[f.base, point.runtime, f.about].filter(Boolean).join('\n')}
+        >
           <div className="flex flex-wrap items-center gap-2 text-md font-medium">
-            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: f.color }} />
+            <span
+              aria-hidden="true"
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: f.color }}
+            />
             <img
               src={f.family === 'Bun' ? bunIcon : nodeIcon}
               alt=""
@@ -119,13 +148,20 @@ export const Table = ({ view }: { view: View }) => {
               </span>
               <span>
                 p90{' '}
-                <Reading className={cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-bad' : ''}>
+                <Reading
+                  className={
+                    cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-bad' : ''
+                  }
+                >
                   {fixed(p90, 1)}
                 </Reading>
               </span>
             </span>
             {startup !== undefined && (
-              <span className="text-xs text-muted" title="Of the cold start, the time spent inside the process">
+              <span
+                className="text-xs text-muted"
+                title="Of the cold start, the time spent inside the process"
+              >
                 in-process <Reading>{fixed(startup, 1)}</Reading>
               </span>
             )}

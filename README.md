@@ -3,17 +3,17 @@
 One SST stack, nine Lambdas that do the same thing on different runtimes, and a script that
 measures their cold and warm starts:
 
-| Function | Runtime | What ships |
-|---|---|---|
-| `BunRuntime` | `provided.al2023` | `bun` executable + bundled `index.js`, started by a shell `bootstrap` |
-| `BunCompile` | `provided.al2023` | `bun build --compile --minify --bytecode` executable as `bootstrap` |
-| `BunCompileCanary` | `provided.al2023` | the same executable, built by the Bun build that `--trim` and `--aot` need |
-| `BunCompileTrim` | `provided.al2023` | `BunCompileCanary` with `--trim`, which drops the parts of Bun the code doesn't use |
-| `BunCompileAot` | `provided.al2023` | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the mincore shim |
-| `BunCompileAotTrim` | `provided.al2023` | same with `--aot --trim` |
-| `Node22` | `nodejs22.x` | SST's esbuild bundle |
-| `Node24` | `nodejs24.x` | SST's esbuild bundle |
-| `Node26` | `nodejs26.x` (public preview) | SST's esbuild bundle |
+| Function            | Runtime                       | What ships                                                                                  |
+| ------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `BunRuntime`        | `provided.al2023`             | `bun` executable + bundled `index.js`, started by a shell `bootstrap`                       |
+| `BunCompile`        | `provided.al2023`             | `bun build --compile --minify --bytecode` executable as `bootstrap`                         |
+| `BunCompileCanary`  | `provided.al2023`             | the same executable, built by the Bun build that `--trim` and `--aot` need                  |
+| `BunCompileTrim`    | `provided.al2023`             | `BunCompileCanary` with `--trim`, which drops the parts of Bun the code doesn't use         |
+| `BunCompileAot`     | `provided.al2023`             | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the mincore shim |
+| `BunCompileAotTrim` | `provided.al2023`             | same with `--aot --trim`                                                                    |
+| `Node22`            | `nodejs22.x`                  | SST's esbuild bundle                                                                        |
+| `Node24`            | `nodejs24.x`                  | SST's esbuild bundle                                                                        |
+| `Node26`            | `nodejs26.x` (public preview) | SST's esbuild bundle                                                                        |
 
 Every function runs the same handler ([`src/report.ts`](src/report.ts)), has the same architecture
 and timeout, and gets a public Function URL. Each one is deployed at 128, 256, 512, 1024 and
@@ -36,15 +36,15 @@ builds on the host instead, for its architecture only, and replaces the function
 
 Settings, all through the environment of `sst deploy`:
 
-| Variable | Default | |
-|---|---|---|
-| `LAMBDA_ARCH` | build host's | `x86_64`, `arm64` or `x86_64,arm64`. The `--aot` variants only build on the host when it matches; with two, see [Both architectures](#both-architectures-built-in-docker). |
-| `LAMBDA_MEMORY` | `128,256,512,1024,1769` | MB; every variant is deployed once per size, its id ending in `M<MB>` when there is more than one |
-| `VARIANTS` | all | e.g. `BunCompile,Node24` |
-| `BUN_BIN` | `bun` | Bun for `BunRuntime` and `BunCompile` |
-| `BUN_AOT_BIN` | `$BUN_BIN` | Bun for `BunCompileCanary` and the `--trim` and `--aot` variants |
-| `CC` | `cc` | C compiler for the mincore shim |
-| `BUN_BUNDLES` | unset | Deploy the Bun variants from `$BUN_BUNDLES/<arch>/<Variant>` instead of building them |
+| Variable        | Default                 |                                                                                                                                                                            |
+| --------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LAMBDA_ARCH`   | build host's            | `x86_64`, `arm64` or `x86_64,arm64`. The `--aot` variants only build on the host when it matches; with two, see [Both architectures](#both-architectures-built-in-docker). |
+| `LAMBDA_MEMORY` | `128,256,512,1024,1769` | MB; every variant is deployed once per size, its id ending in `M<MB>` when there is more than one                                                                          |
+| `VARIANTS`      | all                     | e.g. `BunCompile,Node24`                                                                                                                                                   |
+| `BUN_BIN`       | `bun`                   | Bun for `BunRuntime` and `BunCompile`                                                                                                                                      |
+| `BUN_AOT_BIN`   | `$BUN_BIN`              | Bun for `BunCompileCanary` and the `--trim` and `--aot` variants                                                                                                           |
+| `CC`            | `cc`                    | C compiler for the mincore shim                                                                                                                                            |
+| `BUN_BUNDLES`   | unset                   | Deploy the Bun variants from `$BUN_BUNDLES/<arch>/<Variant>` instead of building them                                                                                      |
 
 ## Both architectures, built in Docker
 
@@ -165,8 +165,13 @@ Lambda returns with `LogType: Tail`, so they are Lambda's own:
 Results land in `bench-results/` as Markdown and raw JSON. The
 [Deploy and benchmark](.github/workflows/bench.yml) workflow does all of it: `bun run build` on an
 `ubuntu-24.04` and an `ubuntu-24.04-arm` runner, each for its own architecture, then one job that
-deploys all 18 functions from those bundles and benchmarks them. It needs an `AWS_ROLE_ARN` secret
-for GitHub OIDC.
+deploys all 18 functions from those bundles and benchmarks them. That job runs in the `bench`
+GitHub environment and assumes an AWS role through GitHub OIDC. `bun run bootstrap:aws`, with
+admin credentials for the account and a logged-in `gh`, sets it up and is safe to re-run
+([`scripts/bootstrap-aws.ts`](scripts/bootstrap-aws.ts)): the account's GitHub OIDC provider, the
+role `bun-aot-lambda-github` that only `repo:<owner>/<repo>:environment:bench` may assume, with
+an inline policy for the services the stack uses, and the `bench` environment with the role's ARN
+as its `AWS_ROLE_ARN` secret.
 
 ## Scheduled runs, like lambda-perf
 
@@ -231,12 +236,12 @@ curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN
 The site's unlinked, `noindex` `/admin` page ([`web/admin.html`](web/admin.html)) does both
 from a secret field and two buttons, repeating `purge` until it's done.
 
-| Variable | Default | |
-|---|---|---|
-| `PERF_ROUNDS` | `10` | Cold starts per function and run |
-| `PERF_WARM` | `5` | Warm invocations after each cold start |
-| `PERF_CONCURRENCY` | `4` | Functions measured at once; each holds two of the account's concurrent executions |
-| `PERF_ADMIN_SECRET` | unset | Path segment that turns on PerfApi's `run` and `purge`; URL-safe characters only |
+| Variable            | Default |                                                                                   |
+| ------------------- | ------- | --------------------------------------------------------------------------------- |
+| `PERF_ROUNDS`       | `10`    | Cold starts per function and run                                                  |
+| `PERF_WARM`         | `5`     | Warm invocations after each cold start                                            |
+| `PERF_CONCURRENCY`  | `4`     | Functions measured at once; each holds two of the account's concurrent executions |
+| `PERF_ADMIN_SECRET` | unset   | Path segment that turns on PerfApi's `run` and `purge`; URL-safe characters only  |
 
 To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:
 `cd web && PERF_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.

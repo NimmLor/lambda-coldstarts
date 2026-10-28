@@ -49,11 +49,7 @@ export type ReportInput = {
   executableBytes: number
 }
 
-export const buildReport = ({
-  event,
-  remainingTimeMs,
-  executableBytes,
-}: ReportInput) => {
+export const buildReport = ({ event, remainingTimeMs, executableBytes }: ReportInput) => {
   const handlerStart = performance.now()
   invocations += 1
   const memory = process.memoryUsage()

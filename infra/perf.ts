@@ -42,7 +42,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     handler: 'src/perf/measure.handler',
     runtime: 'nodejs24.x',
     timeout: '3 minutes',
-    memory: "128 MB",
+    memory: '128 MB',
     // `link` grants access; the name comes through the environment, so the handlers don't depend on
     // sst-env.d.ts, which tsconfig.json doesn't include.
     link: [table],
@@ -59,7 +59,11 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
         // Every function's ARN outgrows an inline policy, so the functions' tag picks them instead.
         resources: ['arn:aws:lambda:*:*:function:*'],
         conditions: [
-          { test: 'StringEquals', variable: `aws:ResourceTag/${BENCH_TAG.key}`, values: [BENCH_TAG.value] },
+          {
+            test: 'StringEquals',
+            variable: `aws:ResourceTag/${BENCH_TAG.key}`,
+            values: [BENCH_TAG.value],
+          },
         ],
       },
     ],

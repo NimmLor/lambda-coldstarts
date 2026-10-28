@@ -117,7 +117,10 @@ const forceColdStarts = async (target: (typeof targets)[number]) => {
 }
 
 const samples = new Map<string, Sample[]>(targets.map((t) => [t.id, []]))
-const configs = new Map<string, { codeSizeMb: number; runtime: string; arch: string; memory: number }>()
+const configs = new Map<
+  string,
+  { codeSizeMb: number; runtime: string; arch: string; memory: number }
+>()
 
 // Rounds interleave the variants, so a slow minute in the region doesn't land on one of them.
 for (let round = 1; round <= ROUNDS; round++) {
@@ -131,7 +134,9 @@ for (let round = 1; round <= ROUNDS; round++) {
     })
     const batch = await Promise.all(Array.from({ length: COLD }, () => invoke(target)))
     samples.get(target.id)!.push(...batch)
-    console.log(`round ${round}/${ROUNDS} ${target.id}: ${batch.filter((s) => s.cold).length}/${COLD} cold`)
+    console.log(
+      `round ${round}/${ROUNDS} ${target.id}: ${batch.filter((s) => s.cold).length}/${COLD} cold`
+    )
   }
 }
 for (const target of targets) {
@@ -155,14 +160,38 @@ const rows = targets.map(({ id }) => {
     id,
     ...config,
     coldSamples: cold.length,
-    initP50: percentile(cold.map((s) => s.initMs!), 50),
-    initP90: percentile(cold.map((s) => s.initMs!), 90),
-    startupP50: percentile(cold.map((s) => s.startupMs ?? Number.NaN), 50),
-    coldDurationP50: percentile(cold.map((s) => s.durationMs), 50),
-    coldClientP50: percentile(cold.map((s) => s.clientMs), 50),
-    warmDurationP50: percentile(warm.map((s) => s.durationMs), 50),
-    warmClientP50: percentile(warm.map((s) => s.clientMs), 50),
-    maxMemoryP50: percentile(all.map((s) => s.maxMemoryMb), 50),
+    initP50: percentile(
+      cold.map((s) => s.initMs!),
+      50
+    ),
+    initP90: percentile(
+      cold.map((s) => s.initMs!),
+      90
+    ),
+    startupP50: percentile(
+      cold.map((s) => s.startupMs ?? Number.NaN),
+      50
+    ),
+    coldDurationP50: percentile(
+      cold.map((s) => s.durationMs),
+      50
+    ),
+    coldClientP50: percentile(
+      cold.map((s) => s.clientMs),
+      50
+    ),
+    warmDurationP50: percentile(
+      warm.map((s) => s.durationMs),
+      50
+    ),
+    warmClientP50: percentile(
+      warm.map((s) => s.clientMs),
+      50
+    ),
+    maxMemoryP50: percentile(
+      all.map((s) => s.maxMemoryMb),
+      50
+    ),
   }
 })
 
@@ -173,21 +202,23 @@ const markdown = [
   '',
   '| Variant | Runtime | Code size | Init p50 | Init p90 | In-process startup p50 | Cold invoke p50 | Cold round trip p50 | Warm invoke p50 | Warm round trip p50 | Max memory p50 |',
   '|---|---|---|---|---|---|---|---|---|---|---|',
-  ...rows.map((r) =>
-    [
-      r.id,
-      r.runtime,
-      fmt(r.codeSizeMb, ' MB'),
-      fmt(r.initP50),
-      fmt(r.initP90),
-      fmt(r.startupP50),
-      fmt(r.coldDurationP50),
-      fmt(r.coldClientP50),
-      fmt(r.warmDurationP50),
-      fmt(r.warmClientP50),
-      fmt(r.maxMemoryP50, ' MB'),
-    ].join(' | ')
-  ).map((line) => `| ${line} |`),
+  ...rows
+    .map((r) =>
+      [
+        r.id,
+        r.runtime,
+        fmt(r.codeSizeMb, ' MB'),
+        fmt(r.initP50),
+        fmt(r.initP90),
+        fmt(r.startupP50),
+        fmt(r.coldDurationP50),
+        fmt(r.coldClientP50),
+        fmt(r.warmDurationP50),
+        fmt(r.warmClientP50),
+        fmt(r.maxMemoryP50, ' MB'),
+      ].join(' | ')
+    )
+    .map((line) => `| ${line} |`),
 ].join('\n')
 console.log(`\n${markdown}`)
 
@@ -195,7 +226,11 @@ await mkdir('bench-results', { recursive: true })
 const stamp = new Date().toISOString().replaceAll(':', '-')
 await writeFile(
   `bench-results/${stamp}.json`,
-  JSON.stringify({ args: { ROUNDS, COLD, WARM }, rows, samples: Object.fromEntries(samples) }, null, 2)
+  JSON.stringify(
+    { args: { ROUNDS, COLD, WARM }, rows, samples: Object.fromEntries(samples) },
+    null,
+    2
+  )
 )
 await writeFile(`bench-results/${stamp}.md`, `${markdown}\n`)
 console.log(`\nResults: bench-results/${stamp}.{md,json}`)

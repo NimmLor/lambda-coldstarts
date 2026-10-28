@@ -13,8 +13,7 @@ const percentile = (sorted: number[], p: number) => {
   return round(below + (above - below) * (rank - Math.floor(rank)))
 }
 
-const average = (values: number[]) =>
-  round(values.reduce((sum, v) => sum + v, 0) / values.length)
+const average = (values: number[]) => round(values.reduce((sum, v) => sum + v, 0) / values.length)
 
 const stats = (values: number[]) => {
   const sorted = values.toSorted((a, b) => a - b)

@@ -35,7 +35,8 @@ export const VARIANTS: Record<string, Variant> = {
     name: 'Bun runtime',
     family: 'Bun',
     build: 'bun build --target=bun --format=esm --minify',
-    about: 'The bundle, run by a bun executable shipped next to it and started by a shell bootstrap',
+    about:
+      'The bundle, run by a bun executable shipped next to it and started by a shell bootstrap',
   },
   BunCompile: {
     name: 'Bun executable',
@@ -62,7 +63,8 @@ export const VARIANTS: Record<string, Variant> = {
     family: 'Bun',
     build: 'bun build --compile --aot',
     canary: true,
-    about: 'An ahead-of-time compiled executable, behind a bootstrap that preloads the mincore shim',
+    about:
+      'An ahead-of-time compiled executable, behind a bootstrap that preloads the mincore shim',
   },
   BunCompileAotTrim: {
     name: 'Bun AOT executable, trimmed',
@@ -179,7 +181,10 @@ export const fixed = (value: number | undefined, digits: number) => value?.toFix
 export const niceMax = (value: number) => {
   if (!(value > 0)) return 1
   const magnitude = 10 ** Math.floor(Math.log10(value))
-  return [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * magnitude >= value * 1.05)! * magnitude
+  return (
+    [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * magnitude >= value * 1.05)! *
+    magnitude
+  )
 }
 
 export const day = (date: Date) =>

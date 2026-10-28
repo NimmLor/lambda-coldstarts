@@ -7,12 +7,7 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { serve } from 'bun'
-import {
-  buildBunBundle,
-  lambdaArch,
-  toLambdaArch,
-  unavailableReason,
-} from '../infra/build'
+import { buildBunBundle, lambdaArch, toLambdaArch, unavailableReason } from '../infra/build'
 import { VARIANTS } from '../infra/functions'
 
 const arch = lambdaArch()

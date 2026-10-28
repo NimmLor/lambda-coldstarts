@@ -31,9 +31,14 @@ export const MemoryChart = ({
       return at && agg(at, 'cold')
     }),
   }))
-  const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== undefined))))
+  const max = niceMax(
+    Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== undefined)))
+  )
   const y = (v: number) => 100 - (v / max) * 100
-  const grid = [0, 0.25, 0.5, 0.75, 1].map((g) => ({ top: 100 - g * 100, label: (max * g).toFixed(0) }))
+  const grid = [0, 0.25, 0.5, 0.75, 1].map((g) => ({
+    top: 100 - g * 100,
+    label: (max * g).toFixed(0),
+  }))
   // The focused line last, so it's drawn on top.
   const ordered = series.toSorted((a, b) => Number(a.f.base === focus) - Number(b.f.base === focus))
   const selected = memories.indexOf(memoryMb)
@@ -88,7 +93,9 @@ export const MemoryChart = ({
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
                 strokeDasharray={s.f.family === 'Node' ? '5 4' : undefined}
-                points={s.values.flatMap((v, i) => (v === undefined ? [] : [`${x(i)},${y(v)}`])).join(' ')}
+                points={s.values
+                  .flatMap((v, i) => (v === undefined ? [] : [`${x(i)},${y(v)}`]))
+                  .join(' ')}
               />
             ))}
           </svg>
@@ -98,7 +105,11 @@ export const MemoryChart = ({
               <div
                 key={s.f.base}
                 className="absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
-                style={{ left: `${x(selected)}%`, top: `${y(s.values[selected]!)}%`, background: s.f.color }}
+                style={{
+                  left: `${x(selected)}%`,
+                  top: `${y(s.values[selected]!)}%`,
+                  background: s.f.color,
+                }}
               />
             ))}
           <div className="absolute inset-0 flex">

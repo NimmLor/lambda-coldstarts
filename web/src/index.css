@@ -63,7 +63,9 @@
     color: var(--color-muted);
     white-space: nowrap;
     cursor: pointer;
-    transition: background-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out);
+    transition:
+      background-color var(--dur-short) var(--ease-out),
+      color var(--dur-short) var(--ease-out);
   }
 
   .cells > button + button {

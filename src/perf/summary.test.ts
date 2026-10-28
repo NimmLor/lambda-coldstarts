@@ -51,7 +51,9 @@ it('pools the warm durations of every round, and has none for runs without them'
 
 it('interpolates percentiles, so p90 of ten cold starts is not just the slowest', () => {
   const [f] = summarize(
-    [100, 101, 102, 103, 104, 105, 106, 107, 108, 500].map((initMs, i) => sample('F', i + 1, initMs))
+    [100, 101, 102, 103, 104, 105, 106, 107, 108, 500].map((initMs, i) =>
+      sample('F', i + 1, initMs)
+    )
   )
   expect(f!.initMs.p50).toBe(104.5)
   expect(f!.initMs.p90).toBe(147.2)

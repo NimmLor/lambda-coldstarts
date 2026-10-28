@@ -4,14 +4,7 @@
  * both call it.
  */
 import { execFileSync } from 'node:child_process'
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
 
@@ -27,10 +20,8 @@ export const bunBin = () => process.env.BUN_BIN || 'bun'
 /** The Bun used for the `canary`, `--trim` and `--aot` variants: a build of oven-sh/bun#45631 until that ships. */
 export const bunAotBin = () => process.env.BUN_AOT_BIN || bunBin()
 
-const run = (file: string, args: string[]) =>
-  execFileSync(file, args, { stdio: 'inherit' })
-const read = (file: string, args: string[]) =>
-  execFileSync(file, args, { encoding: 'utf8' }).trim()
+const run = (file: string, args: string[]) => execFileSync(file, args, { stdio: 'inherit' })
+const read = (file: string, args: string[]) => execFileSync(file, args, { encoding: 'utf8' }).trim()
 
 export const bunVersion = (bin: string) => read(bin, ['--version'])
 
@@ -61,7 +52,9 @@ export const lambdaArchs = (): LambdaArch[] => {
 export const lambdaArch = (): LambdaArch => {
   const archs = lambdaArchs()
   if (archs.length > 1) {
-    throw new Error(`Builds on this host take one LAMBDA_ARCH, not ${archs.join(',')}; bun run build builds both`)
+    throw new Error(
+      `Builds on this host take one LAMBDA_ARCH, not ${archs.join(',')}; bun run build builds both`
+    )
   }
   return archs[0]!
 }
@@ -172,15 +165,11 @@ const addMincoreShim = (bundle: string) => {
       path.resolve(MINCORE_SHIM_SOURCE),
     ])
   } catch (error) {
-    throw new Error(
-      'An --aot build needs a C compiler ($CC or cc) for the Lambda mincore shim',
-      { cause: error }
-    )
+    throw new Error('An --aot build needs a C compiler ($CC or cc) for the Lambda mincore shim', {
+      cause: error,
+    })
   }
-  writeBootstrap(
-    bundle,
-    'LD_PRELOAD="${0%/*}/mincore-shim.so" exec "${0%/*}/app"'
-  )
+  writeBootstrap(bundle, 'LD_PRELOAD="${0%/*}/mincore-shim.so" exec "${0%/*}/app"')
 }
 
 // Lambda's /var/task has neither, so a compiled executable shouldn't look for them on every cold start.

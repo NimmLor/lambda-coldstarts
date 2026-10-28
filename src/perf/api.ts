@@ -48,7 +48,13 @@ type Run = {
   functionCount: number
 }
 
-const toRun = ({ sk, finishedAt, rounds, warmInvocations, functionCount }: Record<string, unknown>) =>
+const toRun = ({
+  sk,
+  finishedAt,
+  rounds,
+  warmInvocations,
+  functionCount,
+}: Record<string, unknown>) =>
   ({ runId: sk, finishedAt, rounds, warmInvocations, functionCount }) as Run
 
 const listRuns = async (limit = 30) => {

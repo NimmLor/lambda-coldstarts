@@ -40,11 +40,7 @@ const toErrorPayload = (error: unknown) =>
       }
     : { errorType: 'Error', errorMessage: String(error), stackTrace: [] }
 
-const post = async (
-  url: string,
-  body: unknown,
-  headers?: Record<string, string>
-) => {
+const post = async (url: string, body: unknown, headers?: Record<string, string>) => {
   const response = await fetch(url, {
     method: 'POST',
     headers,
@@ -64,9 +60,7 @@ export const startLambdaRuntime = async <TEvent, TResult>(
 ): Promise<never> => {
   const runtimeApi = process.env.AWS_LAMBDA_RUNTIME_API
   if (!runtimeApi) {
-    throw new Error(
-      'AWS_LAMBDA_RUNTIME_API is not set; this executable runs as a Lambda bootstrap'
-    )
+    throw new Error('AWS_LAMBDA_RUNTIME_API is not set; this executable runs as a Lambda bootstrap')
   }
   const base = `http://${runtimeApi}/2018-06-01/runtime/invocation`
 
@@ -89,8 +83,7 @@ export const startLambdaRuntime = async <TEvent, TResult>(
 
     const context: LambdaContext = {
       awsRequestId,
-      invokedFunctionArn:
-        headers.get('lambda-runtime-invoked-function-arn') ?? '',
+      invokedFunctionArn: headers.get('lambda-runtime-invoked-function-arn') ?? '',
       deadlineMs: Number(headers.get('lambda-runtime-deadline-ms')),
     }
 

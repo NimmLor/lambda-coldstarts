@@ -3,19 +3,44 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="How the Bun vs Node.js cold start benchmark handles personal data." />
+    <meta
+      name="description"
+      content="How the Bun vs Node.js cold start benchmark handles personal data."
+    />
     <!-- Self-hosted fonts, inline so the bundler leaves their URLs alone; build.ts and dev.ts serve /fonts. -->
     <style>
-      @font-face { font-family: 'Host Grotesk'; font-weight: 400; font-display: swap; src: url('/fonts/host-grotesk-latin-400-normal.woff2') format('woff2'); }
-      @font-face { font-family: 'Host Grotesk'; font-weight: 500; font-display: swap; src: url('/fonts/host-grotesk-latin-500-normal.woff2') format('woff2'); }
-      @font-face { font-family: 'Atkinson Hyperlegible Mono'; font-weight: 400; font-display: swap; src: url('/fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2'); }
-      @font-face { font-family: 'Atkinson Hyperlegible Mono'; font-weight: 500; font-display: swap; src: url('/fonts/atkinson-hyperlegible-mono-latin-500-normal.woff2') format('woff2'); }
+      @font-face {
+        font-family: 'Host Grotesk';
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/host-grotesk-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Host Grotesk';
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/host-grotesk-latin-500-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Atkinson Hyperlegible Mono';
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Atkinson Hyperlegible Mono';
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/atkinson-hyperlegible-mono-latin-500-normal.woff2') format('woff2');
+      }
     </style>
     <title>Privacy policy</title>
     <link rel="stylesheet" href="./src/index.css" />
   </head>
   <body>
-    <header class="mx-auto flex w-full max-w-(--container) flex-col gap-6 px-(--gutter) pt-10 pb-10 sm:pt-16">
+    <header
+      class="mx-auto flex w-full max-w-(--container) flex-col gap-6 px-(--gutter) pt-10 pb-10 sm:pt-16"
+    >
       <a href="/" class="self-start text-sm">Bun vs Node.js cold start benchmark</a>
       <h1 class="text-3xl">Privacy policy</h1>
       <p class="text-sm">Last updated <time datetime="2026-10-28">October 28, 2026</time></p>
@@ -31,79 +56,99 @@
           4020 Linz, ÖSTERREICH<br />
           Email: <a href="mailto:office@nimmervoll.work">office@nimmervoll.work</a>
         </address>
-        <p>For any privacy-specific concerns, you can contact our designated privacy officer at the same address.</p>
+        <p>
+          For any privacy-specific concerns, you can contact our designated privacy officer at the
+          same address.
+        </p>
 
         <h2>2. What Information We Do Not Collect</h2>
         <p>
-          To maximize your privacy, we have intentionally designed this website to avoid collecting personal data. We do
-          not use:
+          To maximize your privacy, we have intentionally designed this website to avoid collecting
+          personal data. We do not use:
         </p>
         <ul>
           <li><strong>Cookies:</strong> We do not place any cookies on your browser.</li>
           <li>
-            <strong>Local or Session Storage:</strong> We do not store any information in your browser’s local or
-            session storage.
+            <strong>Local or Session Storage:</strong> We do not store any information in your
+            browser’s local or session storage.
           </li>
-          <li><strong>Analytics:</strong> We do not use any analytics services to track your behavior.</li>
-          <li><strong>Accounts or Profiles:</strong> You cannot create an account or user profile on this website.</li>
           <li>
-            <strong>Third-Party Content:</strong> Fonts and icons are served from this website’s own domain, so your
-            browser does not contact any other provider while you view it.
+            <strong>Analytics:</strong> We do not use any analytics services to track your behavior.
+          </li>
+          <li>
+            <strong>Accounts or Profiles:</strong> You cannot create an account or user profile on
+            this website.
+          </li>
+          <li>
+            <strong>Third-Party Content:</strong> Fonts and icons are served from this website’s own
+            domain, so your browser does not contact any other provider while you view it.
           </li>
         </ul>
 
         <h2>3. What This Website Shows</h2>
         <p>
-          This website displays the results of automated benchmarks of AWS Lambda functions. It has no forms and no
-          accounts, so you cannot submit any information to it. The benchmark results contain no personal data.
+          This website displays the results of automated benchmarks of AWS Lambda functions. It has
+          no forms and no accounts, so you cannot submit any information to it. The benchmark
+          results contain no personal data.
         </p>
 
         <h2>4. Third-Party Services &amp; Data Storage</h2>
-        <p>This website is hosted on Amazon Web Services (AWS) and utilizes the following services:</p>
+        <p>
+          This website is hosted on Amazon Web Services (AWS) and utilizes the following services:
+        </p>
         <ul>
-          <li><strong>Amazon S3 and CloudFront:</strong> For hosting and delivering the website content.</li>
-          <li><strong>AWS Lambda:</strong> For serving the benchmark results the website displays.</li>
+          <li>
+            <strong>Amazon S3 and CloudFront:</strong> For hosting and delivering the website
+            content.
+          </li>
+          <li>
+            <strong>AWS Lambda:</strong> For serving the benchmark results the website displays.
+          </li>
           <li><strong>Amazon DynamoDB:</strong> For storing the benchmark results.</li>
           <li>
-            <strong>Amazon CloudWatch:</strong> For monitoring, metrics, and log aggregation related to the operation
-            and security of the service.
+            <strong>Amazon CloudWatch:</strong> For monitoring, metrics, and log aggregation related
+            to the operation and security of the service.
           </li>
         </ul>
         <p>
-          All data and services are located within the eu-central-1 (Frankfurt, Germany) region, except for the
-          CloudFront edge locations described in section 4a. AWS acts as our data processor and is responsible for the
-          physical security of the infrastructure.
+          All data and services are located within the eu-central-1 (Frankfurt, Germany) region,
+          except for the CloudFront edge locations described in section 4a. AWS acts as our data
+          processor and is responsible for the physical security of the infrastructure.
         </p>
 
         <h3>4a. Amazon CloudFront (CDN)</h3>
         <p>
-          We use the Amazon CloudFront Content Delivery Network (CDN), provided by Amazon Web Services EMEA SARL, 38
-          avenue John F. Kennedy, L-1855 Luxembourg (AWS), to increase the security and delivery speed of this website.
-          This processing is based on our legitimate interest in secure and efficient content delivery (Art. 6(1)(f)
-          GDPR).
+          We use the Amazon CloudFront Content Delivery Network (CDN), provided by Amazon Web
+          Services EMEA SARL, 38 avenue John F. Kennedy, L-1855 Luxembourg (AWS), to increase the
+          security and delivery speed of this website. This processing is based on our legitimate
+          interest in secure and efficient content delivery (Art. 6(1)(f) GDPR).
         </p>
         <p>
-          A CDN is a network of distributed servers that can deliver content to website users in a technically optimized
-          way. For this purpose, AWS may process personal data in technical server log files as our processor. This can
-          include your IP address, the requested URL, date and time of access, user agent, referrer, and an internal
-          request identifier. We do not use cookies or browser storage in connection with CloudFront.
+          A CDN is a network of distributed servers that can deliver content to website users in a
+          technically optimized way. For this purpose, AWS may process personal data in technical
+          server log files as our processor. This can include your IP address, the requested URL,
+          date and time of access, user agent, referrer, and an internal request identifier. We do
+          not use cookies or browser storage in connection with CloudFront.
         </p>
         <p>
-          <strong>Recipient and location:</strong> AWS is the recipient of the data and acts as our processor.
-          CloudFront answers each request from the edge location nearest to you, which may be outside the EU/EEA.
+          <strong>Recipient and location:</strong> AWS is the recipient of the data and acts as our
+          processor. CloudFront answers each request from the edge location nearest to you, which
+          may be outside the EU/EEA.
         </p>
         <p>
-          <strong>Necessity:</strong> The processing described in this section is neither legally nor contractually
-          required. However, without CloudFront the full functionality, stability, and performance of the website cannot
-          be guaranteed.
+          <strong>Necessity:</strong> The processing described in this section is neither legally
+          nor contractually required. However, without CloudFront the full functionality, stability,
+          and performance of the website cannot be guaranteed.
         </p>
         <p>
-          <strong>Objection:</strong> You have the right to object to this processing. Whether an objection is
-          successful must be determined based on a balancing of interests in the individual case.
+          <strong>Objection:</strong> You have the right to object to this processing. Whether an
+          objection is successful must be determined based on a balancing of interests in the
+          individual case.
         </p>
         <p>
-          <strong>Retention:</strong> We do not enable CloudFront access logs on our side. AWS may retain short-lived
-          technical service logs as necessary to operate and secure the CDN according to AWS policies.
+          <strong>Retention:</strong> We do not enable CloudFront access logs on our side. AWS may
+          retain short-lived technical service logs as necessary to operate and secure the CDN
+          according to AWS policies.
         </p>
         <p>
           Further information and AWS GDPR commitments can be found here:
@@ -113,34 +158,37 @@
 
         <h3>4b. Amazon CloudWatch (Monitoring &amp; Logs)</h3>
         <p>
-          We use Amazon CloudWatch, provided by Amazon Web Services EMEA SARL, 38 avenue John F. Kennedy, L-1855
-          Luxembourg (AWS), to collect and view technical logs, metrics, and alerts required to operate and secure this
-          website. This processing is based on our legitimate interest in ensuring reliability, security, and
-          performance (Art. 6(1)(f) GDPR).
+          We use Amazon CloudWatch, provided by Amazon Web Services EMEA SARL, 38 avenue John F.
+          Kennedy, L-1855 Luxembourg (AWS), to collect and view technical logs, metrics, and alerts
+          required to operate and secure this website. This processing is based on our legitimate
+          interest in ensuring reliability, security, and performance (Art. 6(1)(f) GDPR).
         </p>
         <p>
-          <strong>What is collected:</strong> CloudWatch receives machine-generated technical events from our backend
-          and infrastructure components. Depending on the event, these logs can contain timestamps, request paths/URLs,
-          internal identifiers, error messages/stack traces, performance metrics, and IP addresses included in standard
-          HTTP access logs or upstream service headers. We do not use CloudWatch for user profiling, and it does not
-          place cookies or use browser storage.
+          <strong>What is collected:</strong> CloudWatch receives machine-generated technical events
+          from our backend and infrastructure components. Depending on the event, these logs can
+          contain timestamps, request paths/URLs, internal identifiers, error messages/stack traces,
+          performance metrics, and IP addresses included in standard HTTP access logs or upstream
+          service headers. We do not use CloudWatch for user profiling, and it does not place
+          cookies or use browser storage.
         </p>
         <p>
-          <strong>Recipient and location:</strong> AWS is the recipient of the data and acts as our processor. We
-          configure CloudWatch to store logs and metrics in the EU (Frankfurt, eu-central-1) region.
+          <strong>Recipient and location:</strong> AWS is the recipient of the data and acts as our
+          processor. We configure CloudWatch to store logs and metrics in the EU (Frankfurt,
+          eu-central-1) region.
         </p>
         <p>
-          <strong>Necessity:</strong> The processing described in this section is neither legally nor contractually
-          required. However, without CloudWatch, we cannot adequately ensure system reliability, incident response, or
-          abuse prevention.
+          <strong>Necessity:</strong> The processing described in this section is neither legally
+          nor contractually required. However, without CloudWatch, we cannot adequately ensure
+          system reliability, incident response, or abuse prevention.
         </p>
         <p>
-          <strong>Retention:</strong> Logs from the functions behind this website are kept for one month and then
-          deleted automatically.
+          <strong>Retention:</strong> Logs from the functions behind this website are kept for one
+          month and then deleted automatically.
         </p>
         <p>
-          <strong>Objection:</strong> You have the right to object to this processing. Whether an objection is
-          successful must be determined based on a balancing of interests in the individual case.
+          <strong>Objection:</strong> You have the right to object to this processing. Whether an
+          objection is successful must be determined based on a balancing of interests in the
+          individual case.
         </p>
         <p>
           Further information and AWS GDPR commitments can be found here:
@@ -150,58 +198,63 @@
 
         <h2>5. International Data Transfers</h2>
         <p>
-          Data is stored and processed in the AWS Frankfurt region. The only exception is CloudFront, which may serve
-          your request from an edge location outside the European Economic Area (EEA), as described in section 4a. Such
-          transfers are covered by the AWS GDPR Data Processing Addendum, which includes the EU Standard Contractual
-          Clauses.
+          Data is stored and processed in the AWS Frankfurt region. The only exception is
+          CloudFront, which may serve your request from an edge location outside the European
+          Economic Area (EEA), as described in section 4a. Such transfers are covered by the AWS
+          GDPR Data Processing Addendum, which includes the EU Standard Contractual Clauses.
         </p>
 
         <h2>6. Your Rights Under the GDPR</h2>
         <p>
-          Under the General Data Protection Regulation (GDPR), you have certain rights regarding your personal data. We
-          are obligated to inform you of these rights, which include:
+          Under the General Data Protection Regulation (GDPR), you have certain rights regarding
+          your personal data. We are obligated to inform you of these rights, which include:
         </p>
         <ul>
           <li>
-            <strong>The right to access:</strong> You have the right to request copies of your personal data.
+            <strong>The right to access:</strong> You have the right to request copies of your
+            personal data.
           </li>
           <li>
-            <strong>The right to rectification:</strong> You have the right to request that we correct any information
-            you believe is inaccurate or complete information you believe is incomplete.
+            <strong>The right to rectification:</strong> You have the right to request that we
+            correct any information you believe is inaccurate or complete information you believe is
+            incomplete.
           </li>
           <li>
-            <strong>The right to erasure (the “right to be forgotten”):</strong> You have the right to request that we
-            erase your personal data, under certain conditions.
+            <strong>The right to erasure (the “right to be forgotten”):</strong> You have the right
+            to request that we erase your personal data, under certain conditions.
           </li>
           <li>
-            <strong>The right to restrict processing:</strong> You have the right to request that we restrict the
+            <strong>The right to restrict processing:</strong> You have the right to request that we
+            restrict the processing of your personal data, under certain conditions.
+          </li>
+          <li>
+            <strong>The right to object to processing:</strong> You have the right to object to our
             processing of your personal data, under certain conditions.
           </li>
           <li>
-            <strong>The right to object to processing:</strong> You have the right to object to our processing of your
-            personal data, under certain conditions.
-          </li>
-          <li>
-            <strong>The right to data portability:</strong> You have the right to request that we transfer the data that
-            we have collected to another organization, or directly to you, under certain conditions.
+            <strong>The right to data portability:</strong> You have the right to request that we
+            transfer the data that we have collected to another organization, or directly to you,
+            under certain conditions.
           </li>
         </ul>
         <p>
-          <strong>Important Limitation:</strong> Because this website does not collect any personal information that
-          could identify you, it is not technically possible for us to identify, access, rectify, or erase data
-          associated with a specific individual.
+          <strong>Important Limitation:</strong> Because this website does not collect any personal
+          information that could identify you, it is not technically possible for us to identify,
+          access, rectify, or erase data associated with a specific individual.
         </p>
         <p>
-          Despite this technical limitation, if you have any questions or concerns about our privacy practices, you have
-          the right to lodge a complaint with a supervisory authority in your country of residence.
+          Despite this technical limitation, if you have any questions or concerns about our privacy
+          practices, you have the right to lodge a complaint with a supervisory authority in your
+          country of residence.
         </p>
 
         <h2>7. Changes to This Privacy Policy</h2>
         <p>
-          We may update this Privacy Policy from time to time to reflect changes in our practices or for other
-          operational, legal, or regulatory reasons. Any changes will be posted on this page, and the “Last updated”
-          date at the top of this policy will be revised. We encourage you to review this policy periodically. Your
-          continued use of the website after any changes are posted will constitute your acceptance of such changes.
+          We may update this Privacy Policy from time to time to reflect changes in our practices or
+          for other operational, legal, or regulatory reasons. Any changes will be posted on this
+          page, and the “Last updated” date at the top of this policy will be revised. We encourage
+          you to review this policy periodically. Your continued use of the website after any
+          changes are posted will constitute your acceptance of such changes.
         </p>
 
         <h2>8. Contact Us</h2>

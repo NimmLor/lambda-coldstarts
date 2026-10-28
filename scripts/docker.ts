@@ -12,8 +12,7 @@ const BASE_IMAGE = 'public.ecr.aws/amazonlinux/amazonlinux:2023'
 const SETUP = 'infra/build-image.sh'
 
 export const hostArch = toLambdaArch(process.arch)
-const dockerPlatform = (arch: LambdaArch) =>
-  arch === 'arm64' ? 'linux/arm64' : 'linux/amd64'
+const dockerPlatform = (arch: LambdaArch) => (arch === 'arm64' ? 'linux/arm64' : 'linux/amd64')
 
 /** The command that registers QEMU for `arch`, for a Docker that can't run it yet. */
 export const emulationHint = (arch: LambdaArch) =>
@@ -44,7 +43,19 @@ const buildImage = (arch: LambdaArch) => {
   const container = `bun-aot-lambda-setup-${arch}-${process.pid}`
   try {
     docker(
-      ['run', '-i', '--platform', dockerPlatform(arch), '--name', container, '-e', `LAMBDA_ARCH=${arch}`, BASE_IMAGE, 'sh', '-s'],
+      [
+        'run',
+        '-i',
+        '--platform',
+        dockerPlatform(arch),
+        '--name',
+        container,
+        '-e',
+        `LAMBDA_ARCH=${arch}`,
+        BASE_IMAGE,
+        'sh',
+        '-s',
+      ],
       setup
     )
     docker(['commit', container, image])

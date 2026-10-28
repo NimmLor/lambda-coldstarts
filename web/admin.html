@@ -7,22 +7,47 @@
     <meta name="robots" content="noindex, nofollow" />
     <!-- Self-hosted fonts, inline so the bundler leaves their URLs alone; build.ts and dev.ts serve /fonts. -->
     <style>
-      @font-face { font-family: 'Host Grotesk'; font-weight: 400; font-display: swap; src: url('/fonts/host-grotesk-latin-400-normal.woff2') format('woff2'); }
-      @font-face { font-family: 'Host Grotesk'; font-weight: 500; font-display: swap; src: url('/fonts/host-grotesk-latin-500-normal.woff2') format('woff2'); }
-      @font-face { font-family: 'Atkinson Hyperlegible Mono'; font-weight: 400; font-display: swap; src: url('/fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2'); }
-      @font-face { font-family: 'Atkinson Hyperlegible Mono'; font-weight: 500; font-display: swap; src: url('/fonts/atkinson-hyperlegible-mono-latin-500-normal.woff2') format('woff2'); }
+      @font-face {
+        font-family: 'Host Grotesk';
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/host-grotesk-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Host Grotesk';
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/host-grotesk-latin-500-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Atkinson Hyperlegible Mono';
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Atkinson Hyperlegible Mono';
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/atkinson-hyperlegible-mono-latin-500-normal.woff2') format('woff2');
+      }
     </style>
     <title>Admin</title>
     <link rel="stylesheet" href="./src/index.css" />
   </head>
   <body>
-    <header class="mx-auto flex w-full max-w-(--container) flex-col gap-6 px-(--gutter) pt-10 pb-10 sm:pt-16">
+    <header
+      class="mx-auto flex w-full max-w-(--container) flex-col gap-6 px-(--gutter) pt-10 pb-10 sm:pt-16"
+    >
       <a href="/" class="self-start text-sm">Bun vs Node.js cold start benchmark</a>
       <h1 class="text-3xl">Admin</h1>
     </header>
 
     <main class="mx-auto w-full max-w-(--container) px-(--gutter) pb-16">
-      <form id="admin" class="flex max-w-xl flex-col gap-5 rounded-card border border-rule bg-paper-2 p-5 sm:p-6">
+      <form
+        id="admin"
+        class="flex max-w-xl flex-col gap-5 rounded-card border border-rule bg-paper-2 p-5 sm:p-6"
+      >
         <label class="flex flex-col gap-2">
           <span class="text-sm font-medium text-ink">Secret</span>
           <input
@@ -34,8 +59,12 @@
           />
         </label>
         <div class="flex flex-wrap gap-3">
-          <button type="submit" name="action" value="run" class="btn btn--primary">Start a run</button>
-          <button type="submit" name="action" value="purge" class="btn text-bad">Purge PerfResults</button>
+          <button type="submit" name="action" value="run" class="btn btn--primary">
+            Start a run
+          </button>
+          <button type="submit" name="action" value="purge" class="btn text-bad">
+            Purge PerfResults
+          </button>
         </div>
         <output id="log" class="measured text-sm whitespace-pre-wrap" aria-live="polite"></output>
       </form>

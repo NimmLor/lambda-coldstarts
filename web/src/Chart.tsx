@@ -30,7 +30,9 @@ export const Chart = ({
   const n = runs.length
   const x = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100)
   const series = shown.map((f) => ({ f, values: runs.map((r) => r.points.get(f.id)?.[m.key]) }))
-  const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== undefined))))
+  const max = niceMax(
+    Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== undefined)))
+  )
   const y = (v: number) => 100 - (v / max) * 100
   const grid = [0, 0.25, 0.5, 0.75, 1].map((g) => ({
     top: 100 - g * 100,
@@ -45,9 +47,7 @@ export const Chart = ({
   const ticks = dateTicks(n, wide ? 4 : 2)
 
   return (
-    <article
-      className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}
-    >
+    <article className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm text-muted">
         <div className="flex flex-wrap items-baseline gap-x-3">
           <h2 className={`text-ink ${wide ? 'text-xl' : 'text-lg'}`}>{m.title}</h2>
@@ -56,7 +56,11 @@ export const Chart = ({
         {best && (
           <span className="inline-flex items-center gap-2">
             {m.leader}
-            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: best.color }} />
+            <span
+              aria-hidden="true"
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: best.color }}
+            />
             <span className="font-medium text-ink">{best.name}</span>
           </span>
         )}
@@ -104,7 +108,9 @@ export const Chart = ({
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
                 strokeDasharray={s.f.family === 'Node' ? '5 4' : undefined}
-                points={s.values.flatMap((v, i) => (v === undefined ? [] : [`${x(i)},${y(v)}`])).join(' ')}
+                points={s.values
+                  .flatMap((v, i) => (v === undefined ? [] : [`${x(i)},${y(v)}`]))
+                  .join(' ')}
               />
             ))}
           </svg>
@@ -117,7 +123,11 @@ export const Chart = ({
                   <div
                     key={s.f.id}
                     className="absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
-                    style={{ left: `${x(hover)}%`, top: `${y(s.values[hover]!)}%`, background: s.f.color }}
+                    style={{
+                      left: `${x(hover)}%`,
+                      top: `${y(s.values[hover]!)}%`,
+                      background: s.f.color,
+                    }}
                   />
                 ))}
             </>

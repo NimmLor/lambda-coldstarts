@@ -54,7 +54,8 @@ const memorySizes = () => {
     .split(',')
     .map((mb) => Number(mb.trim()))
   const invalid = sizes.filter((mb) => !Number.isInteger(mb) || mb < 128 || mb > 10240)
-  if (invalid.length) throw new Error(`LAMBDA_MEMORY must list MB from 128 to 10240, not ${invalid.join(', ')}`)
+  if (invalid.length)
+    throw new Error(`LAMBDA_MEMORY must list MB from 128 to 10240, not ${invalid.join(', ')}`)
   return [...new Set(sizes)]
 }
 
@@ -105,7 +106,9 @@ export const createFunctions = () => {
     for (const v of selected()) {
       // Built once, deployed at every memory size.
       const { bundle, reason } =
-        v.kind === 'bun' ? bunBundle(v.id, v.variant, architecture) : { bundle: undefined, reason: undefined }
+        v.kind === 'bun'
+          ? bunBundle(v.id, v.variant, architecture)
+          : { bundle: undefined, reason: undefined }
 
       for (const memoryMb of memories) {
         const id =
