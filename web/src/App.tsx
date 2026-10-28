@@ -211,11 +211,11 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
           <img src={lambdaIcon} alt="" width={22} height={22} className="block shrink-0" />
           AWS Lambda benchmark
         </p>
-        <h1 className="text-3xl text-balance">Bun vs Node.js cold starts on AWS Lambda</h1>
+        <h1 className="text-3xl text-balance">Bun vs LLRT vs Node.js cold starts on AWS Lambda</h1>
       </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} Bun builds, LLRT and ${count('Node')} Node.js versions, each cold started ${latest.rounds} times an hour. `
+          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions, each cold started ${latest.rounds} times an hour. `
           : 'Every runtime gets cold started once an hour. '}
         Each point on the charts is one run. The table averages the range you pick.
       </p>

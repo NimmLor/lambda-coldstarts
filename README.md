@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="web/og.png" alt="Bun vs Node.js cold starts on AWS Lambda" width="720">
+<img src="web/og.png" alt="Bun vs LLRT vs Node.js cold starts on AWS Lambda" width="720">
 
 # ⚡ lambda-coldstarts
 
