@@ -249,38 +249,3 @@ jobs:
             echo
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: 📥 Upload SST Outputs
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: sst-outputs-production
-          path: .sst/outputs.json
-
-      # sst logs the pulumi command line, credentials included, and GitHub masks secrets in the
-      # console but not inside an artifact. The values are known here, so they're cut out and
-      # checked for.
-      - name: 🙈 Redact SST Logs
-        id: redact
-        if: always()
-        run: |
-          set -euo pipefail
-          [ -d .sst/log ] || exit 0
-          for value in "${AWS_ACCESS_KEY_ID:-}" "${AWS_SECRET_ACCESS_KEY:-}" "${AWS_SESSION_TOKEN:-}" "${PERF_ADMIN_SECRET:-}"; do
-            [ -n "$value" ] || continue
-            find .sst/log -type f -print0 | SECRET="$value" xargs -0 -r perl -pi -e 's/\Q$ENV{SECRET}\E/***/g'
-            if grep -rqF -- "$value" .sst/log; then
-              echo "A secret survived redaction, refusing to upload the logs" >&2
-              exit 1
-            fi
-          done
-        env:
-          PERF_ADMIN_SECRET: ${{ secrets.PERF_ADMIN_SECRET }}
-
-      # Deliberately not `always()` alone: a failed scrub must not publish raw logs.
-      - name: 📜 Upload SST Logs
-        if: always() && steps.redact.outcome == 'success'
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: sst-logs-production
-          path: .sst/log
-          retention-days: 7
