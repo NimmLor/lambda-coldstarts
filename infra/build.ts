@@ -17,7 +17,7 @@ const AOT_SHIM_SOURCE = 'infra/aot-shim.c'
 
 /** The Bun used for the `bun` and `compile` variants. */
 export const bunBin = () => process.env.BUN_BIN || 'bun'
-/** The Bun used for the `canary`, `--trim` and `--aot` variants: a build of oven-sh/bun#45631 until that ships. */
+/** The Bun used for the `canary`, `--trim` and `--aot` variants: a canary build until a release has them. */
 export const bunAotBin = () => process.env.BUN_AOT_BIN || bunBin()
 
 const run = (file: string, args: string[]) => execFileSync(file, args, { stdio: 'inherit' })
@@ -84,7 +84,7 @@ const supportsFlag = (bin: string, flag: string) => {
 
 /**
  * The flags beyond `--compile` each variant needs from `bun build`. `compile-canary` passes none,
- * but needs `--trim` all the same: it's how a build of oven-sh/bun#45631 tells itself apart from a
+ * but needs `--trim` all the same: it's how a canary that has them tells itself apart from a
  * release, without which that variant would be BunCompile under another name.
  */
 const NEEDED_FLAGS: Record<BunVariant, string[]> = {
@@ -111,7 +111,7 @@ export const unavailableReason = (variant: BunVariant, arch: LambdaArch) => {
   const bin = bunAotBin()
   const missing = needed.filter((flag) => !supportsFlag(bin, flag))
   if (missing.length) {
-    return `${bin} (bun ${bunVersion(bin)}) has no ${missing.join(' or ')}; point BUN_AOT_BIN at a build of oven-sh/bun#45631`
+    return `${bin} (bun ${bunVersion(bin)}) has no ${missing.join(' or ')}; point BUN_AOT_BIN at a Bun canary`
   }
   return undefined
 }
