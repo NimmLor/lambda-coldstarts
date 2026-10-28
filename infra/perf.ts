@@ -26,6 +26,20 @@ const siteDomain = () => {
   }
 }
 
+/**
+ * Keeps a stage other than production out of search engines: its robots.txt disallows everything,
+ * in place of web/robots.txt, and every other response says noindex. The distribution's own
+ * cloudfront.net host needs nothing, since the Router answers it with a 403 once it has a domain.
+ */
+const NO_INDEX = {
+  viewerRequest: {
+    injection: `if (event.request.uri === '/robots.txt') return { statusCode: 200, headers: { 'content-type': { value: 'text/plain' } }, body: { encoding: 'text', data: 'User-agent: *\\nDisallow: /\\n' } };`,
+  },
+  viewerResponse: {
+    injection: `event.response.headers['x-robots-tag'] = { value: 'noindex, nofollow' };`,
+  },
+}
+
 export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   const table = new sst.aws.Dynamo('PerfResults', {
     fields: { pk: 'string', sk: 'string' },
@@ -172,6 +186,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   // site's invalidation; both settle a few minutes after `sst deploy` returns.
   const router = new sst.aws.Router('PerfRouter', {
     domain: siteDomain(),
+    ...($app.stage !== 'production' && { edge: NO_INDEX }),
     transform: {
       cdn: (args) => {
         args.wait = false

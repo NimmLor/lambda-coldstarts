@@ -40,6 +40,27 @@
       }
     </style>
     <link rel="icon" href="./src/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://coldstarts.github.nimmervoll.work/" />
+    <!-- What the page charts, for search engines' dataset listings; the data is /api/runs/latest. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "name": "Bun vs Node.js cold starts on AWS Lambda",
+        "description": "Cold start, warm start, memory and size for Bun, LLRT and Node.js on AWS Lambda, measured every hour.",
+        "url": "https://coldstarts.github.nimmervoll.work/",
+        "sameAs": "https://github.com/NimmLor/lambda-coldstarts",
+        "creator": { "@type": "Person", "name": "Lorenz Nimmervoll" },
+        "isAccessibleForFree": true,
+        "keywords": ["AWS Lambda", "cold start", "Bun", "Node.js", "LLRT", "benchmark"],
+        "variableMeasured": ["Cold start duration", "Warm start duration", "Memory used", "Size"],
+        "distribution": {
+          "@type": "DataDownload",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://coldstarts.github.nimmervoll.work/api/runs/latest"
+        }
+      }
+    </script>
     <!-- og.png is `bun run og`'s render of og.html; build.ts copies it to the site's root. -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://coldstarts.github.nimmervoll.work/" />
