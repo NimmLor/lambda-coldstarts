@@ -1,6 +1,6 @@
-// Preloaded into Bun AOT executables on Lambda by infra/build.ts. Works around two things the AOT
-// runtime asks of the kernel that Lambda doesn't give it. Only symbols from GLIBC_2.2.5 so it loads
-// on Lambda's glibc 2.34.
+// LD_PRELOADed by the AotWithShim bootstrap (see build.sh). Works around two things the AOT
+// runtime asks of the kernel that Lambda doesn't give it. Only symbols from GLIBC_2.2.5 so it
+// loads on Lambda's glibc 2.34.
 //
 // mincore: JSC's AOT loader (tryReserveLowPages in AOTImageLoading.cpp) asks mincore() whether the
 // pages below mmap_min_addr are mapped and expects ENOMEM. Lambda's seccomp filter fails mincore()

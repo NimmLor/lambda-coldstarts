@@ -1,5 +1,8 @@
 node_modules
 .sst
+out
+# The main branch's build output and the web workspace, if you switch over from there
 dist
-bench-results
+web
+.hallmark
 .env

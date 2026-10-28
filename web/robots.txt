@@ -1,4 +1,0 @@
-User-agent: *
-Disallow:
-
-Sitemap: https://coldstarts.github.nimmervoll.work/sitemap.xml

@@ -1,37 +1,8 @@
 {
-  "name": "lambda-coldstarts",
+  "name": "bun-aot-lambda-repro",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "web"
-  ],
-  "scripts": {
-    "deploy": "bun run build && LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist sst deploy",
-    "just-deploy": "LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist sst deploy",
-    "remove": "sst remove",
-    "bench": "bun scripts/bench.ts",
-    "perf": "bun scripts/perf-run.ts",
-    "build:local": "bun scripts/build-local.ts",
-    "build": "bun scripts/build-docker.ts",
-    "explain": "bun scripts/explain.ts",
-    "bootstrap:aws": "bun scripts/bootstrap-aws.ts",
-    "test": "bun test",
-    "typecheck": "bun check && bun check -p web",
-    "format": "bun fmt",
-    "format:check": "bun fmt --check"
-  },
   "dependencies": {
     "sst": "4.17.2"
-  },
-  "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1158.0",
-    "@aws-sdk/client-lambda": "^3.1158.0",
-    "@aws-sdk/client-scheduler": "^3.1158.0",
-    "@aws-sdk/client-sfn": "^3.1158.0",
-    "@aws-sdk/lib-dynamodb": "^3.1158.0",
-    "@types/aws-lambda": "^8.10.164",
-    "@types/bun": "^1.4.4",
-    "@types/node": "^26.6.5",
-    "typescript": "^5.9.3"
   }
 }
