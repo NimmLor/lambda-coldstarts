@@ -1,6 +1,6 @@
 name: Deploy and benchmark
 
-# Builds the Bun variants natively on an x86_64 and an arm64 runner, which is what the --aot
+# Builds the Bun and LLRT variants natively on an x86_64 and an arm64 runner, which is what the --aot
 # variants need, then deploys every function on both architectures and benchmarks them.
 # Needs the secret AWS_ROLE_ARN on the bench environment: a role that environment may assume
 # through GitHub OIDC. scripts/bootstrap-aws.ts sets up both.

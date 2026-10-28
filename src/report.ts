@@ -15,7 +15,12 @@ let invocations = 0
 // Fixed for the life of the process, so read once rather than per invocation: `process.env` and
 // `process.versions` are built-in objects, where every read is a lookup by name in an --aot build.
 const bunVersion = process.versions.bun
-const runtime = bunVersion ? `bun ${bunVersion}` : `node ${process.versions.node}`
+// LLRT reports its version as `llrt` and, for packages that check, Node's as 0.0.0.
+const runtime = bunVersion
+  ? `bun ${bunVersion}`
+  : process.versions.llrt
+    ? `llrt ${process.versions.llrt}`
+    : `node ${process.versions.node}`
 const variant = process.env.VARIANT
 const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME
 const region = process.env.AWS_REGION

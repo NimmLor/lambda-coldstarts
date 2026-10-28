@@ -10,13 +10,13 @@ export type Run = {
   functions: FunctionSummary[]
 }
 
-export type Family = 'Bun' | 'Node'
+export type Family = 'Bun' | 'LLRT' | 'Node'
 
 type Variant = {
   name: string
   family: Family
   /**
-   * The command infra/build.ts builds it with, short of the entry point, `--outfile`, and for the
+   * The command infra/build.ts or infra/llrt.ts builds it with, short of the entry point, `--outfile`, and for the
    * compiled ones `--target=bun-linux-<arch>` and the `--no-compile-autoload-*` flags.
    */
   build: string
@@ -28,6 +28,7 @@ type Variant = {
 }
 
 const SST_BUNDLE = 'esbuild --bundle --format=esm --minify'
+const LLRT_BUNDLE = 'bun build --target=node --format=esm --minify'
 
 /** Each variant in infra/functions.ts, in legend order; its line colour is `--color-line-<id>` in tokens.css. */
 export const VARIANTS: Record<string, Variant> = {
@@ -72,6 +73,20 @@ export const VARIANTS: Record<string, Variant> = {
     build: 'bun build --compile --aot --trim',
     canary: true,
     about: 'The AOT executable without the parts of Bun the code doesn’t use',
+  },
+  Llrt: {
+    name: 'LLRT',
+    family: 'LLRT',
+    build: LLRT_BUNDLE,
+    about:
+      'The bundle next to LLRT’s no-sdk Lambda build as the bootstrap, which serves invocations itself',
+  },
+  LlrtBytecode: {
+    name: 'LLRT, bytecode',
+    family: 'LLRT',
+    build: 'llrt compile',
+    about:
+      'The LLRT bundle as QuickJS bytecode, run by LLRT’s CLI build, the only one released that reads the bytecode its llrt compile writes',
   },
   Node22: { name: 'Node.js 22', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },
   Node24: { name: 'Node.js 24', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },

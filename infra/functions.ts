@@ -7,12 +7,16 @@ import {
   lambdaArchs,
   unavailableReason,
 } from './build'
+import { buildLlrtBundle, LLRT_HANDLER, type LlrtVariant, llrtUnavailableReason } from './llrt'
 
 type NodeRuntime = 'nodejs22.x' | 'nodejs24.x' | 'nodejs26.x'
 
-type Variant =
+/** A variant whose bundle this repo builds, and which runs on `provided.al2023`. */
+type BuiltVariant =
   | { id: string; kind: 'bun'; variant: BunVariant }
-  | { id: string; kind: 'node'; runtime: NodeRuntime }
+  | { id: string; kind: 'llrt'; variant: LlrtVariant }
+
+type Variant = BuiltVariant | { id: string; kind: 'node'; runtime: NodeRuntime }
 
 export const VARIANTS: Variant[] = [
   { id: 'BunRuntime', kind: 'bun', variant: 'bun' },
@@ -23,6 +27,9 @@ export const VARIANTS: Variant[] = [
   { id: 'BunCompileTrim', kind: 'bun', variant: 'compile-trim' },
   { id: 'BunCompileAot', kind: 'bun', variant: 'aot' },
   { id: 'BunCompileAotTrim', kind: 'bun', variant: 'aot-trim' },
+  // The handler bundle as JavaScript, and as the bytecode `llrt compile` makes of it; see infra/llrt.ts.
+  { id: 'Llrt', kind: 'llrt', variant: 'llrt' },
+  { id: 'LlrtBytecode', kind: 'llrt', variant: 'llrt-bytecode' },
   { id: 'Node22', kind: 'node', runtime: 'nodejs22.x' },
   { id: 'Node24', kind: 'node', runtime: 'nodejs24.x' },
   // A public preview since August 2026. The aws provider pinned in sst.config.ts is the first
@@ -74,23 +81,38 @@ const selected = () => {
  */
 const ARCH_SUFFIX: Record<LambdaArch, string> = { x86_64: 'X64', arm64: 'Arm64' }
 
+/** What Lambda's `_HANDLER` is: Bun's executables poll the Runtime API themselves, LLRT imports a module. */
+export const handlerOf = (v: BuiltVariant) => (v.kind === 'llrt' ? LLRT_HANDLER : 'bootstrap')
+
+/** Why `v` can't be built on this host for `arch`, or `undefined` when it can. */
+export const unavailable = (v: BuiltVariant, arch: LambdaArch) =>
+  v.kind === 'bun' ? unavailableReason(v.variant, arch) : llrtUnavailableReason(v.variant, arch)
+
+/** Builds `v` for `arch` into `bundle` and returns it; `cacheDir` keeps downloads between builds. */
+export const buildBundle = (
+  v: BuiltVariant,
+  options: { bundle: string; arch: LambdaArch; cacheDir: string }
+) =>
+  v.kind === 'bun'
+    ? buildBunBundle({ variant: v.variant, ...options })
+    : buildLlrtBundle({ variant: v.variant, ...options })
+
 /**
- * The bundle of a Bun variant: built on this host, or, with `BUN_BUNDLES`, the one
+ * The bundle of a Bun or LLRT variant: built on this host, or, with `BUN_BUNDLES`, the one
  * scripts/build-docker.ts left in `$BUN_BUNDLES/<arch>/<Variant>`. A string says why there is none.
  */
-const bunBundle = (id: string, variant: BunVariant, arch: LambdaArch) => {
+const bundleOf = (v: BuiltVariant, arch: LambdaArch) => {
   const prebuilt = process.env.BUN_BUNDLES
   if (prebuilt) {
-    const bundle = path.resolve(prebuilt, arch, id)
+    const bundle = path.resolve(prebuilt, arch, v.id)
     if (existsSync(path.join(bundle, 'bootstrap'))) return { bundle }
     return { reason: `no ${path.join(bundle, 'bootstrap')}; bun run build builds it` }
   }
-  const reason = unavailableReason(variant, arch)
+  const reason = unavailable(v, arch)
   if (reason) return { reason }
   return {
-    bundle: buildBunBundle({
-      variant,
-      bundle: path.join($cli.paths.work, 'bun-lambda', arch, id),
+    bundle: buildBundle(v, {
+      bundle: path.join($cli.paths.work, 'bun-lambda', arch, v.id),
       arch,
       cacheDir: path.join($cli.paths.work, 'bun-cache'),
     }),
@@ -106,9 +128,7 @@ export const createFunctions = () => {
     for (const v of selected()) {
       // Built once, deployed at every memory size.
       const { bundle, reason } =
-        v.kind === 'bun'
-          ? bunBundle(v.id, v.variant, architecture)
-          : { bundle: undefined, reason: undefined }
+        v.kind === 'node' ? { bundle: undefined, reason: undefined } : bundleOf(v, architecture)
 
       for (const memoryMb of memories) {
         const id =
@@ -132,7 +152,7 @@ export const createFunctions = () => {
         functions[id] = new sst.aws.Function(id, {
           ...shared(id, architecture, memoryMb),
           bundle,
-          handler: 'bootstrap',
+          handler: handlerOf(v),
           runtime: 'provided.al2023',
         })
       }

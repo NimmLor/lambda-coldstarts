@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react'
 import { type Fn, fixed, niceMax, type View } from './data'
 import bunIcon from './icons/bun.svg'
+import llrtIcon from './icons/llrt.svg'
 import nodeIcon from './icons/nodejs.svg'
+
+const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
 
 /** Seven columns from `lg`; below it each row restacks as the name over labelled figures. */
 const ROW =
@@ -110,13 +113,7 @@ export const Table = ({ view }: { view: View }) => {
               className="size-2.5 shrink-0 rounded-full"
               style={{ background: f.color }}
             />
-            <img
-              src={f.family === 'Bun' ? bunIcon : nodeIcon}
-              alt=""
-              width={18}
-              height={18}
-              className="block shrink-0"
-            />
+            <img src={ICONS[f.family]} alt="" width={18} height={18} className="block shrink-0" />
             {f.name}
             {f.canary && <Badge>canary Bun</Badge>}
             {f.preview && <Badge>preview</Badge>}

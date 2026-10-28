@@ -20,7 +20,7 @@ jobs:
       - run: bun fmt --check
       - run: bun test
 
-  # Builds the Bun variants natively per architecture and runs each bootstrap against a fake
+  # Builds the Bun and LLRT variants natively per architecture and runs each bootstrap against a fake
   # Runtime API, in the same container the deploy builds in.
   build:
     strategy:

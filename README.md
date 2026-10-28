@@ -1,32 +1,35 @@
 # bun-aot-lambda
 
-One SST stack, nine Lambdas that do the same thing on different runtimes, and a script that
+One SST stack, eleven Lambdas that do the same thing on different runtimes, and a script that
 measures their cold and warm starts:
 
-| Function            | Runtime                       | What ships                                                                                  |
-| ------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| `BunRuntime`        | `provided.al2023`             | `bun` executable + bundled `index.js`, started by a shell `bootstrap`                       |
-| `BunCompile`        | `provided.al2023`             | `bun build --compile --minify --bytecode` executable as `bootstrap`                         |
-| `BunCompileCanary`  | `provided.al2023`             | the same executable, built by the Bun build that `--trim` and `--aot` need                  |
-| `BunCompileTrim`    | `provided.al2023`             | `BunCompileCanary` with `--trim`, which drops the parts of Bun the code doesn't use         |
-| `BunCompileAot`     | `provided.al2023`             | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the mincore shim |
-| `BunCompileAotTrim` | `provided.al2023`             | same with `--aot --trim`                                                                    |
-| `Node22`            | `nodejs22.x`                  | SST's esbuild bundle                                                                        |
-| `Node24`            | `nodejs24.x`                  | SST's esbuild bundle                                                                        |
-| `Node26`            | `nodejs26.x` (public preview) | SST's esbuild bundle                                                                        |
+| Function            | Runtime                       | What ships                                                                                         |
+| ------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `BunRuntime`        | `provided.al2023`             | `bun` executable + bundled `index.js`, started by a shell `bootstrap`                              |
+| `BunCompile`        | `provided.al2023`             | `bun build --compile --minify --bytecode` executable as `bootstrap`                                |
+| `BunCompileCanary`  | `provided.al2023`             | the same executable, built by the Bun build that `--trim` and `--aot` need                         |
+| `BunCompileTrim`    | `provided.al2023`             | `BunCompileCanary` with `--trim`, which drops the parts of Bun the code doesn't use                |
+| `BunCompileAot`     | `provided.al2023`             | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the mincore shim        |
+| `BunCompileAotTrim` | `provided.al2023`             | same with `--aot --trim`                                                                           |
+| `Llrt`              | `provided.al2023`             | [LLRT](https://github.com/awslabs/llrt)'s no-sdk Lambda build as `bootstrap` + bundled `index.mjs` |
+| `LlrtBytecode`      | `provided.al2023`             | the bundle as `llrt compile` bytecode, `index.lrt`, with LLRT's CLI build as `bootstrap`           |
+| `Node22`            | `nodejs22.x`                  | SST's esbuild bundle                                                                               |
+| `Node24`            | `nodejs24.x`                  | SST's esbuild bundle                                                                               |
+| `Node26`            | `nodejs26.x` (public preview) | SST's esbuild bundle                                                                               |
 
 Every function runs the same handler ([`src/report.ts`](src/report.ts)), has the same architecture
 and timeout, and gets a public Function URL. Each one is deployed at 128, 256, 512, 1024 and
 1769 MB (one full vCPU), as `BunCompileM128` and so on. The Bun
 variants serve invocations through a small custom runtime loop ([`src/runtime.ts`](src/runtime.ts));
-the Node variants use Lambda's managed runtime.
+LLRT has its own and calls the handler in [`src/llrt.ts`](src/llrt.ts); the Node variants use
+Lambda's managed runtime.
 
 ## Deploy
 
 ```sh
 bun install
 cp .env.example .env   # then fill in AWS_PROFILE or access keys
-bun run deploy --stage dev   # every function on x86_64 and arm64, Bun variants built in Docker
+bun run deploy --stage dev   # every function on x86_64 and arm64, Bun and LLRT variants built in Docker
 curl "$(jq -r '.functions.BunCompileX64.url' .sst/outputs.json)"
 ```
 
@@ -44,13 +47,13 @@ Settings, all through the environment of `sst deploy`:
 | `BUN_BIN`       | `bun`                   | Bun for `BunRuntime` and `BunCompile`                                                                                                                                      |
 | `BUN_AOT_BIN`   | `$BUN_BIN`              | Bun for `BunCompileCanary` and the `--trim` and `--aot` variants                                                                                                           |
 | `CC`            | `cc`                    | C compiler for the mincore shim                                                                                                                                            |
-| `BUN_BUNDLES`   | unset                   | Deploy the Bun variants from `$BUN_BUNDLES/<arch>/<Variant>` instead of building them                                                                                      |
+| `BUN_BUNDLES`   | unset                   | Deploy the Bun and LLRT variants from `$BUN_BUNDLES/<arch>/<Variant>` instead of building them                                                                             |
 
 ## Both architectures, built in Docker
 
 ```sh
 bun run build                # every Bun variant for x86_64 and arm64, into dist/<arch>/<Variant>
-bun run deploy --stage dev   # bun run build, then deploys all 18 functions
+bun run deploy --stage dev   # bun run build, then deploys all 22 functions
 ```
 
 `bun run build` is [`scripts/build-docker.ts`](scripts/build-docker.ts). The Node variants need
@@ -165,7 +168,7 @@ Lambda returns with `LogType: Tail`, so they are Lambda's own:
 Results land in `bench-results/` as Markdown and raw JSON. The
 [Deploy and benchmark](.github/workflows/bench.yml) workflow does all of it: `bun run build` on an
 `ubuntu-24.04` and an `ubuntu-24.04-arm` runner, each for its own architecture, then one job that
-deploys all 18 functions from those bundles and benchmarks them. That job runs in the `bench`
+deploys all 22 functions from those bundles and benchmarks them. That job runs in the `bench`
 GitHub environment and assumes an AWS role through GitHub OIDC. `bun run bootstrap:aws`, with
 admin credentials for the account and a logged-in `gh`, sets it up and is safe to re-run
 ([`scripts/bootstrap-aws.ts`](scripts/bootstrap-aws.ts)): the account's GitHub OIDC provider, the
@@ -249,7 +252,7 @@ To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards 
 ## Try it locally
 
 ```sh
-bun run build:local                 # builds the Bun variants into dist/<arch>/ and smoke-tests them
+bun run build:local                 # builds the Bun and LLRT variants into dist/<arch>/ and smoke-tests them
 bun test                            # runtime loop against a fake Runtime API
 ```
 
@@ -269,3 +272,16 @@ before a deploy.
   cross-compile `--target` is untested; a failed build stops the deploy with Bun's error.
 - The compiled Bun variants are ~100 MB unzipped, against a few KB for Node. Lambda fetches that
   on every cold start, which is visible in the round trip even when init is fast.
+- The LLRT variants use the pinned release in [`infra/llrt.ts`](infra/llrt.ts), downloaded and
+  checked against its hashes, in its no-sdk builds: the default ones bundle AWS SDK clients and
+  open TLS connections to AWS during init, which the handler doesn't need. LLRT lacks
+  `process.memoryUsage`, `process.resourceUsage`, `process.execPath` and
+  `navigator.hardwareConcurrency`, which [`src/llrt-env.ts`](src/llrt-env.ts) fills in from
+  `/proc/self/status`, QuickJS's heap and `os.availableParallelism()`. Its `performance.now()`
+  counts from when it starts QuickJS rather than from process start.
+- `LlrtBytecode` doesn't run on LLRT's Lambda build: `.lrt` bytecode is compressed with a zstd
+  dictionary built into the executable, the release's Lambda build has another than the CLI build
+  that compiles it, and the Lambda build can't compile. So it ships the CLI build, 14 MB against
+  5.5 MB, which also serves invocations. `Llrt` against `LlrtBytecode` therefore compares the
+  executables as well as the bytecode. It builds on Linux on the Lambda architecture only, like
+  `--aot`.

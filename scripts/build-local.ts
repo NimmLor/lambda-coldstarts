@@ -1,5 +1,5 @@
 /**
- * Builds every Bun variant into ./dist/<arch>/<Variant> and, on Linux, runs each `bootstrap` against a
+ * Builds every Bun and LLRT variant into ./dist/<arch>/<Variant> and, on Linux, runs each `bootstrap` against a
  * fake Lambda Runtime API: a quick check that a bundle starts and answers before deploying it.
  *
  *   bun scripts/build-local.ts [BunCompile ...]
@@ -7,8 +7,8 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { serve } from 'bun'
-import { buildBunBundle, lambdaArch, toLambdaArch, unavailableReason } from '../infra/build'
-import { VARIANTS } from '../infra/functions'
+import { lambdaArch, toLambdaArch } from '../infra/build'
+import { buildBundle, handlerOf, unavailable, VARIANTS } from '../infra/functions'
 
 const arch = lambdaArch()
 const canRun = process.platform === 'linux' && toLambdaArch(process.arch) === arch
@@ -22,8 +22,9 @@ const dirSize = async (dir: string) => {
   return total
 }
 
-/** Starts `bootstrap`, hands it two events and measures until it asks for the first one. */
-const smokeTest = async (bootstrap: string) => {
+/** Starts the bundle's `bootstrap`, hands it two events and measures until it asks for the first one. */
+const smokeTest = async (bundle: string, handler: string) => {
+  const bootstrap = path.join(bundle, 'bootstrap')
   const events = [{ rawPath: '/cold' }, { rawPath: '/warm' }]
   const responses: unknown[] = []
   let firstNextMs = 0
@@ -60,7 +61,10 @@ const smokeTest = async (bootstrap: string) => {
       PATH: process.env.PATH,
       AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${server.port}`,
       AWS_LAMBDA_FUNCTION_MEMORY_SIZE: '1769',
-      VARIANT: path.basename(path.dirname(bootstrap)),
+      // As Lambda sets them. LLRT serves invocations only with `_HANDLER`, and imports it from here.
+      _HANDLER: handler,
+      LAMBDA_TASK_ROOT: bundle,
+      VARIANT: path.basename(bundle),
     },
     stdout: 'inherit',
     stderr: 'inherit',
@@ -83,14 +87,13 @@ const smokeTest = async (bootstrap: string) => {
 
 const rows: Record<string, unknown>[] = []
 for (const v of VARIANTS) {
-  if (v.kind !== 'bun' || (wanted.length && !wanted.includes(v.id))) continue
-  const reason = unavailableReason(v.variant, arch)
+  if (v.kind === 'node' || (wanted.length && !wanted.includes(v.id))) continue
+  const reason = unavailable(v, arch)
   if (reason) {
     console.warn(`Skipping ${v.id}: ${reason}`)
     continue
   }
-  const bundle = buildBunBundle({
-    variant: v.variant,
+  const bundle = buildBundle(v, {
     bundle: path.resolve('dist', arch, v.id),
     arch,
     cacheDir: path.resolve('dist', '.cache'),
@@ -99,7 +102,7 @@ for (const v of VARIANTS) {
     variant: v.id,
     bundleMb: Math.round(((await dirSize(bundle)) / 1024 / 1024) * 10) / 10,
   }
-  if (canRun) Object.assign(row, await smokeTest(path.join(bundle, 'bootstrap')))
+  if (canRun) Object.assign(row, await smokeTest(bundle, handlerOf(v)))
   rows.push(row)
 }
 
