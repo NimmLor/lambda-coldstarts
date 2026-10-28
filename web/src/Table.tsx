@@ -84,18 +84,33 @@ const Command = ({ build }: { build: string }) => {
   )
 }
 
-/** `bun 1.4.4-canary.1+72ab4f530 on provided.al2023`: what it ran on, then Lambda's runtime. */
-const Versions = ({ point }: { point?: Point }) =>
-  point && (
-    <p className="text-xs/normal text-muted">
+/** `bun 1.4.4+38afee6c8` or `llrt-lambda-arm64-no-sdk@v0.9.0-beta`: the name, the release, the build after it. */
+const VERSION = /^(.+?)[ @]v?(\d[^+]*)(\+.+)?$/
+
+/** What it ran on, the release brightest, then Lambda's runtime in a chip. */
+const Versions = ({ point }: { point?: Point }) => {
+  if (!point) return
+  const [, name, release, build] = point.version?.match(VERSION) ?? []
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs/normal text-muted slashed-zero">
       {point.version && (
-        <>
-          <Reading className="text-ink-2">{point.version}</Reading> on{' '}
-        </>
+        <span title={point.version}>
+          {release ? (
+            <>
+              {name} <span className="text-ink-2">{release}</span>
+              {build && <span className="opacity-60">{build}</span>}
+            </>
+          ) : (
+            <span className="text-ink-2">{point.version}</span>
+          )}
+        </span>
       )}
-      <Reading>{point.runtime}</Reading>
+      <span className="rounded-chip border border-rule px-1.5" title="Lambda runtime">
+        {point.runtime}
+      </span>
     </p>
   )
+}
 
 /** Every function on the architecture, fastest cold start first. */
 export const Table = ({ view }: { view: View }) => {
