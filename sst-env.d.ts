@@ -481,6 +481,10 @@ declare module "sst" {
       "type": "sst.aws.StaticSite"
       "url": string
     }
+    "PerfSummarize": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
   }
 }
 

@@ -1,12 +1,16 @@
 /**
- * The PerfResults table holds two kinds of items, keyed so each is one Query away:
+ * The PerfResults table holds three kinds of items, keyed so each is one Query away:
  *
  *   pk `runs`          sk <runId>                 a finished run, written by the state machine
+ *   pk `summaries`     sk <runId>                 that run and its per-function statistics,
+ *                                                 written by summarize.ts after it
  *   pk `run#<runId>`   sk <functionId>#<round>    one cold start, written by measure.ts
  *
  * A run's id is the ISO start time of its Step Functions execution, so runs sort by time.
  */
 export const RUNS_PK = 'runs'
+
+export const SUMMARIES_PK = 'summaries'
 
 export const samplesPk = (runId: string) => `run#${runId}`
 

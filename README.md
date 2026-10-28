@@ -182,9 +182,11 @@ The stack also runs the benchmark on its own, the way
   invokes it `PERF_WARM` more times in a row, which find the environment warm, and stores the
   `REPORT` numbers: `Init Duration` of the cold start, `Duration` of each warm invocation. A first
   invocation without an `Init Duration` throws, so Step Functions retries the round.
+- **`PerfSummarize`** ([`src/perf/summarize.ts`](src/perf/summarize.ts)), the run's last step,
+  computes its per-function statistics once and stores them with the run.
 - **`PerfResults`**, a DynamoDB table: one item per round under `run#<runId>`, one per
-  finished run under `runs` ([`src/perf/keys.ts`](src/perf/keys.ts)). A run's id is its
-  execution's start time.
+  finished run under `runs`, and one per summary under `summaries`
+  ([`src/perf/keys.ts`](src/perf/keys.ts)). A run's id is its execution's start time.
 - **`PerfApi`** ([`src/perf/api.ts`](src/perf/api.ts)), served under the site's `/api`: `GET /runs`,
   `GET /runs/history?limit=90`, `GET /runs/latest`, `GET /runs/<runId>`, all but the first with
   per-function p50/p90/avg/min/max of the cold starts' init and in-process startup, and of the
@@ -208,6 +210,14 @@ bun run perf --stage dev --detach   # just starts it
 [`scripts/perf-run.ts`](scripts/perf-run.ts) runs itself under `sst shell` to find the state
 machine, and prints the execution's console link.
 
+Runs recorded before PerfSummarize existed have no summary, so the site leaves them out until
+[`scripts/perf-summarize.ts`](scripts/perf-summarize.ts) summarizes them:
+
+```sh
+bun scripts/perf-summarize.ts --stage production         # the runs without a summary
+bun scripts/perf-summarize.ts --stage production --all   # every run again, e.g. after summary.ts changed
+```
+
 With `PERF_ADMIN_SECRET` set at deploy time, PerfApi also takes two `POST`s under the secret,
 which 404 like any unknown path without it:
 
@@ -220,7 +230,6 @@ curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN
 `{ "deleted": …, "done": false }` while items are left; call it again until `done` is `true`.
 The site's unlinked, `noindex` `/admin` page ([`web/admin.html`](web/admin.html)) does both
 from a secret field and two buttons, repeating `purge` until it's done.
-
 
 | Variable | Default | |
 |---|---|---|

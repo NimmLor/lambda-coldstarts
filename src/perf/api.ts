@@ -23,8 +23,7 @@ import {
   ScanCommand,
 } from '@aws-sdk/lib-dynamodb'
 import type { LambdaFunctionURLEvent } from 'aws-lambda'
-import { RUNS_PK, type Sample, samplesPk } from './keys'
-import { summarize } from './summary'
+import { RUNS_PK, SUMMARIES_PK } from './keys'
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient())
 const sfn = new SFNClient()
@@ -52,13 +51,6 @@ type Run = {
 const toRun = ({ sk, finishedAt, rounds, warmInvocations, functionCount }: Record<string, unknown>) =>
   ({ runId: sk, finishedAt, rounds, warmInvocations, functionCount }) as Run
 
-const getRun = async (runId: string) => {
-  const { Item } = await db.send(
-    new GetCommand({ TableName: TABLE, Key: { pk: RUNS_PK, sk: runId } })
-  )
-  return Item && toRun(Item)
-}
-
 const listRuns = async (limit = 30) => {
   const { Items = [] } = await db.send(
     new QueryCommand({
@@ -72,28 +64,35 @@ const listRuns = async (limit = 30) => {
   return Items.map(toRun)
 }
 
-const listSamples = async (runId: string) => {
-  const samples: Sample[] = []
+const toSummary = ({ pk, sk, ...summary }: Record<string, unknown>) => summary
+
+const getSummary = async (runId: string) => {
+  const { Item } = await db.send(
+    new GetCommand({ TableName: TABLE, Key: { pk: SUMMARIES_PK, sk: runId } })
+  )
+  return Item && toSummary(Item)
+}
+
+/** Newest first. Pages, since a Query stops at 1 MB and each summary is tens of KB. */
+const listSummaries = async (limit: number) => {
+  const summaries: Record<string, unknown>[] = []
   let ExclusiveStartKey: Record<string, unknown> | undefined
   do {
     const page = await db.send(
       new QueryCommand({
         TableName: TABLE,
         KeyConditionExpression: 'pk = :pk',
-        ExpressionAttributeValues: { ':pk': samplesPk(runId) },
+        ExpressionAttributeValues: { ':pk': SUMMARIES_PK },
+        ScanIndexForward: false,
+        Limit: limit - summaries.length,
         ExclusiveStartKey,
       })
     )
-    samples.push(...((page.Items ?? []) as Sample[]))
+    summaries.push(...(page.Items ?? []).map(toSummary))
     ExclusiveStartKey = page.LastEvaluatedKey
-  } while (ExclusiveStartKey)
-  return samples
+  } while (ExclusiveStartKey && summaries.length < limit)
+  return summaries
 }
-
-const withFunctions = async (run: Run) => ({
-  ...run,
-  functions: summarize(await listSamples(run.runId)),
-})
 
 const isSecret = (candidate: string) => {
   if (!ADMIN_SECRET) return false
@@ -161,13 +160,14 @@ export const handler = async (event: LambdaFunctionURLEvent) => {
 
   if (path === '/runs/history') {
     const limit = Math.min(Math.max(Number(event.queryStringParameters?.limit) || 30, 1), 90)
-    return json(200, { runs: await Promise.all((await listRuns(limit)).map(withFunctions)) })
+    return json(200, { runs: await listSummaries(limit) })
   }
 
   const id = path.match(/^\/runs\/([^/]+)$/)?.[1]
   if (!id) return json(404, { error: `No route for ${path}` })
-  const run = id === 'latest' ? (await listRuns(1))[0] : await getRun(decodeURIComponent(id))
-  if (!run) return json(404, { error: 'No such run' })
+  const summary =
+    id === 'latest' ? (await listSummaries(1))[0] : await getSummary(decodeURIComponent(id))
+  if (!summary) return json(404, { error: 'No such run' })
 
-  return json(200, await withFunctions(run))
+  return json(200, summary)
 }

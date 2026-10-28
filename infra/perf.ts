@@ -2,8 +2,8 @@
  * A scheduled cold-start benchmark in the style of maxday/lambda-perf. The PerfRun state machine
  * goes through `PERF_CONCURRENCY` functions at a time, forcing `PERF_ROUNDS` cold starts one after
  * another, each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs
- * in PerfResults), then records the run. PerfApi
- * serves the results to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs and
+ * in PerfResults), then records the run and stores its summary (src/perf/summarize.ts). PerfApi
+ * serves the summaries to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs and
  * purges the table.
  */
 import { RUNS_PK } from '../src/perf/keys'
@@ -65,6 +65,15 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     ],
   })
 
+  const summarizer = new sst.aws.Function('PerfSummarize', {
+    handler: 'src/perf/summarize.handler',
+    runtime: 'nodejs24.x',
+    timeout: '1 minute',
+    memory: '512 MB',
+    link: [table],
+    environment: { PERF_TABLE: table.name },
+  })
+
   const runId = '{% $states.context.Execution.StartTime %}'
 
   const measureRound = sst.aws.StepFunctions.lambdaInvoke({
@@ -123,8 +132,14 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     permissions: [{ actions: ['dynamodb:PutItem'], resources: [table.arn] }],
   })
 
+  const summarizeRun = sst.aws.StepFunctions.lambdaInvoke({
+    name: 'Summarize',
+    function: summarizer,
+    payload: { runId },
+  }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
+
   const stateMachine = new sst.aws.StepFunctions('PerfRun', {
-    definition: run.next(recordRun),
+    definition: run.next(recordRun).next(summarizeRun),
   })
 
   const role = new aws.iam.Role('PerfScheduleRole', {
