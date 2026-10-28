@@ -16,6 +16,8 @@ jobs:
         env:
           SST_TELEMETRY_DISABLED: '1'
       - run: bun run typecheck
+      - run: bun lint --max-warnings 0
+      - run: bun fmt --check
       - run: bun test
 
   # Builds the Bun variants natively per architecture and runs each bootstrap against a fake

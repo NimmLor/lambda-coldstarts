@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- SST's config globals aren't a module
 /// <reference path="./.sst/platform/config.d.ts" />
 
 export default $config({
@@ -21,10 +22,7 @@ export default $config({
 
     return {
       functions: Object.fromEntries(
-        Object.entries(functions).map(([id, fn]) => [
-          id,
-          { name: fn.name, url: fn.url },
-        ])
+        Object.entries(functions).map(([id, fn]) => [id, { name: fn.name, url: fn.url }])
       ),
       perf: createPerf(functions),
     }

@@ -15,7 +15,10 @@
     "build": "bun scripts/build-docker.ts",
     "explain": "bun scripts/explain.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p web"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "lint": "bun lint",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check"
   },
   "dependencies": {
     "sst": "4.17.2"
