@@ -64,8 +64,7 @@ export const VARIANTS: Record<string, Variant> = {
     family: 'Bun',
     build: 'bun build --compile --aot',
     canary: true,
-    about:
-      'An ahead-of-time compiled executable, behind a bootstrap that preloads the mincore shim',
+    about: 'An ahead-of-time compiled executable, behind a bootstrap that preloads the AOT shim',
   },
   BunCompileAotTrim: {
     name: 'Bun AOT executable, trimmed',

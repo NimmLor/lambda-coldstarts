@@ -9,7 +9,7 @@ measures their cold and warm starts:
 | `BunCompile`        | `provided.al2023`             | `bun build --compile --minify --bytecode` executable as `bootstrap`                                |
 | `BunCompileCanary`  | `provided.al2023`             | the same executable, built by the Bun build that `--trim` and `--aot` need                         |
 | `BunCompileTrim`    | `provided.al2023`             | `BunCompileCanary` with `--trim`, which drops the parts of Bun the code doesn't use                |
-| `BunCompileAot`     | `provided.al2023`             | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the mincore shim        |
+| `BunCompileAot`     | `provided.al2023`             | `bun build --compile --aot` executable, behind a `bootstrap` that preloads the AOT shim            |
 | `BunCompileAotTrim` | `provided.al2023`             | same with `--aot --trim`                                                                           |
 | `Llrt`              | `provided.al2023`             | [LLRT](https://github.com/awslabs/llrt)'s no-sdk Lambda build as `bootstrap` + bundled `index.mjs` |
 | `LlrtBytecode`      | `provided.al2023`             | the bundle as `llrt compile` bytecode, `index.lrt`, with LLRT's CLI build as `bootstrap`           |
@@ -46,7 +46,7 @@ Settings, all through the environment of `sst deploy`:
 | `VARIANTS`      | all                     | e.g. `BunCompile,Node24`                                                                                                                                                   |
 | `BUN_BIN`       | `bun`                   | Bun for `BunRuntime` and `BunCompile`                                                                                                                                      |
 | `BUN_AOT_BIN`   | `$BUN_BIN`              | Bun for `BunCompileCanary` and the `--trim` and `--aot` variants                                                                                                           |
-| `CC`            | `cc`                    | C compiler for the mincore shim                                                                                                                                            |
+| `CC`            | `cc`                    | C compiler for the AOT shim                                                                                                                                                |
 | `BUN_BUNDLES`   | unset                   | Deploy the Bun and LLRT variants from `$BUN_BUNDLES/<arch>/<Variant>` instead of building them                                                                             |
 
 ## Both architectures, built in Docker
@@ -115,7 +115,7 @@ Then deploy with it. Only `BunCompileCanary` and the `--trim` and `--aot` varian
 BUN_AOT_BIN=~/.bun-aot/bun-linux-x64/bun bunx sst deploy --stage dev
 ```
 
-The deploy also needs a C compiler (`cc`, or set `$CC`) for the mincore shim. `sst deploy`
+The deploy also needs a C compiler (`cc`, or set `$CC`) for the AOT shim. `sst deploy`
 prints `Skipping <Variant>: …` with the reason for every variant it can't build.
 
 **Linux arm64 and macOS.** The same build has `linux-aarch64` and `darwin-aarch64` binaries: on
@@ -135,7 +135,7 @@ export BUN_AOT_BIN="$(dirname "$(which bun)")/bun-45631"
 "$BUN_AOT_BIN" build --help | grep -E -- '--(aot|trim)\b'   # stock Bun prints nothing
 ```
 
-### Why the mincore shim
+### Why the AOT shim
 
 AOT executables start by reserving the lowest pages of the address space and then call
 `mincore()` on page 0, expecting `ENOMEM` as proof it's unmapped. Lambda's seccomp filter makes
@@ -143,10 +143,24 @@ AOT executables start by reserving the lowest pages of the address space and the
 
 > error: can't run this executable's compiled code: it needs the lowest pages of the address space to be unmapped, and this system maps them
 
-[`infra/mincore-shim.c`](infra/mincore-shim.c) is `LD_PRELOAD`ed by the AOT `bootstrap` and
+[`infra/aot-shim.c`](infra/aot-shim.c) is `LD_PRELOAD`ed by the AOT `bootstrap` and
 rewrites `EPERM` to `ENOMEM` for ranges below `mmap_min_addr`, which nothing can map anyway. It
 only needs glibc 2.2.5 symbols, so it loads on Lambda's glibc 2.34. The real fix belongs upstream:
 skip that check below `mmap_min_addr`.
+
+### Why the shim also wraps `mmap`
+
+Once at startup, the AOT runtime maps a 256 MB table without `MAP_NORESERVE` and calls `abort()`
+when that fails. At 128 MB, Lambda's microVM has less RAM than that, so the kernel's overcommit
+check refuses the mapping, although the table's pages only take memory once they're used. Every
+128 MB AOT function then crashed during init:
+
+> panic(main thread): abort() called
+
+`--compile` without `--aot` makes no such mapping. The shim adds `MAP_NORESERVE` to private,
+writable, anonymous mappings of 128 MB or more, the smallest Lambda's whole memory, so the table
+becomes a reservation like JSC's other large regions. The real fix belongs upstream too: map that
+table with `MAP_NORESERVE`.
 
 ## Benchmark
 

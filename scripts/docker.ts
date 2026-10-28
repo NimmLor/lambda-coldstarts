@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { type LambdaArch, toLambdaArch } from '../infra/build'
 
-/** Lambda's provided.al2023 OS, so the mincore shim and the smoke test see the glibc Lambda has. */
+/** Lambda's provided.al2023 OS, so the AOT shim and the smoke test see the glibc Lambda has. */
 const BASE_IMAGE = 'public.ecr.aws/amazonlinux/amazonlinux:2023'
 const SETUP = 'infra/build-image.sh'
 

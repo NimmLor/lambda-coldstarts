@@ -13,7 +13,7 @@ export type LambdaArch = 'x86_64' | 'arm64'
 
 /** Relative to the repository root: SST bundles the config, so paths relative to this file don't survive. */
 export const ENTRY = 'src/bun.ts'
-const MINCORE_SHIM_SOURCE = 'infra/mincore-shim.c'
+const AOT_SHIM_SOURCE = 'infra/aot-shim.c'
 
 /** The Bun used for the `bun` and `compile` variants. */
 export const bunBin = () => process.env.BUN_BIN || 'bun'
@@ -152,24 +152,25 @@ const linuxBunExecutable = (arch: LambdaArch, cacheDir: string) => {
 
 /**
  * Lambda's seccomp filter fails the `mincore` probe the AOT loader runs before it maps compiled
- * code, so the AOT variants start through a `bootstrap` that preloads mincore-shim.c.
+ * code, and a 128 MB Lambda refuses the 256 MB table the AOT runtime maps at startup, so the AOT
+ * variants start through a `bootstrap` that preloads aot-shim.c.
  */
-const addMincoreShim = (bundle: string) => {
+const addAotShim = (bundle: string) => {
   try {
     run(process.env.CC || 'cc', [
       '-shared',
       '-fPIC',
       '-O2',
       '-o',
-      path.join(bundle, 'mincore-shim.so'),
-      path.resolve(MINCORE_SHIM_SOURCE),
+      path.join(bundle, 'aot-shim.so'),
+      path.resolve(AOT_SHIM_SOURCE),
     ])
   } catch (error) {
-    throw new Error('An --aot build needs a C compiler ($CC or cc) for the Lambda mincore shim', {
+    throw new Error('An --aot build needs a C compiler ($CC or cc) for the Lambda AOT shim', {
       cause: error,
     })
   }
-  writeBootstrap(bundle, 'LD_PRELOAD="${0%/*}/mincore-shim.so" exec "${0%/*}/app"')
+  writeBootstrap(bundle, 'LD_PRELOAD="${0%/*}/aot-shim.so" exec "${0%/*}/app"')
 }
 
 // Lambda's /var/task has neither, so a compiled executable shouldn't look for them on every cold start.
@@ -249,7 +250,7 @@ export const buildBunBundle = ({
     case 'aot-trim': {
       assertAvailable(variant, arch)
       run(bunAotBin(), [...aotBuildArgs(variant, entry), '--outfile', path.join(bundle, 'app')])
-      addMincoreShim(bundle)
+      addAotShim(bundle)
       break
     }
   }
