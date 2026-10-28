@@ -88,12 +88,18 @@ const Command = ({ build }: { build: string }) => {
   )
 }
 
-/** `bun 1.4.4+38afee6c8` or `llrt-lambda-arm64-no-sdk@v0.9.0-beta`: the name, the release, the build after it. */
-const VERSION = /^.+?[ @]v?(\d[^+]*)(\+.+)?$/
+/**
+ * `bun 1.4.4+38afee6c8` or `llrt-lambda-arm64-no-sdk@v0.9.0-beta`: the SDK flavor of an LLRT
+ * build, the release, the build after it.
+ */
+const VERSION = /^(?:.+?-(\w+-sdk)|.+?)[ @]v?(\d[^+]*)(\+.+)?$/
 
-/** The release it ran on, brightest, then Lambda's runtime; the row's name already says what ran. */
+/**
+ * The release it ran on, brightest, with which of its builds, then Lambda's runtime; the row's
+ * name already says what ran.
+ */
 const Versions = ({ point }: { point: Point }) => {
-  const [, release, build] = point.version?.match(VERSION) ?? []
+  const [, sdk, release, build] = point.version?.match(VERSION) ?? []
   return (
     <span className="flex flex-wrap gap-x-[2.5ch] overflow-hidden font-mono text-muted slashed-zero">
       {point.version && (
@@ -102,6 +108,7 @@ const Versions = ({ point }: { point: Point }) => {
             <>
               <span className="text-ink-2">{release}</span>
               {build && <span className="opacity-60">{build}</span>}
+              {sdk && <span className="ml-[1ch]">{sdk}</span>}
             </>
           ) : (
             <span className="text-ink-2">{point.version}</span>
