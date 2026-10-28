@@ -8,7 +8,7 @@ const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
 
 /** Seven columns from `lg`; below it each row restacks as the name over labelled figures. */
 const ROW =
-  'grid grid-cols-[2rem_minmax(0,1fr)] gap-x-4 gap-y-4 py-4 lg:grid-cols-[2rem_minmax(0,1fr)_11rem_7rem_6rem_6rem_5.5rem] lg:items-center'
+  'grid grid-cols-[2rem_minmax(0,1fr)] gap-x-4 gap-y-4 py-4 lg:grid-cols-[2rem_minmax(0,1fr)_13rem_7rem_6rem_6rem_5.5rem] lg:items-center'
 
 const Unit = ({ children }: { children: string }) => (
   <span className="ml-1 text-xs text-muted">{children}</span>
@@ -19,8 +19,34 @@ const Reading = ({ children, className = '' }: { children: string; className?: s
   <span className={`font-mono slashed-zero ${className}`}>{children}</span>
 )
 
-const Badge = ({ children }: { children: string }) => (
-  <span className="rounded-chip border border-rule bg-cool-soft px-1.5 text-xs font-medium text-cool">
+/** A cold start's breakdown: its label over the reading, so the readings line up down the table. */
+const Figure = ({
+  label,
+  children,
+  className = '',
+  title,
+}: {
+  label: string
+  children: string
+  className?: string
+  title?: string
+}) => (
+  <div className="flex flex-col" title={title}>
+    <dt className="text-xs text-muted">{label}</dt>
+    <dd>
+      <Reading className={`text-sm ${className || 'text-ink-2'}`}>{children}</Reading>
+    </dd>
+  </div>
+)
+
+/** Cool for how a build was made; amber for a runtime AWS hasn't released yet. */
+const TONES = {
+  cool: 'bg-cool-soft text-cool',
+  amber: 'bg-accent-soft text-accent',
+}
+
+const Badge = ({ children, tone = 'cool' }: { children: string; tone?: keyof typeof TONES }) => (
+  <span className={`rounded-chip border border-rule px-1.5 text-xs font-medium ${TONES[tone]}`}>
     {children}
   </span>
 )
@@ -116,7 +142,7 @@ export const Table = ({ view }: { view: View }) => {
             <img src={ICONS[f.family]} alt="" width={18} height={18} className="block shrink-0" />
             {f.name}
             {f.canary && <Badge>canary Bun</Badge>}
-            {f.preview && <Badge>preview</Badge>}
+            {f.preview && <Badge tone="amber">preview</Badge>}
           </div>
           <Command build={f.build} />
         </div>
@@ -139,29 +165,25 @@ export const Table = ({ view }: { view: View }) => {
                 />
               ))}
             </div>
-            <span className="flex gap-3 text-xs text-muted">
-              <span>
-                p50 <Reading>{fixed(p50, 1)}</Reading>
-              </span>
-              <span>
-                p90{' '}
-                <Reading
-                  className={
-                    cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-bad' : ''
-                  }
-                >
-                  {fixed(p90, 1)}
-                </Reading>
-              </span>
-            </span>
-            {startup !== undefined && (
-              <span
-                className="text-xs text-muted"
-                title="Of the cold start, the time spent inside the process"
+            <dl className="grid w-full max-w-64 grid-cols-3 gap-x-3">
+              <Figure label="p50">{fixed(p50, 1)}</Figure>
+              <Figure
+                label="p90"
+                className={
+                  cold !== undefined && p90 !== undefined && p90 > cold * 1.6 ? 'text-bad' : ''
+                }
               >
-                in-process <Reading>{fixed(startup, 1)}</Reading>
-              </span>
-            )}
+                {fixed(p90, 1)}
+              </Figure>
+              {startup !== undefined && (
+                <Figure
+                  label="in-process"
+                  title="Of the cold start, the time spent inside the process"
+                >
+                  {fixed(startup, 1)}
+                </Figure>
+              )}
+            </dl>
           </Cell>
           <Cell label="Warm start">
             <span className={`text-md ${best('warm', warm)}`}>

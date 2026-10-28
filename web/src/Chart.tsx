@@ -1,4 +1,4 @@
-import { niceMax, type Stat, type View, day } from './data'
+import { DASHES, niceMax, type Stat, type View, day } from './data'
 
 export type Metric = { key: Stat; title: string; unit: string; height: number; leader: string }
 
@@ -107,7 +107,7 @@ export const Chart = ({
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
-                strokeDasharray={s.f.family === 'Node' ? '5 4' : undefined}
+                strokeDasharray={DASHES[s.f.family]}
                 points={s.values
                   .flatMap((v, i) => (v === undefined ? [] : [`${x(i)},${y(v)}`]))
                   .join(' ')}

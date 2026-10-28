@@ -12,6 +12,13 @@ export type Run = {
 
 export type Family = 'Bun' | 'LLRT' | 'Node'
 
+/** Each family's line style, as a `stroke-dasharray` for round-capped 2px strokes: solid, dotted, dashed. */
+export const DASHES: Record<Family, string | undefined> = {
+  Bun: undefined,
+  LLRT: '0 5',
+  Node: '5 4',
+}
+
 type Variant = {
   name: string
   family: Family

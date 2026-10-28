@@ -1,4 +1,4 @@
-import { type Fn, niceMax, type View } from './data'
+import { DASHES, type Fn, niceMax, type View } from './data'
 
 const HEIGHT = 300
 
@@ -21,7 +21,7 @@ export const MemoryChart = ({
   onPick: (memoryMb: number) => void
   className?: string
 }) => {
-  const { shown, memoryMb, hover, focus, agg } = view
+  const { shown, memoryMb, focus, agg } = view
   // Each size sits in the middle of its column, so the columns double as its hit areas.
   const x = (i: number) => ((i + 0.5) / memories.length) * 100
   const series = shown.map((f) => ({
@@ -45,10 +45,7 @@ export const MemoryChart = ({
 
   return (
     <article className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted">
-        <h2 className="text-xl text-ink">Cold start by memory</h2>
-        ms against MB, {hover !== undefined ? 'that run' : 'mean over the range'}
-      </div>
+      <h2 className="text-xl text-ink">Cold start by memory</h2>
       <div className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2">
         <div className="relative" style={{ height: HEIGHT }}>
           {grid.map((g) => (
@@ -92,7 +89,7 @@ export const MemoryChart = ({
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
-                strokeDasharray={s.f.family === 'Node' ? '5 4' : undefined}
+                strokeDasharray={DASHES[s.f.family]}
                 points={s.values
                   .flatMap((v, i) => (v === undefined ? [] : [`${x(i)},${y(v)}`]))
                   .join(' ')}
@@ -132,7 +129,7 @@ export const MemoryChart = ({
               className={`measured absolute -translate-x-1/2 text-xs whitespace-nowrap ${mb === memoryMb ? 'text-cool' : 'text-muted'}`}
               style={{ left: `${x(i)}%` }}
             >
-              {mb}
+              {mb} MB
             </span>
           ))}
         </div>

@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { Chart, type Metric } from './Chart'
 import {
+  DASHES,
   type Family,
   ORDER,
   type Run,
@@ -12,6 +13,7 @@ import {
   mean,
   toPoints,
 } from './data'
+import { Glance } from './Glance'
 import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
 import { Table } from './Table'
@@ -51,6 +53,40 @@ const Segmented = <T extends string | number>({
       ))}
     </div>
   </div>
+)
+
+/** A choice inside running text: the word it shows, over a transparent native select. */
+const InlinePick = <T extends string | number>({
+  label,
+  options,
+  value,
+  onPick,
+  text = String,
+}: {
+  label: string
+  options: readonly T[]
+  value: T
+  onPick: (v: T) => void
+  text?: (v: T) => string
+}) => (
+  <span className="pick">
+    {/* The select announces the same value. */}
+    <span aria-hidden="true">{text(value)}</span>
+    <svg aria-hidden="true" viewBox="0 0 10 6" className="pick__caret">
+      <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+    <select
+      aria-label={label}
+      value={String(value)}
+      onChange={(e) => onPick(options.find((o) => String(o) === e.target.value)!)}
+    >
+      {options.map((o) => (
+        <option key={o} value={String(o)}>
+          {text(o)}
+        </option>
+      ))}
+    </select>
+  </span>
 )
 
 const Header = ({ latest }: { latest?: RunPoints }) => {
@@ -151,7 +187,11 @@ export const App = () => {
     const shownArch = archs.includes(arch) ? arch : archs[0]!
     const memories = [...new Set(latest.functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
     const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
-    const since = latest.date.getTime() - range * DAY_MS
+    // A range is offered once there are runs older than the next shorter one shows.
+    const span = latest.date.getTime() - history[0]!.date.getTime()
+    const ranges = RANGES.filter((_, i) => i === 0 || span >= RANGES[i - 1]! * DAY_MS)
+    const shownRange = ranges.includes(range) ? range : ranges.at(-1)!
+    const since = latest.date.getTime() - shownRange * DAY_MS
     const runs = history.filter((r) => r.date.getTime() > since)
     const hovered = hover !== undefined && hover < runs.length ? hover : undefined
     const sized = latest.functions.filter((f) => f.arch === shownArch)
@@ -180,12 +220,17 @@ export const App = () => {
       setMemory(mb)
       setHover(undefined)
     }
+    const pickRange = (r: number) => {
+      setRange(r)
+      setHover(undefined)
+    }
     const [cold, ...small] = METRICS
 
     return (
       <>
         <section className={`${WRAP} flex flex-col gap-6`}>
-          <div className="flex flex-col gap-5 rounded-card border border-rule bg-paper-2 p-5 sm:p-6">
+          <Glance history={history} />
+          <div className="mt-6 flex flex-col gap-5 rounded-card border border-rule bg-paper-2 p-5 sm:p-6">
             <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
               <Segmented
                 label="Show"
@@ -208,16 +253,15 @@ export const App = () => {
                 value={shownMemory}
                 onPick={pickMemory}
               />
-              <Segmented
-                label="Range"
-                options={RANGES}
-                value={range}
-                text={(r) => `${r}d`}
-                onPick={(r) => {
-                  setRange(r)
-                  setHover(undefined)
-                }}
-              />
+              {ranges.length > 1 && (
+                <Segmented
+                  label="Range"
+                  options={ranges}
+                  value={shownRange}
+                  text={(r) => `${r}d`}
+                  onPick={pickRange}
+                />
+              )}
               <button
                 type="button"
                 onClick={load}
@@ -262,16 +306,23 @@ export const App = () => {
               })}
             </div>
             <div className="flex gap-5 text-sm text-muted">
-              {(['Bun', 'Node.js'] as const).map((name) => (
-                <span key={name} className="inline-flex items-center gap-2">
+              {(
+                [
+                  ['Bun', 'Bun'],
+                  ['LLRT', 'LLRT'],
+                  ['Node', 'Node.js'],
+                ] as const
+              ).map(([family, name]) => (
+                <span key={family} className="inline-flex items-center gap-2">
                   <svg aria-hidden="true" width="24" height="4" className="stroke-ink-2">
                     <line
-                      x1="0"
-                      x2="24"
+                      x1="1"
+                      x2="23"
                       y1="2"
                       y2="2"
                       strokeWidth="2"
-                      strokeDasharray={name === 'Bun' ? undefined : '5 4'}
+                      strokeLinecap="round"
+                      strokeDasharray={DASHES[family]}
                     />
                   </svg>
                   {name}
@@ -309,8 +360,30 @@ export const App = () => {
           <div className={`${WRAP} flex flex-col gap-8`}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
               <h2 className="text-2xl">
-                {hovered !== undefined ? `Run of ${day(runs[hovered]!.date)}` : `${range}-day mean`}{' '}
-                at {shownMemory} MB
+                {hovered !== undefined ? (
+                  `Run of ${day(runs[hovered]!.date)}`
+                ) : ranges.length > 1 ? (
+                  <>
+                    <InlinePick
+                      label="Range"
+                      options={ranges}
+                      value={shownRange}
+                      text={(r) => `${r}-day`}
+                      onPick={pickRange}
+                    />{' '}
+                    mean
+                  </>
+                ) : (
+                  'Mean'
+                )}{' '}
+                at{' '}
+                <InlinePick
+                  label="Memory"
+                  options={memories}
+                  value={shownMemory}
+                  text={(mb) => `${mb} MB`}
+                  onPick={pickMemory}
+                />
               </h2>
               <p className="max-w-prose text-sm text-muted">
                 Ticks are the {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts

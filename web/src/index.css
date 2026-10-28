@@ -99,6 +99,52 @@
     z-index: var(--z-raised);
   }
 
+  /* A choice set inside a heading: the chosen word, dash-underlined, with the native picker laid over it. */
+  .pick {
+    position: relative;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.2em;
+    text-decoration: underline dashed var(--color-rule-2);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+    transition: text-decoration-color var(--dur-short) var(--ease-out);
+  }
+
+  .pick:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .pick:has(select:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  .pick__caret {
+    width: 0.45em;
+    height: auto;
+    align-self: center;
+    color: var(--color-muted);
+  }
+
+  .pick > select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    opacity: 0;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  /* The open list is drawn by the browser from these, not from the invisible select's own look. */
+  .pick > select,
+  .pick option {
+    background-color: var(--color-paper-2);
+    color: var(--color-ink);
+  }
+
   .btn {
     display: inline-flex;
     align-items: center;
