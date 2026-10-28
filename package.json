@@ -14,6 +14,7 @@
     "build:local": "bun scripts/build-local.ts",
     "build": "bun scripts/build-docker.ts",
     "explain": "bun scripts/explain.ts",
+    "bootstrap:aws": "bun scripts/bootstrap-aws.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "lint": "bun lint",

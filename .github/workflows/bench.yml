@@ -2,7 +2,8 @@ name: Deploy and benchmark
 
 # Builds the Bun variants natively on an x86_64 and an arm64 runner, which is what the --aot
 # variants need, then deploys every function on both architectures and benchmarks them.
-# Needs the repository secret AWS_ROLE_ARN: a role this repo may assume through GitHub OIDC.
+# Needs the secret AWS_ROLE_ARN on the bench environment: a role that environment may assume
+# through GitHub OIDC. scripts/bootstrap-aws.ts sets up both.
 on:
   workflow_dispatch:
     inputs:
@@ -51,6 +52,8 @@ jobs:
   bench:
     needs: build
     runs-on: ubuntu-24.04
+    # The role's trust policy accepts only this environment's OIDC tokens.
+    environment: bench
     env:
       SST_TELEMETRY_DISABLED: '1'
       AWS_REGION: ${{ inputs.region }}
