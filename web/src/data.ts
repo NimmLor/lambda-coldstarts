@@ -189,6 +189,8 @@ export const day = (date: Date) =>
 export type View = {
   runs: RunPoints[]
   latest: RunPoints
+  /** The memory size `fns` have. */
+  memoryMb: number
   /** Every function on the architecture with the memory size, in legend order. */
   fns: Fn[]
   /** The ones not hidden, or all of them when every one is. */

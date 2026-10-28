@@ -12,6 +12,7 @@ import {
   mean,
   toPoints,
 } from './data'
+import { MemoryChart } from './MemoryChart'
 import { Table } from './Table'
 
 const REPO = 'https://github.com/NimmLor/bun-aot-lambda'
@@ -23,7 +24,7 @@ const RANGES = [14, 30, 90]
 const METRICS: Metric[] = [
   { key: 'cold', title: 'Cold start', unit: 'ms', height: 300, leader: 'Fastest' },
   { key: 'warm', title: 'Warm start', unit: 'ms', height: 180, leader: 'Fastest' },
-  { key: 'mem', title: 'Memory', unit: 'MB', height: 180, leader: 'Lowest' },
+  { key: 'mem', title: 'Memory used', unit: 'MB', height: 180, leader: 'Lowest' },
   { key: 'dur', title: 'Duration', unit: 'ms', height: 180, leader: 'Fastest' },
 ]
 
@@ -81,9 +82,9 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
   )
 }
 
-/** A fact of the latest run, parted from its neighbour by a hairline. */
+/** A fact of the latest run, parted from its neighbour by a hairline once they share a line. */
 const Fact = ({ term, children }: { term: string; children: ReactNode }) => (
-  <div className="flex flex-col gap-1 border-l border-rule px-6 first:border-l-0 first:pl-0">
+  <div className="flex flex-col gap-1 pr-6 sm:border-l sm:border-rule sm:px-6 sm:first:border-l-0 sm:first:pl-0">
     <dt className="text-xs text-muted">{term}</dt>
     <dd className="measured m-0 text-sm text-ink">{children}</dd>
   </div>
@@ -153,13 +154,15 @@ export const App = () => {
     const since = latest.date.getTime() - range * DAY_MS
     const runs = history.filter((r) => r.date.getTime() > since)
     const hovered = hover !== undefined && hover < runs.length ? hover : undefined
-    const fns = latest.functions
-      .filter((f) => f.arch === shownArch && f.memoryMb === shownMemory)
+    const sized = latest.functions.filter((f) => f.arch === shownArch)
+    const fns = sized
+      .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
     const visible = fns.filter((f) => !hidden.has(f.base))
     const view: View = {
       runs,
       latest,
+      memoryMb: shownMemory,
       fns,
       shown: visible.length ? visible : fns,
       hidden,
@@ -173,6 +176,11 @@ export const App = () => {
       setFocus,
       toggle,
     }
+    const pickMemory = (mb: number) => {
+      setMemory(mb)
+      setHover(undefined)
+    }
+    const [cold, ...small] = METRICS
 
     return (
       <>
@@ -190,14 +198,10 @@ export const App = () => {
                 }}
               />
               <Segmented
-                label="Memory"
+                label="Memory, MB"
                 options={memories}
                 value={shownMemory}
-                text={(mb) => `${mb} MB`}
-                onPick={(mb) => {
-                  setMemory(mb)
-                  setHover(undefined)
-                }}
+                onPick={pickMemory}
               />
               <Segmented
                 label="Range"
@@ -260,8 +264,23 @@ export const App = () => {
           </div>
 
           <div onMouseLeave={() => setHover(undefined)} className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3">
-            {METRICS.map((m, i) => (
-              <Chart key={m.key} metric={m} wide={i === 0} view={view} />
+            <Chart
+              metric={cold!}
+              wide
+              view={view}
+              className={memories.length > 1 ? 'col-span-full lg:col-span-2' : 'col-span-full'}
+            />
+            {memories.length > 1 && (
+              <MemoryChart
+                view={view}
+                sized={sized}
+                memories={memories}
+                onPick={pickMemory}
+                className="col-span-full lg:col-span-1"
+              />
+            )}
+            {small.map((m) => (
+              <Chart key={m.key} metric={m} wide={false} view={view} />
             ))}
           </div>
         </section>
@@ -270,7 +289,8 @@ export const App = () => {
           <div className={`${WRAP} flex flex-col gap-8`}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
               <h2 className="text-2xl">
-                {hovered !== undefined ? `Run of ${day(runs[hovered]!.date)}` : `${range}-day mean`}
+                {hovered !== undefined ? `Run of ${day(runs[hovered]!.date)}` : `${range}-day mean`} at{' '}
+                {shownMemory} MB
               </h2>
               <p className="max-w-prose text-sm text-muted">
                 Ticks are the {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts of{' '}
@@ -316,7 +336,7 @@ export const App = () => {
           <dd className="m-0">handler duration on an already-initialised instance</dd>
           <dt className="font-medium text-ink">Duration</dt>
           <dd className="m-0">handler duration of the cold invocation</dd>
-          <dt className="font-medium text-ink">Memory</dt>
+          <dt className="font-medium text-ink">Memory used</dt>
           <dd className="m-0">max memory used</dd>
           <dt className="font-medium text-ink">Size</dt>
           <dd className="m-0">deployed code size</dd>

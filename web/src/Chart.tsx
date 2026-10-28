@@ -15,8 +15,18 @@ const dateTicks = (n: number, segments: number) => {
 }
 
 /** One line per shown function, one point per run in range. */
-export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean; view: View }) => {
-  const { runs, shown, hover, focus, agg } = view
+export const Chart = ({
+  metric: m,
+  wide,
+  view,
+  className = '',
+}: {
+  metric: Metric
+  wide: boolean
+  view: View
+  className?: string
+}) => {
+  const { runs, memoryMb, shown, hover, focus, agg } = view
   const n = runs.length
   const x = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100)
   const series = shown.map((f) => ({ f, values: runs.map((r) => r.points.get(f.id)?.[m.key]) }))
@@ -36,12 +46,12 @@ export const Chart = ({ metric: m, wide, view }: { metric: Metric; wide: boolean
 
   return (
     <article
-      className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${wide ? 'col-span-full' : ''}`}
+      className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm text-muted">
         <div className="flex flex-wrap items-baseline gap-x-3">
           <h2 className={`text-ink ${wide ? 'text-xl' : 'text-lg'}`}>{m.title}</h2>
-          {m.unit}, mean per run
+          {m.unit}, mean per run at {memoryMb} MB
         </div>
         {best && (
           <span className="inline-flex items-center gap-2">

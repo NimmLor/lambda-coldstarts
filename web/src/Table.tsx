@@ -137,7 +137,7 @@ export const Table = ({ view }: { view: View }) => {
               p90 <Reading>{fixed(warmP90, 2)}</Reading>
             </span>
           </Cell>
-          <Cell label="Memory">
+          <Cell label="Memory used">
             <span className={best('mem', mem)}>
               <Reading>{fixed(mem, 1)}</Reading>
               <Unit>MB</Unit>
@@ -169,7 +169,7 @@ export const Table = ({ view }: { view: View }) => {
         <span>Function and build</span>
         <span>Cold start</span>
         <span>Warm start</span>
-        <span>Memory</span>
+        <span>Memory used</span>
         <span>Duration</span>
         <span>Size</span>
       </div>
