@@ -3,7 +3,8 @@
  * goes through `PERF_CONCURRENCY` functions at a time, forcing `PERF_ROUNDS` cold starts one after
  * another, each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs
  * in PerfResults), then records the run. PerfApi
- * serves the results to the React site in web/.
+ * serves the results to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs and
+ * purges the table.
  */
 import { RUNS_PK } from '../src/perf/keys'
 import { BENCH_TAG } from './functions'
@@ -160,7 +161,13 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
       router: { instance: router, path: '/api', rewrite: { regex: '^/api/(.*)$', to: '/$1' } },
     },
     link: [table],
-    environment: { PERF_TABLE: table.name },
+    environment: {
+      PERF_TABLE: table.name,
+      PERF_STATE_MACHINE: stateMachine.arn,
+      // Turns on the /admin/<secret>/… routes; they don't exist without it.
+      ...(process.env.PERF_ADMIN_SECRET && { PERF_ADMIN_SECRET: process.env.PERF_ADMIN_SECRET }),
+    },
+    permissions: [{ actions: ['states:StartExecution'], resources: [stateMachine.arn] }],
   })
 
   const site = new sst.aws.StaticSite('PerfSite', {

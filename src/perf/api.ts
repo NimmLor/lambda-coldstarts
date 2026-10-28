@@ -5,19 +5,38 @@
  *   GET /runs/history      the summaries of the latest `?limit=` runs (30, at most 90), newest first
  *   GET /runs/latest       the summary of the newest one
  *   GET /runs/<runId>      the summary of that one
+ *
+ * And, only when PERF_ADMIN_SECRET is set, two routes under it that 404 like any other otherwise:
+ *
+ *   POST /admin/<secret>/run     starts a run of the PerfRun state machine
+ *   POST /admin/<secret>/purge   deletes items from PerfResults until about 15 s have passed;
+ *                                `done: false` means there are more, call it again
  */
+import { timingSafeEqual } from 'node:crypto'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn'
+import {
+  BatchWriteCommand,
+  DynamoDBDocumentClient,
+  GetCommand,
+  QueryCommand,
+  ScanCommand,
+} from '@aws-sdk/lib-dynamodb'
 import type { LambdaFunctionURLEvent } from 'aws-lambda'
 import { RUNS_PK, type Sample, samplesPk } from './keys'
 import { summarize } from './summary'
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient())
+const sfn = new SFNClient()
 const TABLE = process.env.PERF_TABLE
+const STATE_MACHINE = process.env.PERF_STATE_MACHINE
+const ADMIN_SECRET = process.env.PERF_ADMIN_SECRET
+/** Leaves room under PerfRouter's 20 s origin timeout, which is also the function's. */
+const PURGE_BUDGET_MS = 15_000
 
-const json = (statusCode: number, body: unknown) => ({
+const json = (statusCode: number, body: unknown, cacheControl = 'max-age=60') => ({
   statusCode,
-  headers: { 'content-type': 'application/json', 'cache-control': 'max-age=60' },
+  headers: { 'content-type': 'application/json', 'cache-control': cacheControl },
   body: JSON.stringify(body),
 })
 
@@ -76,9 +95,67 @@ const withFunctions = async (run: Run) => ({
   functions: summarize(await listSamples(run.runId)),
 })
 
+const isSecret = (candidate: string) => {
+  if (!ADMIN_SECRET) return false
+  const a = new TextEncoder().encode(candidate)
+  const b = new TextEncoder().encode(ADMIN_SECRET)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+const startRun = async () => {
+  const { executionArn, startDate } = await sfn.send(
+    new StartExecutionCommand({ stateMachineArn: STATE_MACHINE, input: '{}' })
+  )
+  return { runId: startDate?.toISOString(), executionArn }
+}
+
+const deleteKeys = async (keys: Record<string, unknown>[]) => {
+  let requests = keys.map((Key) => ({ DeleteRequest: { Key } }))
+  for (let attempt = 0; requests.length; attempt++) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt))
+    const { UnprocessedItems } = await db.send(
+      new BatchWriteCommand({ RequestItems: { [TABLE!]: requests } })
+    )
+    requests = (UnprocessedItems?.[TABLE!] ?? []) as typeof requests
+  }
+}
+
+/** Scans from the start each call, which only finds what earlier calls didn't delete. */
+const purge = async () => {
+  const deadline = Date.now() + PURGE_BUDGET_MS
+  let deleted = 0
+  let ExclusiveStartKey: Record<string, unknown> | undefined
+  do {
+    const page = await db.send(
+      new ScanCommand({ TableName: TABLE, ProjectionExpression: 'pk, sk', ExclusiveStartKey })
+    )
+    const keys = page.Items ?? []
+    // BatchWriteItem takes 25 requests at most.
+    const batches = Array.from({ length: Math.ceil(keys.length / 25) }, (_, i) =>
+      keys.slice(i * 25, (i + 1) * 25)
+    )
+    await Promise.all(batches.map(deleteKeys))
+    deleted += keys.length
+    ExclusiveStartKey = page.LastEvaluatedKey
+  } while (ExclusiveStartKey && Date.now() < deadline)
+  return { deleted, done: !ExclusiveStartKey }
+}
+
+const admin = async (method: string, action: string) => {
+  if (method !== 'POST') return json(405, { error: 'POST only' }, 'no-store')
+  if (action === 'run') return json(200, await startRun(), 'no-store')
+  if (action === 'purge') return json(200, await purge(), 'no-store')
+  return json(404, { error: 'No such action' }, 'no-store')
+}
+
 export const handler = async (event: LambdaFunctionURLEvent) => {
-  if (event.requestContext.http.method !== 'GET') return json(405, { error: 'GET only' })
+  const { method } = event.requestContext.http
   const path = event.rawPath.replace(/\/+$/, '')
+
+  const [, secret, action] = path.match(/^\/admin\/([^/]+)\/([^/]+)$/) ?? []
+  if (secret && isSecret(secret)) return admin(method, action)
+
+  if (method !== 'GET') return json(405, { error: 'GET only' })
 
   if (path === '/runs') return json(200, { runs: await listRuns() })
 

@@ -208,11 +208,26 @@ bun run perf --stage dev --detach   # just starts it
 [`scripts/perf-run.ts`](scripts/perf-run.ts) runs itself under `sst shell` to find the state
 machine, and prints the execution's console link.
 
+With `PERF_ADMIN_SECRET` set at deploy time, PerfApi also takes two `POST`s under the secret,
+which 404 like any unknown path without it:
+
+```sh
+curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN_SECRET/run     # starts a run
+curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN_SECRET/purge   # empties PerfResults
+```
+
+`purge` stops after about 15 s to stay under CloudFront's origin timeout and answers
+`{ "deleted": …, "done": false }` while items are left; call it again until `done` is `true`.
+The site's unlinked, `noindex` `/admin` page ([`web/admin.html`](web/admin.html)) does both
+from a secret field and two buttons, repeating `purge` until it's done.
+
+
 | Variable | Default | |
 |---|---|---|
 | `PERF_ROUNDS` | `10` | Cold starts per function and run |
 | `PERF_WARM` | `5` | Warm invocations after each cold start |
 | `PERF_CONCURRENCY` | `4` | Functions measured at once; each holds two of the account's concurrent executions |
+| `PERF_ADMIN_SECRET` | unset | Path segment that turns on PerfApi's `run` and `purge`; URL-safe characters only |
 
 To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:
 `cd web && PERF_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.

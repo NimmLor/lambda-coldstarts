@@ -3,6 +3,7 @@
  * forwards /api/* to PerfApi without the /api prefix. `PERF_API_URL` is PerfApi's URL, the
  * stage's `perf.api` output.
  */
+import admin from './admin.html'
 import imprint from './imprint.html'
 import index from './index.html'
 import privacy from './privacy.html'
@@ -16,6 +17,7 @@ const server = Bun.serve({
     '/': index,
     '/imprint': imprint,
     '/privacy': privacy,
+    '/admin': admin,
     // build.ts copies these into dist/fonts; here they come straight from @fontsource.
     '/fonts/:file': (request) => {
       const { file } = request.params
@@ -26,7 +28,9 @@ const server = Bun.serve({
     },
     '/api/*': (request) => {
       const url = new URL(request.url)
-      return fetch(`${target}${url.pathname.slice('/api'.length)}${url.search}`)
+      return fetch(`${target}${url.pathname.slice('/api'.length)}${url.search}`, {
+        method: request.method,
+      })
     },
   },
 })

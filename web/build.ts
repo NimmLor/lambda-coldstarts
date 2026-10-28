@@ -14,7 +14,7 @@ const FONTS = [
 
 await Bun.$`rm -rf dist`
 await Bun.build({
-  entrypoints: ['index.html', 'imprint.html', 'privacy.html'],
+  entrypoints: ['index.html', 'imprint.html', 'privacy.html', 'admin.html'],
   outdir: 'dist',
   plugins: [tailwind],
   minify: true,
