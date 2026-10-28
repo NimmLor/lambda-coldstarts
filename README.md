@@ -34,8 +34,10 @@ curl "$(jq -r '.functions.BunCompileX64.url' .sst/outputs.json)"
 ```
 
 `bun run deploy` is `bun run build` (see [Both architectures](#both-architectures-built-in-docker))
-and then `sst deploy` with `LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist`. A plain `bunx sst deploy`
-builds on the host instead, for its architecture only, and replaces the functions of the other.
+and then `sst deploy` with `LAMBDA_ARCH=x86_64,arm64 BUN_BUNDLES=dist`; `bun run just-deploy` is
+that deploy alone, from the bundles already in `dist/`. A plain `bunx sst deploy` builds on the
+host instead, for its architecture only, and replaces the functions of the other.
+`bun run remove --stage dev` tears a stage down; production's resources are retained.
 
 Settings, all through the environment of `sst deploy`:
 
@@ -53,7 +55,7 @@ Settings, all through the environment of `sst deploy`:
 
 ```sh
 bun run build                # every Bun variant for x86_64 and arm64, into dist/<arch>/<Variant>
-bun run deploy --stage dev   # bun run build, then deploys all 22 functions
+bun run deploy --stage dev   # bun run build, then deploys all 110 functions
 ```
 
 `bun run build` is [`scripts/build-docker.ts`](scripts/build-docker.ts). The Node variants need
@@ -98,12 +100,15 @@ To build them, point `BUN_AOT_BIN` at a canary. `BunCompileTrim` builds on any h
 
 The canary is rebuilt from every push to `main`, which replaces its files, so there's no fixed
 version to pin. This installs the current one next to your normal Bun, without replacing it as
-`bun upgrade --canary` would (`bun-linux-aarch64` on Linux arm64):
+`bun upgrade --canary` would (`bun-linux-aarch64` on Linux arm64). The canary's `SHASUMS256.txt`
+isn't rewritten with each canary, so it checks the zip against the digest GitHub reports for it:
 
 ```sh
 mkdir -p ~/.bun-aot && cd ~/.bun-aot
 curl -fsSLO https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64.zip
-curl -fsSL https://github.com/oven-sh/bun/releases/download/canary/SHASUMS256.txt | grep ' bun-linux-x64.zip$' | sha256sum -c
+curl -fsSL https://api.github.com/repos/oven-sh/bun/releases/tags/canary |
+  jq -r '.assets[] | select(.name == "bun-linux-x64.zip") | .digest | ltrimstr("sha256:") + "  bun-linux-x64.zip"' |
+  sha256sum -c
 unzip -o bun-linux-x64.zip
 ~/.bun-aot/bun-linux-x64/bun --revision   # 1.4.4-canary.1+<commit>
 ```
@@ -123,6 +128,13 @@ prints `Skipping <Variant>: …` with the reason for every variant it can't buil
 the `--aot` variants, since `--aot` only builds for the machine it runs on; use `bun run build` in
 Docker, or the [Deploy and benchmark](.github/workflows/bench.yml) workflow, which builds on native
 x86_64 and arm64 runners.
+
+To see which of the handler's code `--aot` compiled to a slow path, worst first:
+
+```sh
+bun run explain                     # the host's architecture, in the build container
+bun run explain --arch arm64 trim   # or another report: json, guards, guards-json, trim, missed-optimizations, allocations
+```
 
 ### Why the AOT shim
 
@@ -171,7 +183,7 @@ Lambda returns with `LogType: Tail`, so they are Lambda's own:
 Results land in `bench-results/` as Markdown and raw JSON. The
 [Deploy and benchmark](.github/workflows/bench.yml) workflow does all of it: `bun run build` on an
 `ubuntu-24.04` and an `ubuntu-24.04-arm` runner, each for its own architecture, then one job that
-deploys all 22 functions from those bundles and benchmarks them. That job runs in the `bench`
+deploys all 110 functions from those bundles and benchmarks them. That job runs in the `bench`
 GitHub environment and assumes an AWS role through GitHub OIDC. `bun run bootstrap:aws`, with
 admin credentials for the account and a logged-in `gh`, sets it up and is safe to re-run
 ([`scripts/bootstrap-aws.ts`](scripts/bootstrap-aws.ts)): the account's GitHub OIDC provider, the
@@ -179,8 +191,9 @@ role `lambda-coldstarts-github` that only the `bench` and `production` environme
 `<owner>/<repo>` may assume, with an inline policy for the services the stack uses, and both
 environments with the role's ARN as their `AWS_ROLE_ARN` secret.
 
-Every push to main runs [Deploy](.github/workflows/deploy.yml): the checks, the same two native
-builds, then `sst deploy --stage production` from those bundles in the `production` environment.
+Every pull request runs [CI](.github/workflows/ci.yml): the checks and the same two native builds.
+Every push to main runs [Deploy](.github/workflows/deploy.yml): the checks, the same two builds,
+then `sst deploy --stage production` from those bundles in the `production` environment.
 A `PERF_ADMIN_SECRET` secret on that environment turns on PerfApi's admin routes.
 
 ## Scheduled runs, like lambda-perf
@@ -202,14 +215,21 @@ The stack also runs the benchmark on its own, the way
   finished run under `runs`, and one per summary under `summaries`
   ([`src/perf/keys.ts`](src/perf/keys.ts)). A run's id is its execution's start time.
 - **`PerfApi`** ([`src/perf/api.ts`](src/perf/api.ts)), served under the site's `/api`: `GET /runs`,
-  `GET /runs/history?limit=90`, `GET /runs/latest`, `GET /runs/<runId>`, all but the first with
-  per-function p50/p90/avg/min/max of the cold starts' init and in-process startup, and of the
-  warm invocations' duration. Percentiles interpolate between samples, so p90 of ten cold starts
-  isn't simply the slowest.
-- **`PerfSite`**, a React and Tailwind page in [`web/`](web/), bundled by Bun, that charts the
-  last 14, 30 or 90 days of runs per architecture and tables their means, or a hovered run.
+  `GET /runs/history?limit=` (30 by default, at most 90), `GET /runs/latest`, `GET /runs/<runId>`,
+  all but the first with per-function p50/p90/avg/min/max of the cold starts' init and in-process
+  startup, and of the warm invocations' duration. Percentiles interpolate between samples, so p90
+  of ten cold starts isn't simply the slowest.
+- **`PerfSite`**, a React and Tailwind page in [`web/`](web/), bundled by Bun
+  ([`web/build.ts`](web/build.ts)). It opens with at-a-glance panels that compare LLRT, Bun AOT
+  trimmed and Node.js 24 on arm64 at 256 MB over the last 3 days, then charts the last 14, 30 or
+  90 days of runs per architecture and memory size (cold start, warm start, memory used,
+  duration, and cold start by memory size), and tables their means, or a hovered run. The imprint
+  and privacy policy are pages of their own.
 - **`PerfRouter`**, the CloudFront distribution in front of both: `/api/*` goes to PerfApi's
-  Function URL without the `/api`, everything else to PerfSite.
+  Function URL without the `/api`, everything else to PerfSite. On every stage but production it
+  answers `/robots.txt` with `Disallow: /` and adds `X-Robots-Tag: noindex, nofollow` to every
+  response; production serves [`web/robots.txt`](web/robots.txt) and
+  [`web/sitemap.xml`](web/sitemap.xml).
 
 The site is at `coldstarts.github.nimmervoll.work` in production and at
 `<stage>.coldstarts.github.nimmervoll.work` on every other stage, e.g. `dev.coldstarts…`.
@@ -245,10 +265,10 @@ curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN
 
 `purge` stops after about 15 s to stay under CloudFront's origin timeout and answers
 `{ "deleted": …, "done": false }` while items are left; call it again until `done` is `true`.
-`pause` and `resume` answer `{ "state": "DISABLED" | "ENABLED", "was": … }`, and a deploy leaves
-the schedule's state alone unless it has to update the schedule for another reason. The site's unlinked, `noindex` `/admin` page
-([`web/admin.html`](web/admin.html)) does all of them from a secret field and a button each,
-repeating `purge` until it's done.
+`pause` and `resume` answer `{ "state": "DISABLED" | "ENABLED", "was": … }`. A deploy that has
+to update the schedule for another reason sets it back to `ENABLED`; any other deploy leaves its
+state alone. The site's unlinked, `noindex` `/admin` page ([`web/admin.html`](web/admin.html))
+does all of them from a secret field and a button each, repeating `purge` until it's done.
 
 | Variable            | Default |                                                                             |
 | ------------------- | ------- | --------------------------------------------------------------------------- |
@@ -259,15 +279,29 @@ repeating `purge` until it's done.
 To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:
 `cd web && PERF_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.
 
+The social preview, [`web/og.png`](web/og.png), is committed. After changing
+[`web/og.html`](web/og.html), render it again with headless Chrome: `cd web && bun run og`
+(`CHROME` names the binary, `google-chrome` by default).
+
 ## Try it locally
 
 ```sh
 bun run build:local                 # builds the Bun and LLRT variants into dist/<arch>/ and smoke-tests them
-bun test                            # runtime loop against a fake Runtime API
+bun test                            # runtime loop against a fake Runtime API, REPORT parsing, summaries
 ```
 
 `build:local` starts every `bootstrap` against a fake Runtime API, so a broken bundle shows up
 before a deploy.
+
+The checks CI runs, which need a Bun canary for `bun lint` and `bunx sst install` once for the
+types in `.sst/platform`:
+
+```sh
+bun run typecheck   # bun check, for the root and web/
+bun lint --max-warnings 0
+bun fmt --check
+bun test
+```
 
 ## Notes
 
