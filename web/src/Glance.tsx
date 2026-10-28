@@ -113,7 +113,8 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
   const rows: Row[] = CONTENDERS.flatMap(({ base, name }) => {
     const fn = latest.functions.find((f) => f.id === `${base}/${ARCH}/${MEMORY_MB}`)
     if (!fn) return []
-    const avg = (key: Key) => mean(runs.map((r) => r.points.get(fn.id)?.[key]))
+    // Node.js functions report no code size: 0, which the table shows as missing too.
+    const avg = (key: Key) => mean(runs.map((r) => r.points.get(fn.id)?.[key] || undefined))
     return [
       {
         fn,
