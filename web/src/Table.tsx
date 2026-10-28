@@ -87,12 +87,11 @@ const Command = ({ build }: { build: string }) => {
 /** `bun 1.4.4+38afee6c8` or `llrt-lambda-arm64-no-sdk@v0.9.0-beta`: the name, the release, the build after it. */
 const VERSION = /^(.+?)[ @]v?(\d[^+]*)(\+.+)?$/
 
-/** What it ran on, the release brightest, then Lambda's runtime in a chip. */
-const Versions = ({ point }: { point?: Point }) => {
-  if (!point) return
+/** What it ran on, the release brightest, then Lambda's runtime. */
+const Versions = ({ point }: { point: Point }) => {
   const [, name, release, build] = point.version?.match(VERSION) ?? []
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs/normal text-muted slashed-zero">
+    <span className="flex flex-wrap gap-x-[2.5ch] overflow-hidden font-mono text-muted slashed-zero">
       {point.version && (
         <span title={point.version}>
           {release ? (
@@ -105,10 +104,18 @@ const Versions = ({ point }: { point?: Point }) => {
           )}
         </span>
       )}
-      <span className="rounded-chip border border-rule px-1.5" title="Lambda runtime">
+      {/* The dot sits in the gap, so it's clipped away when the runtime wraps to a line of its own. */}
+      <span
+        title="Lambda runtime"
+        className={
+          point.version
+            ? "relative before:absolute before:right-full before:mr-[0.75ch] before:content-['·']"
+            : ''
+        }
+      >
         {point.runtime}
       </span>
-    </p>
+    </span>
   )
 }
 
@@ -167,10 +174,20 @@ export const Table = ({ view }: { view: View }) => {
             {f.canary && <Badge tone="outline">canary Bun</Badge>}
             {f.preview && <Badge tone="amber">preview</Badge>}
           </div>
-          <div className="flex flex-col gap-0.5">
-            <Command build={f.build} />
-            <Versions point={tickRun.points.get(f.id)} />
-          </div>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs/normal">
+            <dt className="text-muted">Build</dt>
+            <dd>
+              <Command build={f.build} />
+            </dd>
+            {tickRun.points.has(f.id) && (
+              <>
+                <dt className="text-muted">Runs on</dt>
+                <dd>
+                  <Versions point={tickRun.points.get(f.id)!} />
+                </dd>
+              </>
+            )}
+          </dl>
         </div>
         <div className="col-start-2 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 lg:contents">
           <Cell label="Cold start" className="col-span-2 sm:col-span-4 lg:col-span-1">
