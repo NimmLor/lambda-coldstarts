@@ -21,13 +21,14 @@
   --color-bad: oklch(70% 0.17 25);
   --color-bad-soft: oklch(24.5% 0.035 25);
 
-  /* One line per variant in data.ts: Bun warm, Node.js cool, LLRT in between. */
+  /* One line per variant in data.ts: Bun warm, Node.js cool, LLRT in between.
+     The headline Bun variant takes Bun's brand pink; the AOT one moves to magenta to stay apart from it. */
   --color-line-BunRuntime: oklch(78% 0.13 85);
   --color-line-BunCompile: oklch(78% 0.13 60);
   --color-line-BunCompileCanary: oklch(74% 0.13 300);
   --color-line-BunCompileTrim: oklch(76% 0.13 35);
-  --color-line-BunCompileAot: oklch(74% 0.14 10);
-  --color-line-BunCompileAotTrim: oklch(74% 0.14 340);
+  --color-line-BunCompileAot: oklch(74% 0.14 325);
+  --color-line-BunCompileAotTrim: #ff2e97;
   --color-line-Llrt: oklch(82% 0.14 115);
   --color-line-LlrtBytecode: oklch(74% 0.12 255);
   --color-line-Node22: oklch(78% 0.13 150);
