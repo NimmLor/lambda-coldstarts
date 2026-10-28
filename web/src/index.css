@@ -137,7 +137,9 @@
     opacity: 0;
     cursor: pointer;
     appearance: none;
-    font: 400 var(--text-md) / 1.4 system-ui, sans-serif;
+    font:
+      400 var(--text-md) / 1.4 system-ui,
+      sans-serif;
   }
 
   /* The open list is drawn by the browser from these, not from the invisible select's own look. */
