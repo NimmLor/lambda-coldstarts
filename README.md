@@ -256,11 +256,11 @@ curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN
 The site's unlinked, `noindex` `/admin` page ([`web/admin.html`](web/admin.html)) does both
 from a secret field and two buttons, repeating `purge` until it's done.
 
-| Variable            | Default |                                                                                   |
-| ------------------- | ------- | --------------------------------------------------------------------------------- |
-| `PERF_ROUNDS`       | `10`    | Cold starts per function and run                                                  |
-| `PERF_WARM`         | `5`     | Warm invocations after each cold start                                            |
-| `PERF_ADMIN_SECRET` | unset   | Path segment that turns on PerfApi's `run` and `purge`; URL-safe characters only  |
+| Variable            | Default |                                                                                  |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| `PERF_ROUNDS`       | `10`    | Cold starts per function and run                                                 |
+| `PERF_WARM`         | `5`     | Warm invocations after each cold start                                           |
+| `PERF_ADMIN_SECRET` | unset   | Path segment that turns on PerfApi's `run` and `purge`; URL-safe characters only |
 
 To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:
 `cd web && PERF_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.

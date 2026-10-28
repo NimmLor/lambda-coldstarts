@@ -16,7 +16,7 @@
     "explain": "bun scripts/explain.ts",
     "bootstrap:aws": "bun scripts/bootstrap-aws.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "typecheck": "bun check && bun check -p web",
     "lint": "bun lint",
     "format": "bun fmt",
     "format:check": "bun fmt --check"
@@ -31,6 +31,7 @@
     "@aws-sdk/lib-dynamodb": "^3.1158.0",
     "@types/aws-lambda": "^8.10.164",
     "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.5",
     "typescript": "^5.9.3"
   }
 }
