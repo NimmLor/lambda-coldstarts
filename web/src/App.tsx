@@ -383,11 +383,12 @@ export const App = () => {
                   onPick={pickMemory}
                 />
               </h2>
-              <p className="max-w-prose text-sm text-muted">
-                Each tick is one of {hovered !== undefined ? 'that' : 'the latest'} run’s{' '}
-                {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts. Warm start
-                averages {latest.rounds} × {latest.warmInvocations ?? '—'} calls. Click a row to
-                hide it.
+              <p className="max-w-prose text-sm text-pretty text-muted">
+                Ticks are {hovered !== undefined ? 'that' : 'the latest'} run’s{' '}
+                {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts.
+                {latest.warmInvocations !== undefined &&
+                  ` Warm start is the mean of the ${latest.warmInvocations} calls after each.`}{' '}
+                Click a row to hide it.
               </p>
             </div>
             <Table view={view} />
