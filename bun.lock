@@ -21,8 +21,6 @@
     "web": {
       "name": "perf-site",
       "dependencies": {
-        "@fontsource/atkinson-hyperlegible-mono": "^5.3.0",
-        "@fontsource/host-grotesk": "^5.3.0",
         "react": "^19.3.1",
         "react-dom": "^19.3.1",
       },
@@ -82,10 +80,6 @@
     "@aws/durable-execution-sdk-js": ["@aws/durable-execution-sdk-js@1.0.2", "", { "dependencies": { "@aws-sdk/client-lambda": "^3.943.0" } }, "sha512-KIYBVqV9gArkWdPEDYOjJqLlO+NecmCXOXadNBlOspJTmqztwuiyb6aZc468bYWSGuL4Me/gyTIK97ubkwFNCw=="],
 
     "@aws/lambda-invoke-store": ["@aws/lambda-invoke-store@0.3.0", "", {}, "sha512-sl4Bm6yiMNYrZKkqqDFWN0UfnWhlS8ivKxrYl+6t0gCLrqr8y3B2IqZZbFRkfaVVp7C/baApyh71P+LeE1A2sQ=="],
-
-    "@fontsource/atkinson-hyperlegible-mono": ["@fontsource/atkinson-hyperlegible-mono@5.3.0", "", {}, "sha512-7Iha5azCRXJVk4NdxbVdKAE+4p/rMJoW6dslvhktugDFPSp7kxFRGAavBtwtSTrnyNhKXW8w1NHgMnrh/6OshA=="],
-
-    "@fontsource/host-grotesk": ["@fontsource/host-grotesk@5.3.0", "", {}, "sha512-/4lcEvSbI3IELjz7UHW5Z1tXuRwOJACKK1ynJKSR28/MscudnKjxXIPQYfRmguv4niURtuksL0Hiusx+SPZS8w=="],
 
     "@smithy/core": ["@smithy/core@3.37.0", "", { "dependencies": { "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-97imTcCyiPd8k0e9+ts/Sp0W65Dn9Ti357J7M09Ov4tI8Q1JDJVFSoAJtjEVKqfHEr3Pdo2jfolqKCaaiszH0g=="],
 

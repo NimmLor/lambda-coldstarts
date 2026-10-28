@@ -18,12 +18,11 @@ const server = Bun.serve({
     '/imprint': imprint,
     '/privacy': privacy,
     '/admin': admin,
-    // build.ts copies these into dist/fonts; here they come straight from @fontsource.
+    // build.ts copies fonts/ into dist/fonts.
     '/fonts/:file': (request) => {
       const { file } = request.params
-      const match = /^([a-z-]+)-latin-\d+-normal\.woff2$/.exec(file)
-      return match
-        ? new Response(Bun.file(`node_modules/@fontsource/${match[1]}/files/${file}`))
+      return /^[a-z-]+-latin-\d+-normal\.woff2$/.test(file)
+        ? new Response(Bun.file(`fonts/${file}`))
         : new Response('Not found', { status: 404 })
     },
     '/api/*': (request) => {
