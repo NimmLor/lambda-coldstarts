@@ -36,11 +36,11 @@ const docker = (args: string[], input?: string) =>
 const buildImage = (arch: LambdaArch) => {
   const setup = readFileSync(SETUP, 'utf8')
   const hash = createHash('sha256').update(setup).digest('hex').slice(0, 12)
-  const image = `bun-aot-lambda-build:${arch}-${hash}`
+  const image = `lambda-coldstarts-build:${arch}-${hash}`
   if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status === 0) {
     return image
   }
-  const container = `bun-aot-lambda-setup-${arch}-${process.pid}`
+  const container = `lambda-coldstarts-setup-${arch}-${process.pid}`
   try {
     docker(
       [

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "bun-aot-lambda",
+      "name": "lambda-coldstarts",
       "dependencies": {
         "sst": "4.17.2",
       },

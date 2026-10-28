@@ -22,7 +22,7 @@ const { values: args } = parseArgs({
   },
 })
 
-const ROLE_NAME = 'bun-aot-lambda-github'
+const ROLE_NAME = 'lambda-coldstarts-github'
 const POLICY_NAME = 'deploy'
 const OIDC_HOST = 'token.actions.githubusercontent.com'
 // AWS no longer checks it for GitHub's provider, but the CLI still asks for one.
@@ -32,7 +32,17 @@ const AUDIENCE = 'sts.amazonaws.com'
 const repo =
   args.repo ?? (await $`gh repo view --json nameWithOwner -q .nameWithOwner`.text()).trim()
 const environments = args.environment!.split(',').map((name) => name.trim())
-const subjects = environments.map((name) => `repo:${repo}:environment:${name}`)
+// With immutable subjects on, GitHub names the repo by owner and repo IDs too
+// (repo:owner@123/name@456), so ask it for the prefix instead of building one.
+const subClaim = (await $`gh api repos/${repo}/actions/oidc/customization/sub`.json()) as {
+  use_default: boolean
+  sub_claim_prefix?: string
+}
+if (!subClaim.use_default) {
+  throw new Error(`${repo} customizes its OIDC subject claim; the trust policy expects the default`)
+}
+const subjectPrefix = subClaim.sub_claim_prefix ?? `repo:${repo}`
+const subjects = environments.map((name) => `${subjectPrefix}:environment:${name}`)
 
 const aws = async <T>(cmd: string[]): Promise<T> => {
   const out = (await $`aws ${cmd} --output json`.quiet()).stdout.toString().trim()

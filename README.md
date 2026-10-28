@@ -1,4 +1,4 @@
-# bun-aot-lambda
+# lambda-coldstarts
 
 One SST stack, eleven Lambdas that do the same thing on different runtimes, and a script that
 measures their cold and warm starts:
@@ -68,7 +68,7 @@ Lambda's `provided.al2023` OS. So `--aot` compiles natively, and the smoke test 
 1.4.4 and the latest canary for its architecture, checksums verified
 ([`infra/build-image.sh`](infra/build-image.sh)), and is cached until that script changes. So
 locally the canary stays the one from when the image was made; to pick up a newer one, remove the
-image with `docker rmi $(docker images -q bun-aot-lambda-build)`. CI makes a new image every run.
+image with `docker rmi $(docker images -q lambda-coldstarts-build)`. CI makes a new image every run.
 `bun run build --arch arm64 BunCompileAot` builds just some of them.
 
 The architecture the host isn't runs under QEMU, which Docker Desktop brings along. A Docker
@@ -175,7 +175,7 @@ deploys all 22 functions from those bundles and benchmarks them. That job runs i
 GitHub environment and assumes an AWS role through GitHub OIDC. `bun run bootstrap:aws`, with
 admin credentials for the account and a logged-in `gh`, sets it up and is safe to re-run
 ([`scripts/bootstrap-aws.ts`](scripts/bootstrap-aws.ts)): the account's GitHub OIDC provider, the
-role `bun-aot-lambda-github` that only the `bench` and `production` environments of
+role `lambda-coldstarts-github` that only the `bench` and `production` environments of
 `<owner>/<repo>` may assume, with an inline policy for the services the stack uses, and both
 environments with the role's ARN as their `AWS_ROLE_ARN` secret.
 

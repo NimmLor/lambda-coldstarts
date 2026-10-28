@@ -1,5 +1,5 @@
 {
-  "name": "bun-aot-lambda",
+  "name": "lambda-coldstarts",
   "private": true,
   "type": "module",
   "workspaces": [
