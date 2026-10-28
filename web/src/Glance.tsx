@@ -1,56 +1,45 @@
-import { type Fn, fixed, mean, type RunPoints } from "./data";
-import bunIcon from "./icons/bun.svg";
-import llrtIcon from "./icons/llrt.svg";
-import nodeIcon from "./icons/nodejs.svg";
+import { type Fn, fixed, mean, type RunPoints } from './data'
+import bunIcon from './icons/bun.svg'
+import llrtIcon from './icons/llrt.svg'
+import nodeIcon from './icons/nodejs.svg'
 
-const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon };
-const DAY_MS = 864e5;
+const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
+const DAY_MS = 864e5
 
-const ARCH = "arm64";
-const MEMORY_MB = 256;
-const DAYS = 30;
+const ARCH = 'arm64'
+const MEMORY_MB = 256
+const DAYS = 30
 /** The ones compared, in the order every panel lists them, with names short enough for a quarter of the page. */
 const CONTENDERS = [
-  { base: "Llrt", name: "LLRT" },
-  { base: "BunCompileAotTrim", name: "Bun AOT, trimmed" },
-  { base: "Node24", name: "Node.js 24" },
-];
+  { base: 'Llrt', name: 'LLRT' },
+  { base: 'BunCompileAotTrim', name: 'Bun AOT, trimmed' },
+  { base: 'Node24', name: 'Node.js 24' },
+]
 /** What each leader is measured against: the newest Node.js Lambda runs without a preview. */
-const BASELINE = "Node24";
+const BASELINE = 'Node24'
 
-type Key = "cold" | "warm" | "mem" | "size";
+type Key = 'cold' | 'warm' | 'mem' | 'size'
 const METRICS: {
-  key: Key;
-  title: string;
-  unit: string;
-  digits: number;
-  better: string;
+  key: Key
+  title: string
+  unit: string
+  digits: number
+  better: string
 }[] = [
-  { key: "cold", title: "Cold start", unit: "ms", digits: 1, better: "faster" },
-  { key: "warm", title: "Warm start", unit: "ms", digits: 2, better: "faster" },
-  { key: "mem", title: "Memory used", unit: "MB", digits: 1, better: "less" },
-  { key: "size", title: "Size", unit: "MB", digits: 1, better: "smaller" },
-];
+  { key: 'cold', title: 'Cold start', unit: 'ms', digits: 1, better: 'faster' },
+  { key: 'warm', title: 'Warm start', unit: 'ms', digits: 2, better: 'faster' },
+  { key: 'mem', title: 'Memory used', unit: 'MB', digits: 1, better: 'less' },
+  { key: 'size', title: 'Size', unit: 'MB', digits: 1, better: 'smaller' },
+]
 
-type Row = { fn: Fn; name: string; values: Record<Key, number | undefined> };
+type Row = { fn: Fn; name: string; values: Record<Key, number | undefined> }
 
-const Panel = ({
-  metric: m,
-  rows,
-}: {
-  metric: (typeof METRICS)[number];
-  rows: Row[];
-}) => {
-  const present = rows.filter((r) => r.values[m.key] !== undefined);
-  const max = Math.max(0, ...present.map((r) => r.values[m.key]!));
-  const leader = present.toSorted(
-    (a, b) => a.values[m.key]! - b.values[m.key]!,
-  )[0];
-  const baseline = rows.find((r) => r.fn.base === BASELINE)?.values[m.key];
-  const ratio =
-    leader && baseline !== undefined
-      ? baseline / leader.values[m.key]!
-      : undefined;
+const Panel = ({ metric: m, rows }: { metric: (typeof METRICS)[number]; rows: Row[] }) => {
+  const present = rows.filter((r) => r.values[m.key] !== undefined)
+  const max = Math.max(0, ...present.map((r) => r.values[m.key]!))
+  const leader = present.toSorted((a, b) => a.values[m.key]! - b.values[m.key]!)[0]
+  const baseline = rows.find((r) => r.fn.base === BASELINE)?.values[m.key]
+  const ratio = leader && baseline !== undefined ? baseline / leader.values[m.key]! : undefined
 
   return (
     <article className="flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6">
@@ -60,8 +49,8 @@ const Panel = ({
       </div>
       <dl className="m-0 flex flex-col gap-3">
         {rows.map((r) => {
-          const v = r.values[m.key];
-          const isLeader = r === leader;
+          const v = r.values[m.key]
+          const isLeader = r === leader
           return (
             <div key={r.fn.base} className="flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-3">
@@ -76,7 +65,7 @@ const Panel = ({
                   {r.name}
                 </dt>
                 <dd
-                  className={`measured m-0 text-md whitespace-nowrap ${isLeader ? "rounded-chip bg-cool-soft px-1 text-cool" : "text-ink-2"}`}
+                  className={`measured m-0 text-md whitespace-nowrap ${isLeader ? 'rounded-chip bg-cool-soft px-1 text-cool' : 'text-ink-2'}`}
                 >
                   {fixed(v, m.digits)}
                 </dd>
@@ -93,15 +82,15 @@ const Panel = ({
                 )}
               </div>
             </div>
-          );
+          )
         })}
       </dl>
       <p className="mt-auto text-sm text-muted">
         {leader && ratio !== undefined && leader.fn.base !== BASELINE ? (
           <>
-            <span className="text-ink">{leader.name}</span>{" "}
-            <span className="measured text-ink">{ratio.toFixed(1)}×</span>{" "}
-            {m.better} than Node.js 24
+            <span className="text-ink">{leader.name}</span>{' '}
+            <span className="measured text-ink">{ratio.toFixed(1)}×</span> {m.better} than Node.js
+            24
           </>
         ) : (
           leader && (
@@ -112,35 +101,33 @@ const Panel = ({
         )}
       </p>
     </article>
-  );
-};
+  )
+}
 
 /** LLRT, Bun's trimmed AOT executable and Node.js 24 side by side, whatever the dashboard below shows. */
 export const Glance = ({ history }: { history: RunPoints[] }) => {
-  const latest = history.at(-1);
-  if (!latest) return null;
-  const since = latest.date.getTime() - DAYS * DAY_MS;
-  const runs = history.filter((r) => r.date.getTime() > since);
+  const latest = history.at(-1)
+  if (!latest) return null
+  const since = latest.date.getTime() - DAYS * DAY_MS
+  const runs = history.filter((r) => r.date.getTime() > since)
   const rows: Row[] = CONTENDERS.flatMap(({ base, name }) => {
-    const fn = latest.functions.find(
-      (f) => f.id === `${base}/${ARCH}/${MEMORY_MB}`,
-    );
-    if (!fn) return [];
-    const avg = (key: Key) => mean(runs.map((r) => r.points.get(fn.id)?.[key]));
+    const fn = latest.functions.find((f) => f.id === `${base}/${ARCH}/${MEMORY_MB}`)
+    if (!fn) return []
+    const avg = (key: Key) => mean(runs.map((r) => r.points.get(fn.id)?.[key]))
     return [
       {
         fn,
         name,
         values: {
-          cold: avg("cold"),
-          warm: avg("warm"),
-          mem: avg("mem"),
-          size: avg("size"),
+          cold: avg('cold'),
+          warm: avg('warm'),
+          mem: avg('mem'),
+          size: avg('size'),
         },
       },
-    ];
-  });
-  if (rows.length < 2) return null;
+    ]
+  })
+  if (rows.length < 2) return null
 
   return (
     <section aria-labelledby="glance" className="flex flex-col gap-5">
@@ -158,5 +145,5 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
         ))}
       </div>
     </section>
-  );
-};
+  )
+}
