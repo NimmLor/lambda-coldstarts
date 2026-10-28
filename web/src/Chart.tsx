@@ -52,6 +52,7 @@ export const Versus = ({ value, baseline }: { value?: number; baseline?: number 
 /**
  * The values under the pointer, lowest first, beside the crosshair at `left`% of the plot: right
  * of it if it fits, else left, else as near it as the plot allows, so the card never clips it.
+ * Up or down only as far as the card grid needs, as a short card's readout can be taller than it.
  */
 export const Readout = ({
   left,
@@ -85,13 +86,26 @@ export const Readout = ({
           ? at - READOUT_GAP - width
           : Math.max(0, Math.min(plot - width, at - width / 2))
     el.style.left = `${x}px`
+    // Centred on the plot, but kept inside the card grid, which clips its cells to round its corners.
+    let clip = el.parentElement!
+    while (clip.parentElement && getComputedStyle(clip).overflowY === 'visible') {
+      clip = clip.parentElement
+    }
+    const own = el.parentElement!.getBoundingClientRect()
+    const bounds = clip.getBoundingClientRect()
+    const height = el.offsetHeight
+    const y = Math.max(
+      bounds.top - own.top + READOUT_GAP,
+      Math.min(bounds.bottom - own.top - READOUT_GAP - height, (own.height - height) / 2)
+    )
+    el.style.top = `${y}px`
   })
 
   return (
     <div
       ref={ref}
       role="tooltip"
-      className="pointer-events-none absolute top-1/2 z-(--z-tooltip) flex -translate-y-1/2 flex-col gap-1 rounded-pill border border-rule-2 bg-paper px-3 py-2 text-xs whitespace-nowrap shadow-[0_8px_24px_oklch(0%_0_0/0.45)]"
+      className="pointer-events-none absolute z-(--z-tooltip) flex flex-col gap-1 rounded-pill border border-rule-2 bg-paper px-3 py-2 text-xs whitespace-nowrap shadow-[0_8px_24px_oklch(0%_0_0/0.45)]"
     >
       <span className="measured text-muted">{title}</span>
       {rows
