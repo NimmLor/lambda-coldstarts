@@ -490,6 +490,7 @@ export const App = () => {
           <code>--no-compile-autoload-dotenv</code> and <code>--no-compile-autoload-bunfig</code>.{' '}
           <code>--trim</code> and <code>--aot</code> only exist in canary Bun, hence the badge.
         </p>
+        <p className="m-0">by Lorenz Nimmervoll</p>
         <SiteLinks />
       </footer>
     </main>
