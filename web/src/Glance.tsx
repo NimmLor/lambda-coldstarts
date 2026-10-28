@@ -8,7 +8,7 @@ const DAY_MS = 864e5
 
 const ARCH = 'arm64'
 const MEMORY_MB = 256
-const DAYS = 30
+const DAYS = 3
 /** The ones compared, in the order every panel lists them, with names short enough for a quarter of the page. */
 const CONTENDERS = [
   { base: 'Llrt', name: 'LLRT' },
