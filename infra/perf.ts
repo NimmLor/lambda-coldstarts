@@ -162,8 +162,16 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   })
 
   // One CloudFront distribution for the site and, under /api, PerfApi, so the page fetches its
-  // own origin.
-  const router = new sst.aws.Router('PerfRouter', { domain: siteDomain() })
+  // own origin. Deploys don't wait for CloudFront to roll out the distribution or finish the
+  // site's invalidation; both settle a few minutes after `sst deploy` returns.
+  const router = new sst.aws.Router('PerfRouter', {
+    domain: siteDomain(),
+    transform: {
+      cdn: (args) => {
+        args.wait = false
+      },
+    },
+  })
 
   const api = new sst.aws.Function('PerfApi', {
     handler: 'src/perf/api.handler',
@@ -186,6 +194,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     path: 'web',
     build: { command: 'bun run build', output: 'dist' },
     router: { instance: router },
+    invalidation: { wait: false },
   })
 
   return { api: api.url, site: site.url, stateMachine: stateMachine.arn }
