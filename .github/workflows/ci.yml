@@ -9,7 +9,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # bun lint is only in canary so far.
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: canary
       - run: bun install --frozen-lockfile
       - run: bunx sst install --stage ci
         env:
