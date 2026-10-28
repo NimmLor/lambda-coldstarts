@@ -25,10 +25,10 @@ const DAY_MS = 864e5
 const RANGES = [14, 30, 90]
 
 const METRICS: Metric[] = [
-  { key: 'cold', title: 'Cold start', unit: 'ms', height: 300, leader: 'Fastest' },
-  { key: 'warm', title: 'Warm start', unit: 'ms', height: 180, leader: 'Fastest' },
-  { key: 'mem', title: 'Memory used', unit: 'MB', height: 180, leader: 'Lowest' },
-  { key: 'dur', title: 'Duration', unit: 'ms', height: 180, leader: 'Fastest' },
+  { key: 'cold', title: 'Cold start', unit: 'ms', height: 300, leader: 'Fastest', icon: 'cold' },
+  { key: 'warm', title: 'Warm start', unit: 'ms', height: 180, leader: 'Fastest', icon: 'warm' },
+  { key: 'mem', title: 'Memory used', unit: 'MB', height: 180, leader: 'Lowest', icon: 'mem' },
+  { key: 'dur', title: 'Duration', unit: 'ms', height: 180, leader: 'Fastest', icon: 'dur' },
 ]
 
 const Segmented = <T extends string | number>({

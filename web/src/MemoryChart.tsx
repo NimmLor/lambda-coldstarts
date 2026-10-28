@@ -1,3 +1,4 @@
+import { ChartIcon } from './ChartIcon'
 import { DASHES, type Fn, niceMax, type View } from './data'
 
 const HEIGHT = 300
@@ -45,7 +46,10 @@ export const MemoryChart = ({
 
   return (
     <article className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
-      <h2 className="text-xl text-ink">Cold start by memory</h2>
+      <h2 className="flex items-baseline gap-2 text-xl text-ink">
+        <ChartIcon name="sizes" className="size-5" />
+        Cold start by memory
+      </h2>
       <div className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2">
         <div className="relative" style={{ height: HEIGHT }}>
           {grid.map((g) => (
