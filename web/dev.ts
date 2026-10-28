@@ -25,11 +25,16 @@ const server = Bun.serve({
         ? new Response(Bun.file(`fonts/${file}`))
         : new Response('Not found', { status: 404 })
     },
-    '/api/*': (request) => {
+    '/api/*': async (request) => {
       const url = new URL(request.url)
-      return fetch(`${target}${url.pathname.slice('/api'.length)}${url.search}`, {
+      const response = await fetch(`${target}${url.pathname.slice('/api'.length)}${url.search}`, {
         method: request.method,
       })
+      // fetch already decompressed the body; passing the encoding on breaks it for the browser.
+      const headers = new Headers(response.headers)
+      headers.delete('content-encoding')
+      headers.delete('content-length')
+      return new Response(response.body, { status: response.status, headers })
     },
   },
 })
