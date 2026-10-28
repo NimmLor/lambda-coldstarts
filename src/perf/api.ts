@@ -6,14 +6,22 @@
  *   GET /runs/latest       the summary of the newest one
  *   GET /runs/<runId>      the summary of that one
  *
- * And, only when PERF_ADMIN_SECRET is set, two routes under it that 404 like any other otherwise:
+ * And, only when PERF_ADMIN_SECRET is set, routes under it that 404 like any other otherwise:
  *
  *   POST /admin/<secret>/run     starts a run of the PerfRun state machine
+ *   POST /admin/<secret>/pause   disables the hourly schedule that starts it
+ *   POST /admin/<secret>/resume  enables it again; both answer `{ state, was }`
  *   POST /admin/<secret>/purge   deletes items from PerfResults until about 15 s have passed;
  *                                `done: false` means there are more, call it again
  */
 import { timingSafeEqual } from 'node:crypto'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
+import {
+  GetScheduleCommand,
+  SchedulerClient,
+  type ScheduleState,
+  UpdateScheduleCommand,
+} from '@aws-sdk/client-scheduler'
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn'
 import {
   BatchWriteCommand,
@@ -27,8 +35,10 @@ import { RUNS_PK, SUMMARIES_PK } from './keys'
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient())
 const sfn = new SFNClient()
+const scheduler = new SchedulerClient()
 const TABLE = process.env.PERF_TABLE
 const STATE_MACHINE = process.env.PERF_STATE_MACHINE
+const SCHEDULE = process.env.PERF_SCHEDULE
 const ADMIN_SECRET = process.env.PERF_ADMIN_SECRET
 /** Leaves room under PerfRouter's 20 s origin timeout, which is also the function's. */
 const PURGE_BUDGET_MS = 15_000
@@ -114,6 +124,26 @@ const startRun = async () => {
   return { runId: startDate?.toISOString(), executionArn }
 }
 
+/** UpdateSchedule replaces the whole schedule, so it gets back everything GetSchedule returned. */
+const setSchedule = async (State: ScheduleState) => {
+  const { Arn, CreationDate, LastModificationDate, $metadata, ...schedule } = await scheduler.send(
+    new GetScheduleCommand({ Name: SCHEDULE })
+  )
+  if (schedule.State !== State) {
+    await scheduler.send(
+      new UpdateScheduleCommand({
+        ...schedule,
+        Name: SCHEDULE,
+        ScheduleExpression: schedule.ScheduleExpression!,
+        FlexibleTimeWindow: schedule.FlexibleTimeWindow!,
+        Target: schedule.Target!,
+        State,
+      })
+    )
+  }
+  return { state: State, was: schedule.State }
+}
+
 const deleteKeys = async (keys: Record<string, unknown>[]) => {
   let requests = keys.map((Key) => ({ DeleteRequest: { Key } }))
   for (let attempt = 0; requests.length; attempt++) {
@@ -149,6 +179,8 @@ const purge = async () => {
 const admin = async (method: string, action: string) => {
   if (method !== 'POST') return json(405, { error: 'POST only' }, 'no-store')
   if (action === 'run') return json(200, await startRun(), 'no-store')
+  if (action === 'pause') return json(200, await setSchedule('DISABLED'), 'no-store')
+  if (action === 'resume') return json(200, await setSchedule('ENABLED'), 'no-store')
   if (action === 'purge') return json(200, await purge(), 'no-store')
   return json(404, { error: 'No such action' }, 'no-store')
 }

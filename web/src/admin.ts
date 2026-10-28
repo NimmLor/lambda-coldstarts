@@ -1,5 +1,6 @@
 /**
- * admin.html: sends PerfApi's POST /admin/<secret>/run and /purge (src/perf/api.ts). A wrong
+ * admin.html: sends PerfApi's POST /admin/<secret>/run, /pause, /resume and /purge
+ * (src/perf/api.ts). A wrong
  * secret gets the 405 any unknown POST gets, since the routes don't exist for it.
  */
 const form = document.getElementById('admin') as HTMLFormElement
@@ -24,6 +25,17 @@ const run = async (secret: string) => {
   say(`Started run ${runId}`)
 }
 
+const scheduleStates: Record<string, string> = { ENABLED: 'running', DISABLED: 'paused' }
+
+const setSchedule = async (secret: string, action: 'pause' | 'resume') => {
+  const { state, was } = await post(secret, action)
+  say(
+    state === was
+      ? `The hourly schedule was already ${scheduleStates[state]}`
+      : `The hourly schedule is ${scheduleStates[state]} now`
+  )
+}
+
 // Each call stops after about 15 s; `done` says whether the table is empty.
 const purge = async (secret: string) => {
   let total = 0
@@ -44,7 +56,9 @@ form.addEventListener('submit', async (event) => {
   log.textContent = ''
   buttons.forEach((button) => (button.disabled = true))
   try {
-    await (action === 'purge' ? purge(secret) : run(secret))
+    if (action === 'purge') await purge(secret)
+    else if (action === 'pause' || action === 'resume') await setSchedule(secret, action)
+    else await run(secret)
   } catch (error) {
     say((error as Error).message)
   } finally {

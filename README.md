@@ -214,7 +214,8 @@ The stack also runs the benchmark on its own, the way
 The site is at `coldstarts.github.nimmervoll.work` in production and at
 `<stage>.coldstarts.github.nimmervoll.work` on every other stage, e.g. `dev.coldstarts…`.
 
-The state machine runs every hour on every stage; to start a run in between:
+The state machine runs every hour on every stage (the admin routes below pause and resume that);
+to start a run in between:
 
 ```sh
 bun run perf --stage dev            # starts a run and waits for it
@@ -232,24 +233,28 @@ bun scripts/perf-summarize.ts --stage production         # the runs without a su
 bun scripts/perf-summarize.ts --stage production --all   # every run again, e.g. after summary.ts changed
 ```
 
-With `PERF_ADMIN_SECRET` set at deploy time, PerfApi also takes two `POST`s under the secret,
+With `PERF_ADMIN_SECRET` set at deploy time, PerfApi also takes these `POST`s under the secret,
 which 404 like any unknown path without it:
 
 ```sh
 curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN_SECRET/run     # starts a run
+curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN_SECRET/pause   # stops the hourly runs
+curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN_SECRET/resume  # starts them again
 curl -X POST https://dev.coldstarts.github.nimmervoll.work/api/admin/$PERF_ADMIN_SECRET/purge   # empties PerfResults
 ```
 
 `purge` stops after about 15 s to stay under CloudFront's origin timeout and answers
 `{ "deleted": …, "done": false }` while items are left; call it again until `done` is `true`.
-The site's unlinked, `noindex` `/admin` page ([`web/admin.html`](web/admin.html)) does both
-from a secret field and two buttons, repeating `purge` until it's done.
+`pause` and `resume` answer `{ "state": "DISABLED" | "ENABLED", "was": … }`, and a deploy leaves
+the schedule's state alone unless it has to update the schedule for another reason. The site's unlinked, `noindex` `/admin` page
+([`web/admin.html`](web/admin.html)) does all of them from a secret field and a button each,
+repeating `purge` until it's done.
 
-| Variable            | Default |                                                                                  |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
-| `PERF_ROUNDS`       | `10`    | Cold starts per function and run                                                 |
-| `PERF_WARM`         | `5`     | Warm invocations after each cold start                                           |
-| `PERF_ADMIN_SECRET` | unset   | Path segment that turns on PerfApi's `run` and `purge`; URL-safe characters only |
+| Variable            | Default |                                                                             |
+| ------------------- | ------- | --------------------------------------------------------------------------- |
+| `PERF_ROUNDS`       | `10`    | Cold starts per function and run                                            |
+| `PERF_WARM`         | `5`     | Warm invocations after each cold start                                      |
+| `PERF_ADMIN_SECRET` | unset   | Path segment that turns on PerfApi's admin routes; URL-safe characters only |
 
 To work on the site against a deployed API, [`web/dev.ts`](web/dev.ts) forwards `/api/*` to it:
 `cd web && PERF_API_URL="$(jq -r '.perf.api' ../.sst/outputs.json)" bun run dev`.

@@ -3,8 +3,8 @@
  * goes through every function in parallel, forcing `PERF_ROUNDS` cold starts one after another,
  * each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs
  * in PerfResults), then records the run and stores its summary (src/perf/summarize.ts). PerfApi
- * serves the summaries to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs and
- * purges the table.
+ * serves the summaries to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs,
+ * pauses and resumes the schedule, and purges the table.
  */
 import { RUNS_PK } from '../src/perf/keys'
 import { BENCH_TAG } from './functions'
@@ -155,11 +155,17 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
       },
     ],
   })
-  new aws.scheduler.Schedule('PerfSchedule', {
-    scheduleExpression: SCHEDULE,
-    flexibleTimeWindow: { mode: 'OFF' },
-    target: { arn: stateMachine.arn, roleArn: role.arn },
-  })
+  const schedule = new aws.scheduler.Schedule(
+    'PerfSchedule',
+    {
+      scheduleExpression: SCHEDULE,
+      flexibleTimeWindow: { mode: 'OFF' },
+      target: { arn: stateMachine.arn, roleArn: role.arn },
+    },
+    // PerfApi's pause and resume set it. Pulumi doesn't read it back, so a deploy that updates
+    // the schedule for another reason still sends the state it last knew, ENABLED.
+    { ignoreChanges: ['state'] }
+  )
 
   // One CloudFront distribution for the site and, under /api, PerfApi, so the page fetches its
   // own origin. Deploys don't wait for CloudFront to roll out the distribution or finish the
@@ -184,10 +190,16 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     environment: {
       PERF_TABLE: table.name,
       PERF_STATE_MACHINE: stateMachine.arn,
+      PERF_SCHEDULE: schedule.name,
       // Turns on the /admin/<secret>/… routes; they don't exist without it.
       ...(process.env.PERF_ADMIN_SECRET && { PERF_ADMIN_SECRET: process.env.PERF_ADMIN_SECRET }),
     },
-    permissions: [{ actions: ['states:StartExecution'], resources: [stateMachine.arn] }],
+    permissions: [
+      { actions: ['states:StartExecution'], resources: [stateMachine.arn] },
+      { actions: ['scheduler:GetSchedule', 'scheduler:UpdateSchedule'], resources: [schedule.arn] },
+      // UpdateSchedule passes the target's role again.
+      { actions: ['iam:PassRole'], resources: [role.arn] },
+    ],
   })
 
   const site = new sst.aws.StaticSite('PerfSite', {
