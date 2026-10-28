@@ -85,18 +85,18 @@ const Command = ({ build }: { build: string }) => {
 }
 
 /** `bun 1.4.4+38afee6c8` or `llrt-lambda-arm64-no-sdk@v0.9.0-beta`: the name, the release, the build after it. */
-const VERSION = /^(.+?)[ @]v?(\d[^+]*)(\+.+)?$/
+const VERSION = /^.+?[ @]v?(\d[^+]*)(\+.+)?$/
 
-/** What it ran on, the release brightest, then Lambda's runtime. */
+/** The release it ran on, brightest, then Lambda's runtime; the row's name already says what ran. */
 const Versions = ({ point }: { point: Point }) => {
-  const [, name, release, build] = point.version?.match(VERSION) ?? []
+  const [, release, build] = point.version?.match(VERSION) ?? []
   return (
     <span className="flex flex-wrap gap-x-[2.5ch] overflow-hidden font-mono text-muted slashed-zero">
       {point.version && (
         <span title={point.version}>
           {release ? (
             <>
-              {name} <span className="text-ink-2">{release}</span>
+              <span className="text-ink-2">{release}</span>
               {build && <span className="opacity-60">{build}</span>}
             </>
           ) : (
@@ -174,20 +174,10 @@ export const Table = ({ view }: { view: View }) => {
             {f.canary && <Badge tone="outline">canary Bun</Badge>}
             {f.preview && <Badge tone="amber">preview</Badge>}
           </div>
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs/normal">
-            <dt className="text-muted">Build</dt>
-            <dd>
-              <Command build={f.build} />
-            </dd>
-            {tickRun.points.has(f.id) && (
-              <>
-                <dt className="text-muted">Runs on</dt>
-                <dd>
-                  <Versions point={tickRun.points.get(f.id)!} />
-                </dd>
-              </>
-            )}
-          </dl>
+          <div className="flex flex-col gap-1 text-xs/normal">
+            <Command build={f.build} />
+            {tickRun.points.has(f.id) && <Versions point={tickRun.points.get(f.id)!} />}
+          </div>
         </div>
         <div className="col-start-2 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 lg:contents">
           <Cell label="Cold start" className="col-span-2 sm:col-span-4 lg:col-span-1">
@@ -220,8 +210,8 @@ export const Table = ({ view }: { view: View }) => {
               </Figure>
               {startup !== undefined && (
                 <Figure
-                  label="in-process"
-                  title="How much of the cold start was spent inside the process"
+                  label="to handler"
+                  title="From process start until the handler was loaded, timed by the process itself"
                 >
                   {fixed(startup, 1)}
                 </Figure>

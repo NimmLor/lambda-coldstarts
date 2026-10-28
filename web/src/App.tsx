@@ -476,6 +476,12 @@ export const App = () => {
         <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
           <dt className="font-medium text-ink">Cold start</dt>
           <dd className="m-0">Lambda init duration</dd>
+          <dt className="font-medium text-ink">To handler</dt>
+          <dd className="m-0">
+            the part of the cold start inside the process: from process start until the handler is
+            loaded, by the process’s own clock. The rest is Lambda starting the process and the
+            runtime asking for its first event
+          </dd>
           <dt className="font-medium text-ink">Warm start</dt>
           <dd className="m-0">handler time on an instance that’s already up</dd>
           <dt className="font-medium text-ink">Duration</dt>
