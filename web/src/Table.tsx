@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { type Fn, fixed, niceMax, type View } from './data'
+import bunIcon from './icons/bun.svg'
+import nodeIcon from './icons/nodejs.svg'
 
 /** Seven columns from `lg`; below it each row restacks as the name over labelled figures. */
 const ROW =
@@ -80,7 +82,7 @@ export const Table = ({ view }: { view: View }) => {
           <div className="flex flex-wrap items-center gap-2 text-md font-medium">
             <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: f.color }} />
             <img
-              src={`https://cdn.simpleicons.org/${f.family === 'Bun' ? 'bun/f3d9a4' : 'nodedotjs/7fd35b'}`}
+              src={f.family === 'Bun' ? bunIcon : nodeIcon}
               alt=""
               width={18}
               height={18}

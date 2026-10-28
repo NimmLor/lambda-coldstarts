@@ -12,10 +12,10 @@ import {
   mean,
   toPoints,
 } from './data'
+import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
 import { Table } from './Table'
 
-const REPO = 'https://github.com/NimmLor/bun-aot-lambda'
 /** PerfApi, behind the same CloudFront distribution; see infra/perf.ts and dev.ts. */
 const API = '/api'
 const DAY_MS = 864e5
@@ -27,9 +27,6 @@ const METRICS: Metric[] = [
   { key: 'mem', title: 'Memory used', unit: 'MB', height: 180, leader: 'Lowest' },
   { key: 'dur', title: 'Duration', unit: 'ms', height: 180, leader: 'Fastest' },
 ]
-
-/** The page's one column: capped and centred, its gutters growing past 1440. */
-const WRAP = 'mx-auto w-full max-w-(--container) px-(--gutter)'
 
 const Segmented = <T extends string | number>({
   label,
@@ -346,9 +343,7 @@ export const App = () => {
           and <code>--no-compile-autoload-bunfig</code>; “canary Bun” is the Bun build that <code>--trim</code> and{' '}
           <code>--aot</code> need.
         </p>
-        <a href={REPO} className="self-start">
-          NimmLor/bun-aot-lambda
-        </a>
+        <SiteLinks />
       </footer>
     </main>
   )
