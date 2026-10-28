@@ -162,12 +162,6 @@
         height: 22px;
       }
 
-      .families svg {
-        width: 30px;
-        height: 4px;
-        overflow: visible;
-      }
-
       .chart {
         position: absolute;
         right: 0;
@@ -186,7 +180,7 @@
       <div class="live">Measured every hour</div>
     </header>
 
-    <h1>Bun vs Node.js cold starts<br />on <span class="lambda">AWS Lambda</span></h1>
+    <h1>Bun vs LLRT vs Node.js<br />cold starts on <span class="lambda">AWS Lambda</span></h1>
 
     <div class="lead">
       <div class="metrics">
@@ -225,51 +219,9 @@
         </span>
       </div>
       <div class="families">
-        <!-- data.ts's DASHES: Bun solid, LLRT dotted, Node.js dashed. -->
-        <span>
-          <img src="src/icons/bun.svg" alt="" />Bun
-          <svg>
-            <line
-              x1="0"
-              y1="2"
-              x2="30"
-              y2="2"
-              stroke="oklch(78% 0.13 60)"
-              stroke-width="2.5"
-              stroke-linecap="round"
-            />
-          </svg>
-        </span>
-        <span>
-          <img src="src/icons/llrt.svg" alt="" />LLRT
-          <svg>
-            <line
-              x1="1"
-              y1="2"
-              x2="30"
-              y2="2"
-              stroke="oklch(82% 0.14 115)"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-dasharray="0 5"
-            />
-          </svg>
-        </span>
-        <span>
-          <img src="src/icons/nodejs.svg" alt="" />Node.js
-          <svg>
-            <line
-              x1="0"
-              y1="2"
-              x2="30"
-              y2="2"
-              stroke="oklch(78% 0.13 150)"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-dasharray="5 4"
-            />
-          </svg>
-        </span>
+        <span> <img src="src/icons/bun.svg" alt="" />Bun </span>
+        <span> <img src="src/icons/llrt.svg" alt="" />LLRT </span>
+        <span> <img src="src/icons/nodejs.svg" alt="" />Node.js </span>
       </div>
     </div>
 
