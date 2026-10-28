@@ -9,7 +9,6 @@ import {
   type Stat,
   VARIANTS,
   type View,
-  day,
   mean,
   toPoints,
 } from './data'
@@ -64,32 +63,50 @@ const InlinePick = <T extends string | number>({
   value,
   onPick,
   text = String,
+  group,
 }: {
   label: string
   options: readonly T[]
   value: T
   onPick: (v: T) => void
   text?: (v: T) => string
-}) => (
-  <span className="pick">
-    {/* The select announces the same value. */}
-    <span aria-hidden="true">{text(value)}</span>
-    <svg aria-hidden="true" viewBox="0 0 10 6" className="pick__caret">
-      <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-    <select
-      aria-label={label}
-      value={String(value)}
-      onChange={(e) => onPick(options.find((o) => String(o) === e.target.value)!)}
-    >
-      {options.map((o) => (
-        <option key={o} value={String(o)}>
-          {text(o)}
-        </option>
-      ))}
-    </select>
-  </span>
-)
+  /** Labels the options into optgroups, consecutive ones with the same label together. */
+  group?: (v: T) => string
+}) => {
+  const option = (o: T) => (
+    <option key={o} value={String(o)}>
+      {text(o)}
+    </option>
+  )
+  const groups: { label: string; options: T[] }[] = []
+  for (const o of options) {
+    const label = group?.(o) ?? ''
+    if (groups.at(-1)?.label === label) groups.at(-1)!.options.push(o)
+    else groups.push({ label, options: [o] })
+  }
+  return (
+    <span className="pick">
+      {/* The select announces the same value. */}
+      <span aria-hidden="true">{text(value)}</span>
+      <svg aria-hidden="true" viewBox="0 0 10 6" className="pick__caret">
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+      <select
+        aria-label={label}
+        value={String(value)}
+        onChange={(e) => onPick(options.find((o) => String(o) === e.target.value)!)}
+      >
+        {group
+          ? groups.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.options.map(option)}
+              </optgroup>
+            ))
+          : options.map(option)}
+      </select>
+    </span>
+  )
+}
 
 const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
@@ -125,6 +142,17 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
     </header>
   )
 }
+
+/** A run by when it finished, to the minute: there is one an hour. */
+const when = (date: Date) =>
+  date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'UTC',
+  })
 
 const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 const UNITS = [
@@ -181,6 +209,8 @@ export const App = () => {
   const [memory, setMemory] = useState(1769)
   const [range, setRange] = useState(30)
   const [hover, setHover] = useState<number>()
+  /** The run picked over the mean, by its finishedAt; it stays across ranges and sizes it is in. */
+  const [pinned, setPinned] = useState<string>()
   const [focus, setFocus] = useState<string>()
   const [hidden, setHidden] = useState(new Set<string>())
 
@@ -219,7 +249,10 @@ export const App = () => {
     const shownRange = ranges.includes(range) ? range : ranges.at(-1)!
     const since = latest.date.getTime() - shownRange * DAY_MS
     const runs = history.filter((r) => r.date.getTime() > since)
-    const hovered = hover !== undefined && hover < runs.length ? hover : undefined
+    const pinnedAt = runs.findIndex((r) => r.finishedAt === pinned)
+    // A hover shows its run over the picked one, which comes back once the pointer leaves.
+    const hovered =
+      hover !== undefined && hover < runs.length ? hover : pinnedAt >= 0 ? pinnedAt : undefined
     const sized = latest.functions.filter((f) => f.arch === shownArch)
     const fns = sized
       .filter((f) => f.memoryMb === shownMemory)
@@ -249,6 +282,19 @@ export const App = () => {
     const pickRange = (r: number) => {
       setRange(r)
       setHover(undefined)
+    }
+    // The mean over each range, then every run in the shown one, newest first.
+    const means = ranges.map((r) => `mean:${r}`)
+    const picks = [...means, ...runs.map((r) => r.finishedAt).reverse()]
+    const pickText = (key: string) => {
+      if (!key.startsWith('mean:')) return `Run of ${when(new Date(key))} UTC`
+      return ranges.length > 1 ? `${key.slice(5)}-day mean` : 'Mean'
+    }
+    const pick = (key: string) => {
+      setHover(undefined)
+      if (!key.startsWith('mean:')) return setPinned(key)
+      setPinned(undefined)
+      setRange(Number(key.slice(5)))
     }
     const [cold, ...small] = METRICS
 
@@ -358,22 +404,14 @@ export const App = () => {
           <div className={`${WRAP} flex flex-col gap-8`}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
               <h2 className="text-2xl">
-                {hovered !== undefined ? (
-                  `Run of ${day(runs[hovered]!.date)}`
-                ) : ranges.length > 1 ? (
-                  <>
-                    <InlinePick
-                      label="Range"
-                      options={ranges}
-                      value={shownRange}
-                      text={(r) => `${r}-day`}
-                      onPick={pickRange}
-                    />{' '}
-                    mean
-                  </>
-                ) : (
-                  'Mean'
-                )}{' '}
+                <InlinePick
+                  label="Mean or run"
+                  options={picks}
+                  value={hovered !== undefined ? runs[hovered]!.finishedAt : `mean:${shownRange}`}
+                  text={pickText}
+                  group={(key) => (key.startsWith('mean:') ? 'Mean' : 'Runs')}
+                  onPick={pick}
+                />{' '}
                 at{' '}
                 <InlinePick
                   label="Memory"
@@ -429,6 +467,12 @@ export const App = () => {
       <footer
         className={`${WRAP} flex flex-col gap-6 pt-12 pb-16 text-sm text-muted ${latest ? '' : 'mt-16'}`}
       >
+        <p className="max-w-prose">
+          Every function runs the same tiny handler,{' '}
+          <a href={`${REPO}/blob/main/src/report.ts`}>src/report.ts</a>, which returns its own
+          startup time and memory use as JSON. No packages, no network calls: the numbers are the
+          runtime’s, not the code’s.
+        </p>
         <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
           <dt className="font-medium text-ink">Cold start</dt>
           <dd className="m-0">Lambda init duration</dd>

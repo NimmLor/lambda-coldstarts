@@ -43,56 +43,54 @@ export const VARIANTS: Record<string, Variant> = {
     name: 'Bun runtime',
     family: 'Bun',
     build: 'bun build --target=bun --format=esm --minify',
-    about:
-      'The bundle, run by a bun executable shipped next to it and started by a shell bootstrap',
+    about: 'The bundle plus a bun binary, started by a shell bootstrap',
   },
   BunCompile: {
     name: 'Bun executable',
     family: 'Bun',
     build: 'bun build --compile --format=esm --minify --bytecode',
-    about: 'A single-file executable as the bootstrap',
+    about: 'A single-file executable that is the bootstrap',
   },
   BunCompileCanary: {
     name: 'Bun executable, canary',
     family: 'Bun',
     build: 'bun build --compile --format=esm --minify --bytecode',
     canary: true,
-    about: 'The Bun executable, built by the canary Bun: the baseline for the trimmed and AOT ones',
+    about: 'The same executable built with canary Bun, to compare the trimmed and AOT ones against',
   },
   BunCompileTrim: {
     name: 'Bun executable, trimmed',
     family: 'Bun',
     build: 'bun build --compile --trim --format=esm --minify --bytecode',
     canary: true,
-    about: 'A single-file executable without the parts of Bun the code doesn’t use',
+    about: 'The executable minus the parts of Bun the code doesn’t use',
   },
   BunCompileAot: {
     name: 'Bun AOT executable',
     family: 'Bun',
     build: 'bun build --compile --aot',
     canary: true,
-    about: 'An ahead-of-time compiled executable, behind a bootstrap that preloads the AOT shim',
+    about: 'Compiled ahead of time, started by a bootstrap that preloads the AOT shim',
   },
   BunCompileAotTrim: {
     name: 'Bun AOT executable, trimmed',
     family: 'Bun',
     build: 'bun build --compile --aot --trim',
     canary: true,
-    about: 'The AOT executable without the parts of Bun the code doesn’t use',
+    about: 'The AOT executable minus the parts of Bun the code doesn’t use',
   },
   Llrt: {
     name: 'LLRT',
     family: 'LLRT',
     build: LLRT_BUNDLE,
-    about:
-      'The bundle next to LLRT’s no-sdk Lambda build as the bootstrap, which serves invocations itself',
+    about: 'The bundle, run by LLRT’s no-SDK Lambda build as the bootstrap',
   },
   LlrtBytecode: {
     name: 'LLRT, bytecode',
     family: 'LLRT',
     build: 'llrt compile',
     about:
-      'The LLRT bundle as QuickJS bytecode, run by LLRT’s CLI build, the only one released that reads the bytecode its llrt compile writes',
+      'The bundle as QuickJS bytecode, run by LLRT’s CLI build: the only release that reads what llrt compile writes',
   },
   Node22: { name: 'Node.js 22', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },
   Node24: { name: 'Node.js 24', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },
@@ -101,7 +99,7 @@ export const VARIANTS: Record<string, Variant> = {
     family: 'Node',
     build: SST_BUNDLE,
     preview: true,
-    about: 'SST’s default bundle, on a runtime in public preview',
+    about: 'SST’s default bundle, on a runtime still in preview',
   },
 }
 export const ORDER = Object.keys(VARIANTS)
@@ -226,10 +224,10 @@ export type View = {
   /** The ones not hidden, or all of them when every one is. */
   shown: Fn[]
   hidden: Set<string>
-  /** Index of the hovered run within `runs`. */
+  /** Index of the hovered or picked run within `runs`. */
   hover?: number
   focus?: string
-  /** The hovered run's value, or the mean over the range. */
+  /** The hovered or picked run's value, or the mean over the range. */
   agg: (f: Fn, key: Stat) => number | undefined
   setHover: (i: number | undefined) => void
   setFocus: (base: string | undefined) => void

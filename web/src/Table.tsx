@@ -39,14 +39,14 @@ const Figure = ({
   </div>
 )
 
-/** Cool for how a build was made; amber for a runtime AWS hasn't released yet. */
+/** A dashed outline for how a build was made; a filled amber chip for a runtime AWS hasn't released yet. */
 const TONES = {
-  cool: 'bg-cool-soft text-cool',
-  amber: 'bg-accent-soft text-accent',
+  outline: 'border-dashed border-rule-2 text-ink-2',
+  amber: 'border-rule bg-accent-soft text-accent',
 }
 
-const Badge = ({ children, tone = 'cool' }: { children: string; tone?: keyof typeof TONES }) => (
-  <span className={`rounded-chip border border-rule px-1.5 text-xs font-medium ${TONES[tone]}`}>
+const Badge = ({ children, tone }: { children: string; tone: keyof typeof TONES }) => (
+  <span className={`rounded-chip border px-1.5 text-xs font-medium ${TONES[tone]}`}>
     {children}
   </span>
 )
@@ -147,14 +147,9 @@ export const Table = ({ view }: { view: View }) => {
           title={[f.base, f.about].filter(Boolean).join('\n')}
         >
           <div className="flex flex-wrap items-center gap-2 text-md font-medium">
-            <span
-              aria-hidden="true"
-              className="size-2.5 shrink-0 rounded-full"
-              style={{ background: f.color }}
-            />
             <img src={ICONS[f.family]} alt="" width={18} height={18} className="block shrink-0" />
             {f.name}
-            {f.canary && <Badge>canary Bun</Badge>}
+            {f.canary && <Badge tone="outline">canary Bun</Badge>}
             {f.preview && <Badge tone="amber">preview</Badge>}
           </div>
           <div className="flex flex-col gap-0.5">
@@ -194,7 +189,7 @@ export const Table = ({ view }: { view: View }) => {
               {startup !== undefined && (
                 <Figure
                   label="in-process"
-                  title="Of the cold start, the time spent inside the process"
+                  title="How much of the cold start was spent inside the process"
                 >
                   {fixed(startup, 1)}
                 </Figure>
