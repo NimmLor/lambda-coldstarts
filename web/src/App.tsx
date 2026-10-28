@@ -14,6 +14,7 @@ import {
   toPoints,
 } from './data'
 import { Glance } from './Glance'
+import lambdaIcon from './icons/lambda.svg'
 import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
 import { Table } from './Table'
@@ -97,11 +98,17 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
     <header
       className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}
     >
-      <h1 className="text-3xl lg:col-span-12">Bun vs Node.js cold start benchmark</h1>
+      <div className="flex flex-col gap-4 lg:col-span-12">
+        <p className="m-0 inline-flex items-center gap-2.5 text-sm font-medium text-ink-2">
+          <img src={lambdaIcon} alt="" width={22} height={22} className="block shrink-0" />
+          AWS Lambda benchmark
+        </p>
+        <h1 className="text-3xl text-balance">Bun vs Node.js cold starts on AWS Lambda</h1>
+      </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} ways to ship Bun against ${count('Node')} Node.js runtimes on AWS Lambda, with ${latest.rounds} cold starts per function every hour. `
-          : 'On AWS Lambda, updated hourly. '}
+          ? `${count('Bun')} ways to ship Bun against ${count('Node')} Node.js runtimes, each deployed as a Lambda function and cold started ${latest.rounds} times every hour. `
+          : 'Each runtime deployed as a Lambda function and cold started every hour. '}
         The charts plot each run’s mean. The table below shows the mean over the selected range.
       </p>
       <nav className="flex flex-col gap-1.5 text-sm lg:col-span-4 lg:items-end">
