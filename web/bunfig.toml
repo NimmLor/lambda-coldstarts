@@ -1,3 +1,0 @@
-# For dev.ts, which serves index.html with Bun's own bundler.
-[serve.static]
-plugins = ["bun-plugin-tailwind"]
