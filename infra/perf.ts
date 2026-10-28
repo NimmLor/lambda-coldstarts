@@ -1,7 +1,7 @@
 /**
  * A scheduled cold-start benchmark in the style of maxday/lambda-perf. The PerfRun state machine
- * goes through `PERF_CONCURRENCY` functions at a time, forcing `PERF_ROUNDS` cold starts one after
- * another, each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs
+ * goes through every function in parallel, forcing `PERF_ROUNDS` cold starts one after another,
+ * each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs
  * in PerfResults), then records the run and stores its summary (src/perf/summarize.ts). PerfApi
  * serves the summaries to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs and
  * purges the table.
@@ -12,12 +12,6 @@ import { BENCH_TAG } from './functions'
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
 /** Invocations after each round's cold start, which find its environment warm. */
 const WARM = Number(process.env.PERF_WARM ?? 5)
-/**
- * Functions measured at once. Each holds two concurrent executions, PerfMeasure waiting on its
- * synchronous invoke of the target, so 4 stays within a new account's limit of 10 and leaves
- * room for PerfApi.
- */
-const CONCURRENCY = Number(process.env.PERF_CONCURRENCY ?? 4)
 
 /** How often EventBridge Scheduler starts PerfRun, on every stage. */
 const SCHEDULE = 'rate(1 hour)'
@@ -114,7 +108,6 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   const run = sst.aws.StepFunctions.map({
     name: 'Functions',
     items: Object.entries(functions).map(([id, fn]) => ({ id, name: fn.name })),
-    maxConcurrency: CONCURRENCY,
     processor: rounds.catch(skipped),
     output: {},
   })
