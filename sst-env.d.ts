@@ -306,6 +306,106 @@ declare module "sst" {
       "type": "sst.aws.Function"
       "url": string
     }
+    "LlrtArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtBytecodeX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
     "Node22Arm64M1024": {
       "name": string
       "type": "sst.aws.Function"
