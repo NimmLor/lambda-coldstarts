@@ -14,3 +14,5 @@ await Bun.build({
 })
 // The fonts each page's inline @font-face rules load from /fonts, with their OFL licenses.
 await Bun.$`cp -R fonts dist/fonts`
+// The social preview index.html's og:image names; `bun run og` renders it from og.html.
+await Bun.$`cp og.png dist/og.png`

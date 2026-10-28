@@ -1,0 +1,351 @@
+<!doctype html>
+<!--
+  The 1200×630 social preview, og.png. Not a page of the site: `bun run og` renders it with
+  headless Chrome. Colours are tokens.css's, fonts and icons the committed ones. The chart
+  strip draws no measured figures, since a run every hour would leave them stale.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>og.png</title>
+    <style>
+      @font-face {
+        font-family: 'Host Grotesk';
+        font-weight: 400;
+        src: url('fonts/host-grotesk-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Host Grotesk';
+        font-weight: 500;
+        src: url('fonts/host-grotesk-latin-500-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Atkinson Hyperlegible Mono';
+        font-weight: 400;
+        src: url('fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Atkinson Hyperlegible Mono';
+        font-weight: 500;
+        src: url('fonts/atkinson-hyperlegible-mono-latin-500-normal.woff2') format('woff2');
+      }
+
+      :root {
+        --paper: oklch(17% 0.008 250);
+        --paper-2: oklch(21% 0.009 250);
+        --paper-3: oklch(13.5% 0.007 250);
+        --ink: oklch(95% 0.005 250);
+        --ink-2: oklch(83% 0.008 250);
+        --muted: oklch(71% 0.01 250);
+        --rule: oklch(31% 0.01 250);
+        --rule-2: oklch(42% 0.012 250);
+        --accent: oklch(82% 0.15 80);
+        --ok: oklch(76% 0.15 150);
+        --display: 'Host Grotesk', sans-serif;
+        --mono: 'Atkinson Hyperlegible Mono', monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+
+      body {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 56px 64px 0;
+        background:
+          radial-gradient(900px 420px at 100% 0%, oklch(82% 0.15 80 / 0.07), transparent 70%),
+          var(--paper);
+        color: var(--muted);
+        font-family: var(--display);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 20px;
+      }
+
+      .site {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--ink-2);
+      }
+
+      .site img {
+        width: 40px;
+        height: 40px;
+      }
+
+      .live {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border: 1px solid var(--rule);
+        border-radius: 6px;
+        background: var(--paper-2);
+        color: var(--ink-2);
+      }
+
+      .live::before {
+        content: '';
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--ok);
+        box-shadow: 0 0 0 4px oklch(76% 0.15 150 / 0.18);
+      }
+
+      h1 {
+        margin-top: 52px;
+        color: var(--ink);
+        font-size: 78px;
+        font-weight: 500;
+        line-height: 1.02;
+        letter-spacing: -0.035em;
+      }
+
+      h1 .lambda {
+        color: var(--accent);
+      }
+
+      .lead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 30px;
+      }
+
+      .metrics,
+      .families {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        font-family: var(--mono);
+        font-size: 19px;
+        color: var(--ink-2);
+      }
+
+      .metrics span,
+      .families span {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .metrics svg {
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.9;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .families img {
+        width: 22px;
+        height: 22px;
+      }
+
+      .families svg {
+        width: 30px;
+        height: 4px;
+        overflow: visible;
+      }
+
+      .chart {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 210px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="site">
+        <img src="src/favicon.svg" alt="" />
+        coldstarts.github.nimmervoll.work
+      </div>
+      <div class="live">Measured every hour</div>
+    </header>
+
+    <h1>Bun vs Node.js cold starts<br />on <span class="lambda">AWS Lambda</span></h1>
+
+    <div class="lead">
+      <div class="metrics">
+        <!-- ChartIcon.tsx's glyphs, in its tokens.css hues. -->
+        <span style="color: oklch(80% 0.11 225)">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M12 2v20M3.34 7l17.32 10M3.34 17 20.66 7M9.5 3.5 12 6l2.5-2.5M9.5 20.5 12 18l2.5 2.5M3.4 10.6l3.4-.9-.9-3.4M18.1 17.7l-.9-3.4 3.4-.9M5.9 17.7l.9-3.4-3.4-.9M20.6 10.6l-3.4-.9.9-3.4"
+            />
+          </svg>
+          Cold start
+        </span>
+        <span style="color: oklch(74% 0.16 45)">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.2-3-6.5-4.3-10.5-2 2-3 4-3 6-1.8-1.1-2.6-3.3-2-6C6.2 6.9 4.5 10.7 4.5 14.5A7.5 7.5 0 0 0 12 22ZM12 22a3 3 0 0 0 3-3c0-1.8-1.2-3-3-4.8-1.8 1.8-3 3-3 4.8a3 3 0 0 0 3 3Z"
+            />
+          </svg>
+          Warm start
+        </span>
+        <span style="color: oklch(74% 0.13 295)">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M6 6h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1ZM9 10h6v4H9ZM9 2v4M15 2v4M9 18v4M15 18v4M1 9h4M1 15h4M19 9h4M19 15h4"
+            />
+          </svg>
+          Memory
+        </span>
+        <span style="color: oklch(80% 0.13 165)">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM12 10v4l2 2M10 2h4M12 2v4M19 6l1.5-1.5"
+            />
+          </svg>
+          Duration
+        </span>
+      </div>
+      <div class="families">
+        <!-- data.ts's DASHES: Bun solid, LLRT dotted, Node.js dashed. -->
+        <span>
+          <img src="src/icons/bun.svg" alt="" />Bun
+          <svg>
+            <line
+              x1="0"
+              y1="2"
+              x2="30"
+              y2="2"
+              stroke="oklch(78% 0.13 60)"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+        <span>
+          <img src="src/icons/llrt.svg" alt="" />LLRT
+          <svg>
+            <line
+              x1="1"
+              y1="2"
+              x2="30"
+              y2="2"
+              stroke="oklch(82% 0.14 115)"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-dasharray="0 5"
+            />
+          </svg>
+        </span>
+        <span>
+          <img src="src/icons/nodejs.svg" alt="" />Node.js
+          <svg>
+            <line
+              x1="0"
+              y1="2"
+              x2="30"
+              y2="2"
+              stroke="oklch(78% 0.13 150)"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-dasharray="5 4"
+            />
+          </svg>
+        </span>
+      </div>
+    </div>
+
+    <svg class="chart" viewBox="0 0 1200 210" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#fff" stop-opacity="0.2" />
+          <stop offset="0.55" stop-color="#fff" stop-opacity="0.75" />
+          <stop offset="1" stop-color="#fff" stop-opacity="1" />
+        </linearGradient>
+        <mask id="m"><rect width="1200" height="210" fill="url(#fade)" /></mask>
+      </defs>
+      <g id="grid" stroke="oklch(31% 0.01 250)" stroke-width="1"></g>
+      <g
+        id="lines"
+        mask="url(#m)"
+        fill="none"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      ></g>
+    </svg>
+
+    <script>
+      // Decorative traces in each variant's --color-line-*, from a seeded generator so renders match.
+      let seed = 7
+      const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
+      // Families interleaved, so the strip ranks nothing.
+      const LINES = [
+        ['oklch(78% 0.13 85)', undefined, 34],
+        ['oklch(78% 0.11 185)', '5 6', 52],
+        ['oklch(74% 0.14 325)', undefined, 70],
+        ['oklch(82% 0.14 115)', '0 6', 88],
+        ['oklch(78% 0.13 150)', '5 6', 104],
+        ['oklch(78% 0.13 60)', undefined, 120],
+        ['oklch(74% 0.12 255)', '0 6', 136],
+        ['#ff2e97', undefined, 152],
+        ['oklch(74% 0.12 225)', '5 6', 168],
+        ['oklch(76% 0.13 35)', undefined, 184],
+      ]
+      const ns = 'http://www.w3.org/2000/svg'
+      const grid = document.getElementById('grid')
+      for (const y of [24, 82, 140, 198]) {
+        const l = document.createElementNS(ns, 'line')
+        Object.entries({ x1: 0, x2: 1200, y1: y, y2: y, 'stroke-dasharray': '2 6' }).forEach(
+          ([k, v]) => l.setAttribute(k, v)
+        )
+        grid.append(l)
+      }
+      const lines = document.getElementById('lines')
+      for (const [color, dash, base] of LINES) {
+        // A slow swell of its own plus a little noise, like an hourly series.
+        const [phase, period] = [rand() * 6.3, 380 + rand() * 260]
+        const pts = []
+        for (let x = -20; x <= 1220; x += 40) {
+          pts.push([x, base + Math.sin((x / period) * 6.3 + phase) * 5 + (rand() - 0.5) * 7])
+        }
+        // Catmull-Rom through the points, as cubic Béziers.
+        let d = `M${pts[0][0]},${pts[0][1].toFixed(1)}`
+        for (let i = 0; i < pts.length - 1; i++) {
+          const [p0, p1, p2, p3] = [
+            pts[i - 1] ?? pts[i],
+            pts[i],
+            pts[i + 1],
+            pts[i + 2] ?? pts[i + 1],
+          ]
+          const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6]
+          const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
+          d += `C${c1[0]},${c1[1].toFixed(1)} ${c2[0]},${c2[1].toFixed(1)} ${p2[0]},${p2[1].toFixed(1)}`
+        }
+        const path = document.createElementNS(ns, 'path')
+        path.setAttribute('d', d)
+        path.setAttribute('stroke', color)
+        if (dash) path.setAttribute('stroke-dasharray', dash)
+        lines.append(path)
+      }
+    </script>
+  </body>
+</html>

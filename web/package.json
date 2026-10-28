@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot dev.ts",
-    "build": "bun build.ts"
+    "build": "bun build.ts",
+    "og": "bun og.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
