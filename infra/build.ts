@@ -25,6 +25,13 @@ const read = (file: string, args: string[]) => execFileSync(file, args, { encodi
 
 export const bunVersion = (bin: string) => read(bin, ['--version'])
 
+/**
+ * Where a build leaves what it was built with, e.g. `bun 1.4.4-canary.1+72ab4f530`: next to the
+ * bundle rather than in it, so it doesn't add to what Lambda loads. infra/functions.ts deploys it
+ * as the function's description.
+ */
+export const versionFile = (bundle: string) => `${bundle}.version`
+
 export const toLambdaArch = (arch: string): LambdaArch => {
   if (arch === 'x64') return 'x86_64'
   if (arch === 'arm64') return 'arm64'
@@ -206,10 +213,11 @@ export const buildBunBundle = ({
   mkdirSync(bundle, { recursive: true })
   const entry = path.resolve(ENTRY)
   const target = `--target=bun-linux-${arch === 'arm64' ? 'arm64' : 'x64'}`
+  const bin = variant === 'bun' || variant === 'compile' ? bunBin() : bunAotBin()
 
   switch (variant) {
     case 'bun': {
-      run(bunBin(), [
+      run(bin, [
         'build',
         entry,
         '--target=bun',
@@ -231,7 +239,7 @@ export const buildBunBundle = ({
     case 'compile-trim': {
       const trim = variant === 'compile-trim'
       if (variant !== 'compile') assertAvailable(variant, arch)
-      run(variant === 'compile' ? bunBin() : bunAotBin(), [
+      run(bin, [
         'build',
         entry,
         '--compile',
@@ -249,10 +257,12 @@ export const buildBunBundle = ({
     case 'aot':
     case 'aot-trim': {
       assertAvailable(variant, arch)
-      run(bunAotBin(), [...aotBuildArgs(variant, entry), '--outfile', path.join(bundle, 'app')])
+      run(bin, [...aotBuildArgs(variant, entry), '--outfile', path.join(bundle, 'app')])
       addAotShim(bundle)
       break
     }
   }
+  // The release says which Bun only by its version; a canary also has the commit it was built from.
+  writeFileSync(versionFile(bundle), `bun ${read(bin, ['--revision'])}`)
   return bundle
 }

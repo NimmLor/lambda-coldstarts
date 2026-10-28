@@ -41,6 +41,8 @@ export const summarize = (samples: Sample[]) => {
       return {
         functionId,
         runtime,
+        /** What it ran on, see `Sample`'s `version`; `null` when no round has it. */
+        version: ordered.find((s) => s.version)?.version ?? null,
         arch,
         memoryMb,
         codeSizeMb,

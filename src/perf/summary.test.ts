@@ -70,3 +70,12 @@ it('summarizes the in-process startup of the rounds that report it', () => {
   expect(reported!.startupMs).toEqual({ p50: 5, p90: 5.8, avg: 5, min: 4, max: 6 })
   expect(missing!.startupMs).toBeNull()
 })
+
+it('keeps the version a handler reported, and has none for runs without it', () => {
+  const [reported, old] = summarize([
+    { ...sample('Reported', 1, 10), version: 'node 24.11.1' },
+    sample('Old', 1, 20),
+  ])
+  expect(reported!.version).toBe('node 24.11.1')
+  expect(old!.version).toBeNull()
+})

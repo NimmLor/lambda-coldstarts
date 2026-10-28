@@ -33,6 +33,12 @@ export type Sample = {
   warmMs?: number[]
   /** The handler's own `startupMs`, see src/report.ts. */
   startupMs?: number
+  /**
+   * What it ran on: the function's description, which infra/functions.ts sets to what built it, e.g.
+   * `bun 1.4.4-canary.1+72ab4f530`, or else the handler's own `runtime`, e.g. `node 24.11.1`.
+   * Missing from older runs.
+   */
+  version?: string
   requestId: string
   measuredAt: string
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { type Fn, fixed, niceMax, type View } from './data'
+import { type Fn, fixed, niceMax, type Point, type View } from './data'
 import bunIcon from './icons/bun.svg'
 import llrtIcon from './icons/llrt.svg'
 import nodeIcon from './icons/nodejs.svg'
@@ -84,6 +84,19 @@ const Command = ({ build }: { build: string }) => {
   )
 }
 
+/** `bun 1.4.4-canary.1+72ab4f530 on provided.al2023`: what it ran on, then Lambda's runtime. */
+const Versions = ({ point }: { point?: Point }) =>
+  point && (
+    <p className="text-xs/normal text-muted">
+      {point.version && (
+        <>
+          <Reading className="text-ink-2">{point.version}</Reading> on{' '}
+        </>
+      )}
+      <Reading>{point.runtime}</Reading>
+    </p>
+  )
+
 /** Every function on the architecture, fastest cold start first. */
 export const Table = ({ view }: { view: View }) => {
   const { runs, latest, fns, shown, hidden, hover, focus, agg } = view
@@ -131,7 +144,7 @@ export const Table = ({ view }: { view: View }) => {
         </span>
         <div
           className="flex min-w-0 flex-col gap-2"
-          title={[f.base, point.runtime, f.about].filter(Boolean).join('\n')}
+          title={[f.base, f.about].filter(Boolean).join('\n')}
         >
           <div className="flex flex-wrap items-center gap-2 text-md font-medium">
             <span
@@ -144,7 +157,10 @@ export const Table = ({ view }: { view: View }) => {
             {f.canary && <Badge>canary Bun</Badge>}
             {f.preview && <Badge tone="amber">preview</Badge>}
           </div>
-          <Command build={f.build} />
+          <div className="flex flex-col gap-0.5">
+            <Command build={f.build} />
+            <Versions point={tickRun.points.get(f.id)} />
+          </div>
         </div>
         <div className="col-start-2 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 lg:contents">
           <Cell label="Cold start" className="col-span-2 sm:col-span-4 lg:col-span-1">

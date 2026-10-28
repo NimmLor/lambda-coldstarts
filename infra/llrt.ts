@@ -4,9 +4,17 @@
  */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
-import { bunBin, type LambdaArch, toLambdaArch } from './build'
+import { bunBin, type LambdaArch, toLambdaArch, versionFile } from './build'
 
 export type LlrtVariant = 'llrt' | 'llrt-bytecode'
 
@@ -31,12 +39,17 @@ const LLRT_SHA256: Record<string, string> = {
 
 const run = (file: string, args: string[]) => execFileSync(file, args, { stdio: 'inherit' })
 
+/** The release asset of `build` for `arch`, without its `.zip`: `llrt-lambda-arm64-no-sdk`. */
+const llrtAsset = (build: 'lambda' | 'linux', arch: LambdaArch) =>
+  `llrt-${build}-${arch === 'arm64' ? 'arm64' : 'x64'}-no-sdk`
+
 /**
  * The file `name` from the release's `<build>-<arch>-no-sdk.zip`, downloaded once into `cacheDir`
  * and checked against its pinned hash.
  */
+
 const llrtFile = (build: 'lambda' | 'linux', arch: LambdaArch, name: string, cacheDir: string) => {
-  const zip = `llrt-${build}-${arch === 'arm64' ? 'arm64' : 'x64'}-no-sdk.zip`
+  const zip = `${llrtAsset(build, arch)}.zip`
   const dir = path.join(cacheDir, `llrt-${LLRT_VERSION}`, zip.replace(/\.zip$/, ''))
   const file = path.join(dir, name)
   if (existsSync(file)) return file
@@ -110,6 +123,7 @@ export const buildLlrtBundle = ({
   ])
   if (variant === 'llrt') {
     copyFileSync(llrtFile('lambda', arch, 'bootstrap', cacheDir), path.join(bundle, 'bootstrap'))
+    writeFileSync(versionFile(bundle), `${llrtAsset('lambda', arch)}@${LLRT_VERSION}`)
     return bundle
   }
 
@@ -121,5 +135,6 @@ export const buildLlrtBundle = ({
   run(cli, ['compile', script, path.join(bundle, 'index.lrt')])
   rmSync(script)
   copyFileSync(cli, path.join(bundle, 'bootstrap'))
+  writeFileSync(versionFile(bundle), `${llrtAsset('linux', arch)}@${LLRT_VERSION}`)
   return bundle
 }

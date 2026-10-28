@@ -83,6 +83,7 @@ export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
     if (warmReport.initMs === undefined) warmMs.push(warmReport.durationMs)
   }
 
+  const body = JSON.parse(JSON.parse(payload).body)
   const sample: Sample = {
     functionId: target.id,
     round,
@@ -95,7 +96,9 @@ export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
     billedMs: report.billedMs,
     maxMemoryMb: report.maxMemoryMb,
     warmMs,
-    startupMs: JSON.parse(JSON.parse(payload).body).container?.startupMs,
+    startupMs: body.container?.startupMs,
+    // What the function was built with, see infra/functions.ts; the Node ones say which Node they are.
+    version: config.Description || body.runtime,
     requestId: report.requestId,
     measuredAt: new Date().toISOString(),
   }

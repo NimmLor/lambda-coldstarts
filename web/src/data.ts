@@ -130,7 +130,10 @@ export type Point = {
   mem: number
   dur: number
   size: number
+  /** Lambda's runtime, e.g. `nodejs24.x` or `provided.al2023`. */
   runtime: string
+  /** What it ran on, e.g. `llrt-lambda-arm64-no-sdk@v0.9.0-beta`; missing from older runs. */
+  version?: string
 }
 export type Stat = 'cold' | 'p50' | 'p90' | 'startup' | 'warm' | 'warmP90' | 'mem' | 'dur'
 
@@ -185,6 +188,7 @@ export const toPoints = (run: Run): RunPoints => {
           dur: f.durationMsAvg,
           size: f.codeSizeMb,
           runtime: f.runtime,
+          version: f.version ?? undefined,
         },
       ])
     ),

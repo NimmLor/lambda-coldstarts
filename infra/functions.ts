@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   type BunVariant,
@@ -6,6 +6,7 @@ import {
   type LambdaArch,
   lambdaArchs,
   unavailableReason,
+  versionFile,
 } from './build'
 import { buildLlrtBundle, LLRT_HANDLER, type LlrtVariant, llrtUnavailableReason } from './llrt'
 
@@ -129,6 +130,10 @@ export const createFunctions = () => {
       // Built once, deployed at every memory size.
       const { bundle, reason } =
         v.kind === 'node' ? { bundle: undefined, reason: undefined } : bundleOf(v, architecture)
+      const version =
+        bundle && existsSync(versionFile(bundle))
+          ? readFileSync(versionFile(bundle), 'utf8')
+          : undefined
 
       for (const memoryMb of memories) {
         const id =
@@ -154,6 +159,9 @@ export const createFunctions = () => {
           bundle,
           handler: handlerOf(v),
           runtime: 'provided.al2023',
+          // What PerfMeasure records as the version, since the process can't tell: a canary Bun
+          // reports the release it precedes, and LLRT not which of its builds it is.
+          description: version,
         })
       }
     }
