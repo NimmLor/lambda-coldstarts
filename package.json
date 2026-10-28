@@ -17,7 +17,6 @@
     "bootstrap:aws": "bun scripts/bootstrap-aws.ts",
     "test": "bun test",
     "typecheck": "bun check && bun check -p web",
-    "lint": "bun lint",
     "format": "bun fmt",
     "format:check": "bun fmt --check"
   },
