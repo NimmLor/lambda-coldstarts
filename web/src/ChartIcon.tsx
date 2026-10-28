@@ -26,7 +26,13 @@ const COLORS: Record<ChartIconName, string> = {
 }
 
 /** The small glyph left of a chart's headline. */
-export const ChartIcon = ({ name, className = '' }: { name: ChartIconName; className?: string }) => (
+export const ChartIcon = ({
+  name,
+  className = '',
+}: {
+  name: ChartIconName
+  className?: string
+}) => (
   <svg
     aria-hidden="true"
     viewBox="0 0 24 24"

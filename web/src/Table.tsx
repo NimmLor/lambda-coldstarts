@@ -7,8 +7,9 @@ import nodeIcon from './icons/nodejs.svg'
 const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
 
 /**
- * Seven columns from `lg`; below it each row is a card: the name with its cold start at the end,
- * then the ticks, the percentiles and one line of the other figures under it.
+ * Seven columns from `lg`; below it each row is a card: the rank and logo over the name, beside
+ * them the cold start, then the build, the ticks, the percentiles and one line of the other
+ * figures under it.
  */
 const ROW =
   'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 py-4 lg:grid-cols-[2rem_minmax(0,1fr)_13rem_7rem_6rem_6rem_5.5rem] lg:items-center lg:gap-4'
@@ -166,29 +167,32 @@ export const Table = ({ view }: { view: View }) => {
         }}
       >
         <span className="measured text-xs text-muted max-lg:hidden">{rank}</span>
-        <div
-          className="flex min-w-0 flex-col gap-2"
-          title={[f.base, f.about].filter(Boolean).join('\n')}
-        >
-          {/* The name wraps beside the logo, not under it. */}
-          <div className="flex items-center gap-2 text-md font-medium">
-            {/* The card has no column for the rank, so it leads the name. */}
-            <span className="measured text-xs font-normal text-muted lg:hidden">{rank}</span>
-            <img src={ICONS[f.family]} alt="" width={18} height={18} className="block shrink-0" />
+        {/* Its own column from `lg`; below it, its parts sit in the card's grid. */}
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-2">
+          {/* On a card the logo heads the name, which has the line to itself and its badges. */}
+          <div
+            className="flex min-w-0 flex-col items-start gap-1.5 text-md font-medium lg:flex-row lg:items-center lg:gap-2"
+            title={[f.base, f.about].filter(Boolean).join('\n')}
+          >
+            <span className="flex items-center gap-2">
+              {/* The card has no column for the rank, so it leads the logo. */}
+              <span className="measured text-xs font-normal text-muted lg:hidden">{rank}</span>
+              <img src={ICONS[f.family]} alt="" width={18} height={18} className="block shrink-0" />
+            </span>
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               {f.name}
               {f.canary && <Badge tone="outline">canary Bun</Badge>}
               {f.preview && <Badge tone="amber">preview</Badge>}
             </span>
           </div>
-          <div className="flex flex-col gap-1 text-xs/normal">
+          <div className="col-span-full flex flex-col gap-1 text-xs/normal">
             <Command build={f.build} />
             {tickRun.points.has(f.id) && <Versions point={tickRun.points.get(f.id)!} />}
           </div>
         </div>
         {/* Its own column from `lg`; below it, its parts sit in the card's grid. */}
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:items-end lg:gap-1.5 lg:text-right">
-          <div className="flex flex-col items-end gap-0.5 lg:block">
+          <div className="col-start-2 row-start-1 flex flex-col items-end gap-0.5 lg:block">
             <span className="text-xs font-medium text-muted lg:hidden">Cold start</span>
             <span className={`text-xl font-medium tracking-tight ${best('cold', cold)}`}>
               <Reading>{fixed(cold, 1)}</Reading>

@@ -1,8 +1,11 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
-import { DASHES, niceMax, type Stat, type View, day } from './data'
+import { DASHES, type Fn, fixed, niceMax, type Stat, type View, day, when } from './data'
 
 export type Metric = {
   key: Stat
+  /** Decimals in the readout, as the table shows them. */
+  digits: number
   title: string
   unit: string
   height: number
@@ -19,6 +22,76 @@ export const Y_LABELS = 'max-sm:pointer-events-none max-sm:absolute max-sm:inset
 export const Y_LABEL =
   'measured absolute text-xs text-muted max-sm:left-0 max-sm:-translate-y-full max-sm:rounded-chip max-sm:bg-paper-2/85 max-sm:pr-1 sm:right-0 sm:-translate-y-1/2'
 export const X_LABELS = 'relative mt-2 h-5 sm:col-start-2'
+
+/** Between the crosshair and the readout beside it. */
+const READOUT_GAP = 12
+
+/**
+ * The values under the pointer, lowest first, beside the crosshair at `left`% of the plot: right
+ * of it if it fits, else left, else as near it as the plot allows, so the card never clips it.
+ */
+export const Readout = ({
+  left,
+  title,
+  rows,
+  unit,
+  digits,
+  focus,
+}: {
+  left: number
+  title: string
+  rows: { f: Fn; value: number | undefined }[]
+  unit: string
+  digits: number
+  focus?: string
+}) => {
+  const ref = useRef<HTMLDivElement>(null)
+  // Its width changes with every run, so it's placed after every render, before paint.
+  useLayoutEffect(() => {
+    const el = ref.current!
+    const plot = el.parentElement!.clientWidth
+    const at = (left / 100) * plot
+    const width = el.offsetWidth
+    const x =
+      at + READOUT_GAP + width <= plot
+        ? at + READOUT_GAP
+        : at - READOUT_GAP - width >= 0
+          ? at - READOUT_GAP - width
+          : Math.max(0, Math.min(plot - width, at - width / 2))
+    el.style.left = `${x}px`
+  })
+
+  return (
+    <div
+      ref={ref}
+      role="tooltip"
+      className="pointer-events-none absolute top-1/2 z-(--z-tooltip) flex -translate-y-1/2 flex-col gap-1 rounded-pill border border-rule-2 bg-paper px-3 py-2 text-xs whitespace-nowrap shadow-[0_8px_24px_oklch(0%_0_0/0.45)]"
+    >
+      <span className="measured text-muted">{title}</span>
+      {rows
+        .filter((r) => r.value !== undefined)
+        .sort((a, b) => a.value! - b.value!)
+        .map(({ f, value }) => (
+          <span
+            key={f.id}
+            className={`flex items-center gap-2 ${focus && focus !== f.base ? 'opacity-40' : ''}`}
+          >
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full"
+              style={{ background: f.color }}
+            />
+            <span className={focus === f.base ? 'font-medium text-ink' : 'text-ink-2'}>
+              {f.name}
+            </span>
+            <span className="measured ml-auto pl-4 text-ink">
+              {fixed(value, digits)} <span className="text-muted">{unit}</span>
+            </span>
+          </span>
+        ))}
+    </div>
+  )
+}
 
 /** About `segments` + 1 dates under the chart, always including the last. */
 const dateTicks = (n: number, segments: number) => {
@@ -45,6 +118,8 @@ export const Chart = ({
   className?: string
 }) => {
   const { runs, memoryMb, shown, hover, focus, agg } = view
+  // Every chart follows the hovered run; only the one under the pointer reads it out.
+  const [inside, setInside] = useState(false)
   const n = runs.length
   const x = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100)
   const series = shown.map((f) => ({ f, values: runs.map((r) => r.points.get(f.id)?.[m.key]) }))
@@ -149,9 +224,23 @@ export const Chart = ({
                     }}
                   />
                 ))}
+              {inside && (
+                <Readout
+                  left={x(hover)}
+                  title={`${when(runs[hover]!.date)} UTC`}
+                  rows={series.map((s) => ({ f: s.f, value: s.values[hover] }))}
+                  unit={m.unit}
+                  digits={m.digits}
+                  focus={focus}
+                />
+              )}
             </>
           )}
-          <div className="absolute inset-0 flex">
+          <div
+            className="absolute inset-0 flex"
+            onMouseEnter={() => setInside(true)}
+            onMouseLeave={() => setInside(false)}
+          >
             {runs.map((r, i) => (
               <div key={r.finishedAt} className="flex-1" onMouseEnter={() => view.setHover(i)} />
             ))}

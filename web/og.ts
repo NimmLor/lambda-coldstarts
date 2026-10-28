@@ -44,16 +44,16 @@ try {
   const socket = new WebSocket(target.webSocketDebuggerUrl)
   await new Promise((resolve) => socket.addEventListener('open', resolve, { once: true }))
   let id = 0
-  const pending = new Map<number, (result: any) => void>()
+  const pending = new Map<number, (result: unknown) => void>()
   const events = new Map<string, () => void>()
   socket.addEventListener('message', ({ data }) => {
     const message = JSON.parse(String(data))
     pending.get(message.id)?.(message.result)
     events.get(message.method)?.()
   })
-  const send = (method: string, params = {}) =>
-    new Promise<any>((resolve) => {
-      pending.set(++id, resolve)
+  const send = <T>(method: string, params = {}) =>
+    new Promise<T>((resolve) => {
+      pending.set(++id, resolve as (result: unknown) => void)
       socket.send(JSON.stringify({ id, method, params }))
     })
 
@@ -68,7 +68,7 @@ try {
   await send('Page.navigate', { url: `file://${import.meta.dir}/og.html` })
   await loaded
   await send('Runtime.evaluate', { expression: 'document.fonts.ready', awaitPromise: true })
-  const { data } = await send('Page.captureScreenshot', { format: 'png' })
+  const { data } = await send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
   await Bun.write(join(import.meta.dir, 'og.png'), Buffer.from(data, 'base64'))
   socket.close()
   console.log('wrote og.png')

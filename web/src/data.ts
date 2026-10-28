@@ -210,6 +210,17 @@ export const niceMax = (value: number) => {
   )
 }
 
+/** A run by when it finished, to the minute: there is one an hour. */
+export const when = (date: Date) =>
+  date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'UTC',
+  })
+
 export const day = (date: Date) =>
   date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 

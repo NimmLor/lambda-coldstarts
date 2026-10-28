@@ -1,6 +1,7 @@
-import { AXES, X_LABELS, Y_LABEL, Y_LABELS } from './Chart'
+import { useState } from 'react'
+import { AXES, Readout, X_LABELS, Y_LABEL, Y_LABELS } from './Chart'
 import { ChartIcon } from './ChartIcon'
-import { DASHES, type Fn, niceMax, type View } from './data'
+import { DASHES, type Fn, niceMax, type View, when } from './data'
 
 const HEIGHT = 300
 
@@ -23,7 +24,9 @@ export const MemoryChart = ({
   onPick: (memoryMb: number) => void
   className?: string
 }) => {
-  const { shown, memoryMb, focus, agg } = view
+  const { runs, hover, shown, memoryMb, focus, agg } = view
+  /** Index of the size column under the pointer. */
+  const [pointed, setPointed] = useState<number>()
   // Each size sits in the middle of its column, so the columns double as its hit areas.
   const x = (i: number) => ((i + 0.5) / memories.length) * 100
   const series = shown.map((f) => ({
@@ -97,6 +100,16 @@ export const MemoryChart = ({
               />
             ))}
           </svg>
+          {pointed !== undefined && (
+            <Readout
+              left={x(pointed)}
+              title={`${memories[pointed]} MB, ${hover !== undefined ? `${when(runs[hover]!.date)} UTC` : 'mean'}`}
+              rows={series.map((s) => ({ f: s.f, value: s.values[pointed] }))}
+              unit="ms"
+              digits={1}
+              focus={focus}
+            />
+          )}
           {series
             .filter((s) => s.values[selected] !== undefined && (!focus || focus === s.f.base))
             .map((s) => (
@@ -110,14 +123,15 @@ export const MemoryChart = ({
                 }}
               />
             ))}
-          <div className="absolute inset-0 flex">
-            {memories.map((mb) => (
+          <div className="absolute inset-0 flex" onMouseLeave={() => setPointed(undefined)}>
+            {memories.map((mb, i) => (
               <button
                 key={mb}
                 type="button"
                 aria-pressed={mb === memoryMb}
                 aria-label={`Show ${mb} MB`}
                 onClick={() => onPick(mb)}
+                onMouseEnter={() => setPointed(i)}
                 className="flex-1 cursor-pointer hover:bg-rule/30 focus-visible:-outline-offset-2"
               />
             ))}

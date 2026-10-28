@@ -11,6 +11,7 @@ import {
   type View,
   mean,
   toPoints,
+  when,
 } from './data'
 import { Functions } from './Functions'
 import { Glance } from './Glance'
@@ -25,10 +26,42 @@ const DAY_MS = 864e5
 const RANGES = [14, 30, 90]
 
 const METRICS: Metric[] = [
-  { key: 'cold', title: 'Cold start', unit: 'ms', height: 300, leader: 'Fastest', icon: 'cold' },
-  { key: 'warm', title: 'Warm start', unit: 'ms', height: 180, leader: 'Fastest', icon: 'warm' },
-  { key: 'mem', title: 'Memory used', unit: 'MB', height: 180, leader: 'Lowest', icon: 'mem' },
-  { key: 'dur', title: 'Duration', unit: 'ms', height: 180, leader: 'Fastest', icon: 'dur' },
+  {
+    key: 'cold',
+    digits: 1,
+    title: 'Cold start',
+    unit: 'ms',
+    height: 300,
+    leader: 'Fastest',
+    icon: 'cold',
+  },
+  {
+    key: 'warm',
+    digits: 2,
+    title: 'Warm start',
+    unit: 'ms',
+    height: 180,
+    leader: 'Fastest',
+    icon: 'warm',
+  },
+  {
+    key: 'mem',
+    digits: 1,
+    title: 'Memory used',
+    unit: 'MB',
+    height: 180,
+    leader: 'Lowest',
+    icon: 'mem',
+  },
+  {
+    key: 'dur',
+    digits: 2,
+    title: 'Duration',
+    unit: 'ms',
+    height: 180,
+    leader: 'Fastest',
+    icon: 'dur',
+  },
 ]
 
 const Segmented = <T extends string | number>({
@@ -164,17 +197,6 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
     </header>
   )
 }
-
-/** A run by when it finished, to the minute: there is one an hour. */
-const when = (date: Date) =>
-  date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    timeZone: 'UTC',
-  })
 
 const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 const UNITS = [
