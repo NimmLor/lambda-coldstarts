@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Chart, type Metric } from './Chart'
 import {
   DASHES,
@@ -13,6 +13,7 @@ import {
   mean,
   toPoints,
 } from './data'
+import { Functions } from './Functions'
 import { Glance } from './Glance'
 import lambdaIcon from './icons/lambda.svg'
 import { REPO, SiteLinks, WRAP } from './layout'
@@ -44,8 +45,8 @@ const Segmented = <T extends string | number>({
   onPick: (v: T) => void
   text?: (v: T) => string
 }) => (
-  <div className="flex flex-col gap-2">
-    <span className="text-sm font-medium text-muted">{label}</span>
+  <div className="flex shrink-0 items-center gap-2.5">
+    <span className="text-xs font-medium text-muted">{label}</span>
     <div className="cells" role="group" aria-label={label}>
       {options.map((v) => (
         <button key={v} type="button" aria-pressed={v === value} onClick={() => onPick(v)}>
@@ -107,12 +108,12 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
       </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} ways to ship Bun against ${count('Node')} Node.js runtimes, each deployed as a Lambda function and cold started ${latest.rounds} times every hour. `
-          : 'Each runtime deployed as a Lambda function and cold started every hour. '}
-        The charts plot each run’s mean. The table below shows the mean over the selected range.
+          ? `${count('Bun')} Bun builds, LLRT and ${count('Node')} Node.js versions, each cold started ${latest.rounds} times an hour. `
+          : 'Every runtime gets cold started once an hour. '}
+        Each point on the charts is one run. The table averages the range you pick.
       </p>
       <nav className="flex flex-col gap-1.5 text-sm lg:col-span-4 lg:items-end">
-        <a href={`${REPO}#scheduled-runs-like-lambda-perf`}>How does it work</a>
+        <a href={`${REPO}#scheduled-runs-like-lambda-perf`}>How it works</a>
         <a href={REPO}>Source on GitHub</a>
         <span className="text-muted">
           Inspired by{' '}
@@ -125,18 +126,42 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
   )
 }
 
-/** A fact of the latest run, parted from its neighbour by a hairline once they share a line. */
-const Fact = ({ term, children }: { term: string; children: ReactNode }) => (
-  <div className="flex flex-col gap-1 pr-6 sm:border-l sm:border-rule sm:px-6 sm:first:border-l-0 sm:first:pl-0">
-    <dt className="text-xs text-muted">{term}</dt>
-    <dd className="measured m-0 text-sm text-ink">{children}</dd>
-  </div>
-)
+const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+const UNITS = [
+  ['day', 864e5],
+  ['hour', 36e5],
+  ['minute', 6e4],
+  ['second', 1e3],
+] as const
+
+/** When the latest run finished, as how long ago, kept current; the dot turns once an hourly run is missed. */
+const LastRun = ({ run }: { run: RunPoints }) => {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1e3)
+    return () => clearInterval(id)
+  }, [])
+  const ms = run.date.getTime() - now
+  const [unit, size] = UNITS.find(([, size]) => Math.abs(ms) >= size) ?? UNITS.at(-1)!
+  const iso = run.finishedAt.replace(/\.\d+Z$/, 'Z')
+  return (
+    <span className="inline-flex items-center gap-2 text-ink-2" title={iso}>
+      <span
+        aria-hidden="true"
+        className={`size-1.5 shrink-0 rounded-full ${-ms > 2 * 36e5 ? 'bg-bad' : 'bg-ok'}`}
+      />
+      <span>
+        Last run{' '}
+        <time dateTime={run.finishedAt}>{RELATIVE.format(Math.trunc(ms / size), unit)}</time>
+      </span>
+    </span>
+  )
+}
 
 /** The first load, in the shape of the toolbar, the cold start chart and the board. */
 const Skeleton = () => (
   <div aria-busy="true" aria-label="Loading runs" className={`${WRAP} flex flex-col gap-6`}>
-    <div className="skeleton h-28" />
+    <div className="skeleton h-12" />
     <div className="skeleton h-96" />
     <div className="flex flex-col gap-2">
       {[0, 1, 2, 3].map((i) => (
@@ -151,7 +176,6 @@ export const App = () => {
   const [history, setHistory] = useState<RunPoints[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
-  const [family, setFamily] = useState<Family | 'All'>()
   const [arch, setArch] = useState('arm64')
   // One full vCPU, and the only size before there were more.
   const [memory, setMemory] = useState(1769)
@@ -178,15 +202,10 @@ export const App = () => {
 
   const latest = history.at(-1)
 
-  const showFamily = (f: Family | 'All') => {
-    setFamily(f)
-    setHidden(new Set(ORDER.filter((base) => f !== 'All' && VARIANTS[base]!.family !== f)))
-  }
   const toggle = (base: string) => {
     const next = new Set(hidden)
     if (!next.delete(base)) next.add(base)
     setHidden(next)
-    setFamily(undefined)
   }
 
   const dashboard = (latest: RunPoints) => {
@@ -235,107 +254,79 @@ export const App = () => {
 
     return (
       <>
-        <section className={`${WRAP} flex flex-col gap-6`}>
+        <section className={WRAP}>
           <Glance history={history} />
-          <div className="mt-6 flex flex-col gap-5 rounded-card border border-rule bg-paper-2 p-5 sm:p-6">
-            <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-              <Segmented
-                label="Show"
-                options={['All', 'Bun', 'Node'] as const}
-                value={family}
-                onPick={showFamily}
-              />
-              <Segmented
-                label="Arch"
-                options={archs}
-                value={shownArch}
-                onPick={(a) => {
-                  setArch(a)
-                  setHover(undefined)
-                }}
-              />
-              <Segmented
-                label="Memory, MB"
-                options={memories}
-                value={shownMemory}
-                onPick={pickMemory}
-              />
-              {ranges.length > 1 && (
-                <Segmented
-                  label="Range"
-                  options={ranges}
-                  value={shownRange}
-                  text={(r) => `${r}d`}
-                  onPick={pickRange}
-                />
-              )}
-              <button
-                type="button"
-                onClick={load}
-                aria-busy={loading}
-                className="btn btn--primary hit relative sm:ml-auto"
-              >
-                {loading ? 'Refreshing…' : 'Refresh'}
-              </button>
-            </div>
-            <dl className="m-0 flex flex-wrap gap-y-4 border-t border-rule pt-4">
-              <Fact term="Last run">{latest.finishedAt.replace(/\.\d+Z$/, 'Z')}</Fact>
-              <Fact term="Rounds">{latest.rounds}</Fact>
-              <Fact term="Functions">
-                {new Set(latest.functions.map((f) => f.base)).size} on {archs.length} architectures
-                × {memories.length} memory sizes
-              </Fact>
-            </dl>
-          </div>
+        </section>
 
-          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-            <div className="flex flex-wrap gap-2">
-              {fns.map((f) => {
-                const on = !hidden.has(f.base)
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggle(f.base)}
-                    onMouseEnter={() => on && setFocus(f.base)}
-                    onMouseLeave={() => setFocus(undefined)}
-                    className="hit relative inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-pill border border-rule px-2.5 text-sm font-medium text-muted hover:border-rule-2 hover:text-ink-2 active:translate-y-px aria-pressed:border-rule-2 aria-pressed:bg-paper-2 aria-pressed:text-ink"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="size-2.5 shrink-0 rounded-full border-2"
-                      style={{ borderColor: f.color, background: on ? f.color : 'transparent' }}
-                    />
-                    {f.name}
-                  </button>
-                )
-              })}
+        {/* Across the page and over the charts and the board below, which both follow it. */}
+        <div className="sticky top-0 z-(--z-sticky) mt-12 border-y border-rule bg-paper/85 backdrop-blur-md">
+          <div className={`${WRAP} flex flex-wrap items-center gap-x-8 gap-y-1 py-2`}>
+            <div className="flex min-w-0 flex-auto items-center gap-x-6">
+              {/* Outside the scroller, which would clip its panel. */}
+              <Functions view={view} setHidden={setHidden} />
+              {/* One line however narrow: the choices scroll sideways instead of stacking. */}
+              <div className="-my-1 flex min-w-0 flex-auto items-center gap-x-6 overflow-x-auto py-2 [scrollbar-width:none]">
+                <Segmented
+                  label="Arch"
+                  options={archs}
+                  value={shownArch}
+                  onPick={(a) => {
+                    setArch(a)
+                    setHover(undefined)
+                  }}
+                />
+                <Segmented
+                  label="Memory, MB"
+                  options={memories}
+                  value={shownMemory}
+                  onPick={pickMemory}
+                />
+                {ranges.length > 1 && (
+                  <Segmented
+                    label="Range"
+                    options={ranges}
+                    value={shownRange}
+                    text={(r) => `${r}d`}
+                    onPick={pickRange}
+                  />
+                )}
+              </div>
             </div>
-            <div className="flex gap-5 text-sm text-muted">
-              {(
-                [
-                  ['Bun', 'Bun'],
-                  ['LLRT', 'LLRT'],
-                  ['Node', 'Node.js'],
-                ] as const
-              ).map(([family, name]) => (
-                <span key={family} className="inline-flex items-center gap-2">
-                  <svg aria-hidden="true" width="24" height="4" className="stroke-ink-2">
-                    <line
-                      x1="1"
-                      x2="23"
-                      y1="2"
-                      y2="2"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeDasharray={DASHES[family]}
-                    />
-                  </svg>
-                  {name}
-                </span>
-              ))}
-            </div>
+            <p className="measured m-0 flex shrink-0 items-center gap-x-4 text-xs text-muted">
+              <LastRun run={latest} />
+              <span>{latest.rounds} rounds</span>
+              <span className="hidden sm:inline">
+                {new Set(latest.functions.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
+                {memories.length} sizes
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <section className={`${WRAP} mt-6 flex flex-col gap-6`}>
+          <div className="flex justify-end gap-5 text-sm text-muted">
+            {(
+              [
+                ['Bun', 'Bun'],
+                ['LLRT', 'LLRT'],
+                ['Node', 'Node.js'],
+              ] as const
+            ).map(([family, name]) => (
+              <span key={family} className="inline-flex items-center gap-2">
+                <svg aria-hidden="true" width="24" height="4" className="stroke-ink-2">
+                  <line
+                    x1="1"
+                    x2="23"
+                    y1="2"
+                    y2="2"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray={DASHES[family]}
+                  />
+                </svg>
+                {name}
+              </span>
+            ))}
           </div>
 
           <div
@@ -393,9 +384,10 @@ export const App = () => {
                 />
               </h2>
               <p className="max-w-prose text-sm text-muted">
-                Ticks are the {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts
-                of {hovered !== undefined ? 'that' : 'the latest'} run. Warm is {latest.rounds} ×{' '}
-                {latest.warmInvocations ?? '—'} invocations. Click a row to hide it.
+                Each tick is one of {hovered !== undefined ? 'that' : 'the latest'} run’s{' '}
+                {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts. Warm start
+                averages {latest.rounds} × {latest.warmInvocations ?? '—'} calls. Click a row to
+                hide it.
               </p>
             </div>
             <Table view={view} />
@@ -414,7 +406,7 @@ export const App = () => {
           role={error ? 'alert' : undefined}
           className="flex flex-col items-start gap-4 rounded-card border border-rule bg-paper-2 p-6"
         >
-          <h2 className="text-lg">{error ? 'The runs didn’t load' : 'No runs yet.'}</h2>
+          <h2 className="text-lg">{error ? 'Couldn’t load the runs' : 'No runs yet'}</h2>
           {error && <p className="measured text-sm text-bad">{error}</p>}
           <button
             type="button"
@@ -440,18 +432,18 @@ export const App = () => {
           <dt className="font-medium text-ink">Cold start</dt>
           <dd className="m-0">Lambda init duration</dd>
           <dt className="font-medium text-ink">Warm start</dt>
-          <dd className="m-0">handler duration on an already-initialised instance</dd>
+          <dd className="m-0">handler time on an instance that’s already up</dd>
           <dt className="font-medium text-ink">Duration</dt>
-          <dd className="m-0">handler duration of the cold invocation</dd>
+          <dd className="m-0">handler time of the cold invocation</dd>
           <dt className="font-medium text-ink">Memory used</dt>
-          <dd className="m-0">max memory used</dd>
+          <dd className="m-0">peak memory, as Lambda reports it</dd>
           <dt className="font-medium text-ink">Size</dt>
-          <dd className="m-0">deployed code size</dd>
+          <dd className="m-0">size of the deployed code</dd>
         </dl>
         <p className="max-w-prose">
           Compiled builds also pass <code>--target=bun-linux-{'<arch>'}</code>,{' '}
-          <code>--no-compile-autoload-dotenv</code> and <code>--no-compile-autoload-bunfig</code>;
-          “canary Bun” is the Bun build that <code>--trim</code> and <code>--aot</code> need.
+          <code>--no-compile-autoload-dotenv</code> and <code>--no-compile-autoload-bunfig</code>.{' '}
+          <code>--trim</code> and <code>--aot</code> only exist in canary Bun, hence the badge.
         </p>
         <SiteLinks />
       </footer>
