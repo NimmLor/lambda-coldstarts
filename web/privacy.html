@@ -50,7 +50,7 @@
     >
       <a href="/" class="self-start text-sm">Bun vs LLRT vs Node.js cold start benchmark</a>
       <h1 class="text-3xl">Privacy policy</h1>
-      <p class="text-sm">Last updated <time datetime="2026-10-28">October 28, 2026</time></p>
+      <p class="text-sm">Last updated <time datetime="2026-10-29">October 29, 2026</time></p>
     </header>
 
     <main class="mx-auto w-full max-w-(--container) px-(--gutter) pb-16">
@@ -70,8 +70,8 @@
 
         <h2>2. What Information We Do Not Collect</h2>
         <p>
-          To maximize your privacy, we have intentionally designed this website to avoid collecting
-          personal data. We do not use:
+          To maximize your privacy, we have intentionally designed this website to collect as little
+          personal data as possible. We do not use:
         </p>
         <ul>
           <li><strong>Cookies:</strong> We do not place any cookies on your browser.</li>
@@ -80,15 +80,14 @@
             browser’s local or session storage.
           </li>
           <li>
-            <strong>Analytics:</strong> We do not use any analytics services to track your behavior.
-          </li>
-          <li>
             <strong>Accounts or Profiles:</strong> You cannot create an account or user profile on
             this website.
           </li>
           <li>
-            <strong>Third-Party Content:</strong> Fonts and icons are served from this website’s own
-            domain, so your browser does not contact any other provider while you view it.
+            <strong>Third-Party Content:</strong> Fonts, icons and scripts are served from this
+            website’s own domain, so your browser does not contact any other provider while you view
+            it. Even the usage statistics described in section 4c go to this website’s own domain
+            first.
           </li>
         </ul>
 
@@ -96,7 +95,8 @@
         <p>
           This website displays the results of automated benchmarks of AWS Lambda functions. It has
           no forms and no accounts, so you cannot submit any information to it. The benchmark
-          results contain no personal data.
+          results contain no personal data. To learn how the website is used, the dashboard sends
+          anonymous usage statistics to PostHog, as described in section 4c.
         </p>
 
         <h2>4. Third-Party Services &amp; Data Storage</h2>
@@ -203,12 +203,63 @@
           <a href="https://d1.awsstatic.com/legal/aws-gdpr/AWS_GDPR_DPA.pdf">AWS GDPR DPA</a>.
         </p>
 
+        <h3>4c. PostHog (Usage Statistics)</h3>
+        <p>
+          We use PostHog, a product analytics service provided by PostHog Inc., to understand how
+          the dashboard on our home page is used and to improve it. This processing is based on our
+          legitimate interest in improving this website (Art. 6(1)(f) GDPR).
+        </p>
+        <p>
+          <strong>What is collected:</strong> While you view the dashboard, it records page views,
+          the buttons, links and pickers you click, the choices you make in them (for example the
+          architecture, memory size or comparison you pick), where on the page you click and scroll,
+          how fast the page loads, and when you leave the page. Each event carries the page’s URL
+          and title, the referrer, your browser, operating system, device type, screen size and
+          language, and your IP address, which PostHog uses to derive an approximate location
+          (country and city). We do not record your screen, what you type, or anything outside this
+          website.
+        </p>
+        <p>
+          <strong>No cookies or browser storage:</strong> PostHog runs in a mode that sets no
+          cookies and stores nothing in your browser. It assigns a random identifier for each visit
+          that is forgotten when you close or reload the page, so we cannot recognize you on a later
+          visit or link your visits to each other. We do not identify you or build a profile of you.
+        </p>
+        <p>
+          <strong>How it is sent:</strong> The script is served from this website’s own domain, and
+          your browser sends the events to this website’s own domain, from where CloudFront (section
+          4a) forwards them to PostHog.
+        </p>
+        <p>
+          <strong>Recipient and location:</strong> PostHog is the recipient of the data and acts as
+          our processor. We use PostHog’s EU Cloud, which stores the data in the EU (Frankfurt,
+          Germany).
+        </p>
+        <p>
+          <strong>Retention:</strong> PostHog keeps events for the retention period of our plan (one
+          year on PostHog’s free plan, up to seven years on a paid plan) and then deletes them.
+        </p>
+        <p>
+          <strong>Necessity and objection:</strong> The processing described in this section is
+          neither legally nor contractually required, and the website works the same without it. You
+          have the right to object to it. If your browser sends a “Do Not Track” signal, the
+          dashboard sends no usage statistics at all. Blocking scripts or using a content blocker
+          also prevents it.
+        </p>
+        <p>
+          Further information can be found here:
+          <a href="https://posthog.com/privacy">PostHog Privacy Policy</a> and here:
+          <a href="https://posthog.com/dpa">PostHog DPA</a>.
+        </p>
+
         <h2>5. International Data Transfers</h2>
         <p>
-          Data is stored and processed in the AWS Frankfurt region. The only exception is
-          CloudFront, which may serve your request from an edge location outside the European
-          Economic Area (EEA), as described in section 4a. Such transfers are covered by the AWS
-          GDPR Data Processing Addendum, which includes the EU Standard Contractual Clauses.
+          Data is stored and processed in Frankfurt, Germany: by AWS in its eu-central-1 region and
+          by PostHog in its EU Cloud. CloudFront may serve your request from an edge location
+          outside the European Economic Area (EEA), as described in section 4a, and PostHog Inc. is
+          based in the United States, so its staff may access the data from outside the EEA. Such
+          transfers are covered by the AWS GDPR Data Processing Addendum and the PostHog DPA, both
+          of which include the EU Standard Contractual Clauses.
         </p>
 
         <h2>6. Your Rights Under the GDPR</h2>
@@ -245,9 +296,10 @@
           </li>
         </ul>
         <p>
-          <strong>Important Limitation:</strong> Because this website does not collect any personal
-          information that could identify you, it is not technically possible for us to identify,
-          access, rectify, or erase data associated with a specific individual.
+          <strong>Important Limitation:</strong> Because this website does not collect any
+          information that could identify you, and its usage statistics use a new random identifier
+          on every visit, it is not technically possible for us to identify, access, rectify, or
+          erase data associated with a specific individual.
         </p>
         <p>
           Despite this technical limitation, if you have any questions or concerns about our privacy

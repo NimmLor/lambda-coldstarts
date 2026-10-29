@@ -228,6 +228,11 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     ],
   })
 
+  // web/src/analytics.ts sends its events here, so the page talks to its own origin only.
+  router.route('/ingest', 'https://eu.i.posthog.com', {
+    rewrite: { regex: '^/ingest/(.*)$', to: '/$1' },
+  })
+
   const site = new sst.aws.StaticSite('PerfSite', {
     path: 'web',
     build: { command: 'bun run build', output: 'dist' },

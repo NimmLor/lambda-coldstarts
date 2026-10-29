@@ -4,7 +4,8 @@ name: 🚀 Deploy
 # both architectures to the production stage, coldstarts.github.nimmervoll.work.
 # Needs the secret AWS_ROLE_ARN on the production environment: a role that environment may assume
 # through GitHub OIDC. `bun run bootstrap:aws` sets up both. PERF_ADMIN_SECRET on the same
-# environment turns on PerfApi's admin routes; without it they stay off.
+# environment turns on PerfApi's admin routes; without it they stay off. The variable
+# POSTHOG_PROJECT_TOKEN turns on the site's PostHog analytics; without it the site tracks nothing.
 on:
   push:
     branches:
@@ -213,6 +214,7 @@ jobs:
           # Authenticates sst's plugin downloads from GitHub releases.
           GITHUB_TOKEN: ${{ github.token }}
           PERF_ADMIN_SECRET: ${{ secrets.PERF_ADMIN_SECRET }}
+          POSTHOG_PROJECT_TOKEN: ${{ vars.POSTHOG_PROJECT_TOKEN }}
 
       - name: 🧮 Read SST Outputs
         id: outputs
