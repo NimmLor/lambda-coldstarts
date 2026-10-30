@@ -6,13 +6,31 @@
  *                                                 written by summarize.ts after it
  *   pk `run#<runId>`   sk <functionId>#<round>    one cold start, written by measure.ts
  *
- * A run's id is the ISO start time of its Step Functions execution, so runs sort by time.
+ * A run's id is the ISO start time of its Step Functions execution, so runs sort by time, and its
+ * month is the id's first seven characters. Every item of a run carries the same `expiresAt`,
+ * which DynamoDB's TTL deletes it after; export.ts copies each month to S3 long before that.
  */
 export const RUNS_PK = 'runs'
 
 export const SUMMARIES_PK = 'summaries'
 
-export const samplesPk = (runId: string) => `run#${runId}`
+export const SAMPLES_PREFIX = 'run#'
+
+export const samplesPk = (runId: string) => `${SAMPLES_PREFIX}${runId}`
+
+/** How long PerfResults keeps a run, counted from its start. */
+export const RETENTION_DAYS = 120
+
+/** When a run's items expire, in the epoch seconds TTL reads. */
+export const expiresAt = (runId: string) =>
+  Math.floor(Date.parse(runId) / 1000) + RETENTION_DAYS * 86_400
+
+/** The run a stored item belongs to, from its key; undefined for an item of no run. */
+export const runIdOf = ({ pk, sk }: { pk: string; sk: string }) => {
+  if (pk === RUNS_PK || pk === SUMMARIES_PK) return sk
+  if (pk.startsWith(SAMPLES_PREFIX)) return pk.slice(SAMPLES_PREFIX.length)
+  return undefined
+}
 
 export const sampleSk = (functionId: string, round: number) =>
   `${functionId}#${String(round).padStart(3, '0')}`

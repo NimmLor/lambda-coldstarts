@@ -2,7 +2,7 @@
 <!--
   The 1200×630 social preview, og.png. Not a page of the site: `bun run og` renders it with
   headless Chrome. Colours are tokens.css's, fonts and icons the committed ones. The chart
-  strip draws no measured figures, since a run every hour would leave them stale.
+  strip draws no measured figures, since a run every 4 hours would leave them stale.
 -->
 <html lang="en">
   <head>
@@ -177,7 +177,7 @@
         <img src="src/favicon.svg" alt="" />
         coldstarts.github.nimmervoll.work
       </div>
-      <div class="live">Measured every hour</div>
+      <div class="live">Measured every 4 hours</div>
     </header>
 
     <h1>Bun vs LLRT vs Node.js<br />cold starts on <span class="lambda">AWS Lambda</span></h1>
@@ -273,7 +273,7 @@
       }
       const lines = document.getElementById('lines')
       for (const [color, dash, base] of LINES) {
-        // A slow swell of its own plus a little noise, like an hourly series.
+        // A slow swell of its own plus a little noise, like a series of runs.
         const [phase, period] = [rand() * 6.3, 380 + rand() * 260]
         const pts = []
         for (let x = -20; x <= 1220; x += 40) {

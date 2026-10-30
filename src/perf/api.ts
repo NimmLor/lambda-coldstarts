@@ -9,7 +9,7 @@
  * And, only when PERF_ADMIN_SECRET is set, routes under it that 404 like any other otherwise:
  *
  *   POST /admin/<secret>/run     starts a run of the PerfRun state machine
- *   POST /admin/<secret>/pause   disables the hourly schedule that starts it
+ *   POST /admin/<secret>/pause   disables the schedule that starts it every 4 hours
  *   POST /admin/<secret>/resume  enables it again; both answer `{ state, was }`
  *   POST /admin/<secret>/purge   deletes items from PerfResults until about 15 s have passed;
  *                                `done: false` means there are more, call it again
@@ -50,7 +50,7 @@ const json = (statusCode: number, body: unknown, cacheControl = 'max-age=60') =>
   body: JSON.stringify(body),
 })
 
-const toSummary = ({ pk, sk, ...summary }: Record<string, unknown>) => summary
+const toSummary = ({ pk, sk, expiresAt, ...summary }: Record<string, unknown>) => summary
 
 /** Newest first. Pages, since a Query stops at 1 MB and each summary is tens of KB. */
 const listSummaries = async (limit: number) => {

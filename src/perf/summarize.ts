@@ -6,7 +6,7 @@
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
-import { RUNS_PK, type Sample, SUMMARIES_PK, samplesPk } from './keys'
+import { expiresAt, RUNS_PK, type Sample, SUMMARIES_PK, samplesPk } from './keys'
 import { summarize } from './summary'
 
 export type SummarizeEvent = { runId: string }
@@ -54,6 +54,7 @@ export const handler = async ({ runId }: SummarizeEvent) => {
         warmInvocations,
         functionCount,
         functions,
+        expiresAt: expiresAt(runId),
       },
     })
   )
