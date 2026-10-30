@@ -13,7 +13,7 @@ import {
   waitUntilFunctionUpdatedV2,
 } from '@aws-sdk/client-lambda'
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb'
-import { type Sample, sampleSk, samplesPk } from './keys'
+import { expiresAt, type Sample, sampleSk, samplesPk } from './keys'
 import { parseReport } from './report-line'
 
 export type MeasureEvent = {
@@ -105,7 +105,12 @@ export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
   await db.send(
     new PutCommand({
       TableName: TABLE,
-      Item: { pk: samplesPk(runId), sk: sampleSk(target.id, round), ...sample },
+      Item: {
+        pk: samplesPk(runId),
+        sk: sampleSk(target.id, round),
+        ...sample,
+        expiresAt: expiresAt(runId),
+      },
     })
   )
   return { functionId: target.id, round, initMs: report.initMs }

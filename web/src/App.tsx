@@ -24,6 +24,8 @@ import { Table } from './Table'
 /** PerfApi, behind the same CloudFront distribution; see infra/perf.ts and dev.ts. */
 const API = '/api'
 const DAY_MS = 864e5
+/** How often PerfSchedule starts a run (infra/perf.ts). */
+const RUN_EVERY_MS = 4 * 36e5
 const RANGES = [14, 30, 90]
 
 const METRICS: Metric[] = [
@@ -216,8 +218,8 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
       </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions, each cold started ${latest.rounds} times an hour. `
-          : 'Every runtime gets cold started once an hour. '}
+          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions, each cold started ${latest.rounds} times every 4 hours. `
+          : 'Each runtime is cold started every 4 hours. '}
         Each point on the charts is one run. The table averages the range you pick.
       </p>
       <nav className="flex flex-col gap-1.5 text-sm lg:col-span-4 lg:items-end">
@@ -242,7 +244,7 @@ const UNITS = [
   ['second', 1e3],
 ] as const
 
-/** When the latest run finished, as how long ago, kept current; the dot turns once an hourly run is missed. */
+/** When the latest run finished, as how long ago, kept current; the dot turns once a run is missed. */
 const LastRun = ({ run }: { run: RunPoints }) => {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
@@ -256,7 +258,7 @@ const LastRun = ({ run }: { run: RunPoints }) => {
     <span className="inline-flex items-center gap-2 text-ink-2" title={iso}>
       <span
         aria-hidden="true"
-        className={`size-1.5 shrink-0 rounded-full ${-ms > 2 * 36e5 ? 'bg-bad' : 'bg-ok'}`}
+        className={`size-1.5 shrink-0 rounded-full ${-ms > 2 * RUN_EVERY_MS ? 'bg-bad' : 'bg-ok'}`}
       />
       <span>
         Last run{' '}

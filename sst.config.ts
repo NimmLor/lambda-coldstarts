@@ -17,7 +17,7 @@ export default $config({
   },
   async run() {
     // Caps what a burst of requests can cost. PerfApi serves the site's /api/runs, so it gets room
-    // for more than one visitor at a time, and PerfRun measures every function at once, each round
+    // for more than one visitor at a time, and PerfRun measures 40 functions at once, each round
     // through PerfMeasure. $transform only reaches functions created after it.
     const RESERVED: Record<string, number> = { PerfApi: 10, PerfMeasure: 100 }
     $transform(sst.aws.Function, (args, _opts, name) => {
