@@ -173,12 +173,12 @@ bun run perf --stage dev [--detach]                    # start a run now (and wa
 bun scripts/perf-summarize.ts --stage production [--all]   # summarize runs that have no summary yet
 ```
 
-| Variable                | Default |                                                                                     |
-| ----------------------- | ------- | ----------------------------------------------------------------------------------- |
-| `PERF_ROUNDS`           | `10`    | Cold starts per function and run                                                    |
-| `PERF_WARM`             | `5`     | Warm invocations after each cold start                                              |
-| `PERF_ADMIN_SECRET`     | unset   | Turns on the admin routes (URL-safe characters only)                                |
-| `POSTHOG_PROJECT_TOKEN` | unset   | Turns on the site's PostHog analytics, sent through `/ingest` to PostHog's EU cloud |
+| Variable                | Default |                                                                                                   |
+| ----------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `PERF_ROUNDS`           | `10`    | Cold starts per function and run                                                                  |
+| `PERF_WARM`             | `5`     | Warm invocations after each cold start                                                            |
+| `PERF_ADMIN_SECRET`     | unset   | Turns on the admin routes (URL-safe characters only)                                              |
+| `POSTHOG_PROJECT_TOKEN` | unset   | Turns on the site's PostHog analytics in production, sent through `/ingest` to PostHog's EU cloud |
 
 <details>
 <summary>🔐 Admin routes</summary>
