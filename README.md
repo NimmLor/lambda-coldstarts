@@ -5,7 +5,7 @@
 # ⚡ lambda-coldstarts
 
 **How fast do Bun, LLRT and Node.js cold-start on AWS Lambda?**<br>
-110 real Lambdas, benchmarked every hour.
+130 real Lambdas, benchmarked every hour.
 
 [🌐 Live results](https://coldstarts.github.nimmervoll.work) ·
 [🚀 Deploy](#-deploy) ·
@@ -22,7 +22,7 @@
 
 One SST stack. Every function runs the same handler ([`src/report.ts`](src/report.ts)) and gets a
 public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 MB**:
-11 variants × 2 architectures × 5 sizes = **110 functions**, named like `BunCompileArm64M128`.
+13 variants × 2 architectures × 5 sizes = **130 functions**, named like `BunCompileArm64M128`.
 
 |     | Variant                        | What ships                                                                           |
 | --- | ------------------------------ | ------------------------------------------------------------------------------------ |
@@ -34,6 +34,8 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🥟  | `BunCompileAotTrim`            | `--aot --trim`                                                                       |
 | 🪶  | `Llrt`                         | [LLRT](https://github.com/awslabs/llrt)'s no-sdk Lambda build + bundled `index.mjs`  |
 | 🪶  | `LlrtBytecode`                 | the bundle as `llrt compile` bytecode, run by LLRT's CLI build                       |
+| 🪶  | `LlrtStdSdk`                   | `Llrt` on LLRT's default Lambda build, with the common AWS SDK clients built in      |
+| 🪶  | `LlrtFullSdk`                  | `Llrt` on LLRT's full-sdk Lambda build, with every AWS SDK client built in           |
 | 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)           |
 
 Bun and LLRT run on `provided.al2023`. Bun serves invocations through a small runtime loop
@@ -45,7 +47,7 @@ through Lambda's managed runtime.
 ```sh
 bun install
 cp .env.example .env         # add AWS_PROFILE or access keys
-bun run deploy --stage dev   # builds both architectures in Docker, deploys all 110 functions
+bun run deploy --stage dev   # builds both architectures in Docker, deploys all 130 functions
 bun run remove --stage dev   # tears it down again (production is retained)
 ```
 
@@ -230,7 +232,10 @@ bun test
 
 - 📦 Compiled Bun executables are ~100 MB against a few KB for Node. Lambda fetches them on every cold
   start, which shows up in the round trip even when init is fast.
-- 🪶 LLRT is pinned in [`infra/llrt.ts`](infra/llrt.ts) and uses the no-sdk builds.
+- 🪶 LLRT is pinned in [`infra/llrt.ts`](infra/llrt.ts). `Llrt` and `LlrtBytecode` use the no-sdk
+  builds; `LlrtStdSdk` (6.2 MB) and `LlrtFullSdk` (7.7 MB) run the same handler, which imports no
+  SDK client, so against `Llrt` (5.2 MB) they show what the embedded SDK costs on its own. LLRT's
+  TLS warm-up only connects for imported clients, so it isn't part of it.
   [`src/llrt-env.ts`](src/llrt-env.ts) fills in the `process` and `navigator` APIs it lacks.
 - 🧩 `LlrtBytecode` ships LLRT's CLI build (14 MB vs 5.5 MB), because only the CLI build reads
   bytecode the CLI compiled. Comparing it with `Llrt` therefore compares the executables as well.
