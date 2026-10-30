@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { track } from './analytics'
 import { Chart, type Metric } from './Chart'
 import {
   DASHES,
@@ -358,10 +359,12 @@ export const App = () => {
       toggle,
     }
     const pickMemory = (mb: number) => {
+      track('memory_picked', { memory_mb: mb })
       setMemory(mb)
       setHover(undefined)
     }
     const pickRange = (r: number) => {
+      track('range_picked', { days: r })
       setRange(r)
       setHover(undefined)
     }
@@ -373,6 +376,7 @@ export const App = () => {
       return ranges.length > 1 ? `${key.slice(5)}-day mean` : 'Mean'
     }
     const pick = (key: string) => {
+      track('run_picked', { run: key.startsWith('mean:') ? 'mean' : 'run' })
       setHover(undefined)
       if (!key.startsWith('mean:')) return setPinned(key)
       setPinned(undefined)
@@ -400,6 +404,7 @@ export const App = () => {
                   options={archs}
                   value={shownArch}
                   onPick={(a) => {
+                    track('arch_picked', { arch: a })
                     setArch(a)
                     setHover(undefined)
                   }}
@@ -441,7 +446,10 @@ export const App = () => {
               options={['', ...fns.map((f) => f.base)]}
               value={fns.some((f) => f.base === compare) ? compare : ''}
               text={(b) => (b ? (VARIANTS[b]?.name ?? b) : 'None')}
-              onPick={setCompare}
+              onPick={(b) => {
+                track('compare_picked', { variant: b || 'none' })
+                setCompare(b)
+              }}
             />
             <div className="ml-auto flex gap-5">
               {(

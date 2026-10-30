@@ -228,9 +228,20 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
     ],
   })
 
+  // web/src/analytics.ts sends its events here, so the page talks to its own origin only.
+  router.route('/ingest', 'https://eu.i.posthog.com', {
+    rewrite: { regex: '^/ingest/(.*)$', to: '/$1' },
+  })
+
   const site = new sst.aws.StaticSite('PerfSite', {
     path: 'web',
     build: { command: 'bun run build', output: 'dist' },
+    // Analytics on production only: any other stage builds with the token empty, which
+    // web/src/analytics.ts takes as off, even when the shell or .env sets it.
+    environment: {
+      POSTHOG_PROJECT_TOKEN:
+        $app.stage === 'production' ? (process.env.POSTHOG_PROJECT_TOKEN ?? '') : '',
+    },
     router: { instance: router },
     invalidation: { wait: false },
   })

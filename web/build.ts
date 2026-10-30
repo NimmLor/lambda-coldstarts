@@ -10,7 +10,11 @@ await Bun.build({
   outdir: 'dist',
   plugins: [tailwind],
   minify: true,
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    // Turns on src/analytics.ts; a build without it tracks nothing.
+    'process.env.POSTHOG_PROJECT_TOKEN': JSON.stringify(process.env.POSTHOG_PROJECT_TOKEN ?? ''),
+  },
 })
 // The fonts each page's inline @font-face rules load from /fonts, with their OFL licenses.
 await Bun.$`cp -R fonts dist/fonts`
