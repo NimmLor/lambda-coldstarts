@@ -31,6 +31,9 @@ export const VARIANTS: Variant[] = [
   // The handler bundle as JavaScript, and as the bytecode `llrt compile` makes of it; see infra/llrt.ts.
   { id: 'Llrt', kind: 'llrt', variant: 'llrt' },
   { id: 'LlrtBytecode', kind: 'llrt', variant: 'llrt-bytecode' },
+  // LLRT's Lambda builds that embed the common AWS SDK clients, and all of them.
+  { id: 'LlrtStdSdk', kind: 'llrt', variant: 'llrt-std-sdk' },
+  { id: 'LlrtFullSdk', kind: 'llrt', variant: 'llrt-full-sdk' },
   { id: 'Node22', kind: 'node', runtime: 'nodejs22.x' },
   { id: 'Node24', kind: 'node', runtime: 'nodejs24.x' },
   // A public preview since August 2026. The aws provider pinned in sst.config.ts is the first
