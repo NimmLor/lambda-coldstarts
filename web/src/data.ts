@@ -92,6 +92,20 @@ export const VARIANTS: Record<string, Variant> = {
     about:
       'The bundle as QuickJS bytecode, run by LLRT’s CLI build: the only release that reads what llrt compile writes',
   },
+  LlrtStdSdk: {
+    name: 'LLRT, standard SDK',
+    family: 'LLRT',
+    build: LLRT_BUNDLE,
+    about:
+      'The bundle, run by LLRT’s default Lambda build, which embeds the common AWS SDK clients the handler doesn’t import',
+  },
+  LlrtFullSdk: {
+    name: 'LLRT, full SDK',
+    family: 'LLRT',
+    build: LLRT_BUNDLE,
+    about:
+      'The bundle, run by LLRT’s Lambda build that embeds every AWS SDK client, none of which the handler imports',
+  },
   Node22: { name: 'Node.js 22', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },
   Node24: { name: 'Node.js 24', family: 'Node', build: SST_BUNDLE, about: 'SST’s default bundle' },
   Node26: {
