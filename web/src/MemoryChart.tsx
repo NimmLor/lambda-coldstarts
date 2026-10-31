@@ -24,7 +24,7 @@ export const MemoryChart = ({
   onPick: (memoryMb: number) => void
   className?: string
 }) => {
-  const { runs, hover, shown, memoryMb, focus, agg, baseline } = view
+  const { runs, hover, shown, scaled, memoryMb, focus, agg, baseline } = view
   /** Index of the size column under the pointer. */
   const [pointed, setPointed] = useState<number>()
   // Each size sits in the middle of its column, so the columns double as its hit areas.
@@ -34,9 +34,8 @@ export const MemoryChart = ({
     return fn && agg(fn, 'cold')
   }
   const series = shown.map((f) => ({ f, values: memories.map((mb) => at(f.base, mb)) }))
-  const max = niceMax(
-    Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== undefined)))
-  )
+  // On both architectures, so the axis holds still when the other is shown.
+  const max = niceMax(Math.max(0, ...scaled.map((f) => agg(f, 'cold') ?? 0)))
   const y = (v: number) => 100 - (v / max) * 100
   const grid = [0, 0.25, 0.5, 0.75, 1].map((g) => ({
     top: 100 - g * 100,

@@ -342,12 +342,15 @@ export const App = () => {
       .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
     const visible = fns.filter((f) => !hidden.has(f.base))
+    const shown = visible.length ? visible : fns
+    const shownBases = new Set(shown.map((f) => f.base))
     const view: View = {
       runs,
       latest,
       memoryMb: shownMemory,
       fns,
-      shown: visible.length ? visible : fns,
+      shown,
+      scaled: latest.functions.filter((f) => shownBases.has(f.base)),
       hidden,
       hover: hovered,
       focus,
