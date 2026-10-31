@@ -586,12 +586,6 @@ export const App = () => {
           startup time and memory use as JSON. No packages, no network calls: the numbers are the
           runtime’s, not the code’s.
         </p>
-        <p className="max-w-prose">
-          Everything runs in <code>{STACK_REGION}</code>, Frankfurt, except the Web Function: Lambda
-          Web Functions aren’t in <code>{STACK_REGION}</code> yet, so it runs in{' '}
-          <code>{VARIANTS.Node24Web!.region}</code>, Ireland. Every Web Function environment has 2
-          GB and 2 vCPUs, so it shows at whichever memory size you pick.
-        </p>
         <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
           <dt className="font-medium text-ink">Cold start</dt>
           <dd className="m-0">
@@ -618,6 +612,11 @@ export const App = () => {
           </dd>
           <dt className="font-medium text-ink">Size</dt>
           <dd className="m-0">size of the deployed code</dd>
+          <dt className="font-medium text-ink">Region</dt>
+          <dd className="m-0">
+            {STACK_REGION}, Frankfurt. The Web Function runs in {VARIANTS.Node24Web!.region},
+            Ireland, the only EU region with Web Functions so far, always at 2 GB
+          </dd>
         </dl>
         <p className="max-w-prose">
           Compiled builds also pass <code>--target=bun-linux-{'<arch>'}</code>,{' '}
