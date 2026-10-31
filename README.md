@@ -39,7 +39,7 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)           |
 | 🌐  | `Node24Web`                    | a `node:http` server on a [Lambda Web Function](#-the-web-function)                  |
 
-Everything runs in **eu-central-1**, except `Node24Web`, which is one more function in eu-west-1.
+Everything runs in **eu-central-1**, `Node24Web` included.
 
 Bun and LLRT run on `provided.al2023`. Bun serves invocations through a small runtime loop
 ([`src/runtime.ts`](src/runtime.ts)), LLRT through its own ([`src/llrt.ts`](src/llrt.ts)), and Node
@@ -156,8 +156,8 @@ HTTP server rather than a handler, and serve many requests per environment.
 has no component for them yet. Their API differs, and so does how it's measured
 ([`src/perf/web.ts`](src/perf/web.ts)):
 
-- 🌍 **eu-west-1**, not eu-central-1, which doesn't have Web Functions yet. The code sits in a
-  versioned bucket there.
+- 🪣 **The code** sits in a versioned bucket, which Lambda reads on behalf of the function's
+  revisions.
 - 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site gives it a
   section of its own, against `Node24` on arm64 at whichever memory size you pick.
 - 🔄 **A cold start** is a new revision that differs in `BENCH_NONCE`, which the endpoint is then

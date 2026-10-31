@@ -210,7 +210,6 @@ export const measureWeb = async (
     warmMs: warmRequests.map((r) => log.requestMs.get(r.requestId)!),
     startupMs: cold.body.container?.startupMs,
     version: cold.body.runtime,
-    region: target.region,
     roundTripMs: Math.round(cold.roundTripMs * 100) / 100,
     // Lambda had the environment starting before the request went out: it waited for less of
     // the init than `initMs`, or none of it.

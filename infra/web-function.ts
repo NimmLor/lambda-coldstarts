@@ -1,15 +1,13 @@
 /**
  * The Lambda Web Function variant: src/web.ts as an HTTP server on the `nodejs24.x` Web Function
- * runtime. Web Functions are only in a few regions, none of them the stack's eu-central-1, so this
- * one runs in eu-west-1. Its code is a zip in a versioned bucket there, which every revision points
- * at; PerfMeasure forces each cold start by creating a revision of its own (src/perf/web.ts).
+ * runtime, in the stack's region like everything else. Its code is a zip in a versioned bucket,
+ * which every revision points at; PerfMeasure forces each cold start by creating a revision of its
+ * own (src/perf/web.ts).
  */
 import { execFileSync } from 'node:child_process'
 import { statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { bunBin } from './build'
-
-export const WEB_REGION = 'eu-west-1'
 
 /** The endpoint PerfMeasure sends its requests to. */
 const ENDPOINT = 'bench'
@@ -30,19 +28,19 @@ export type WebFunction = ReturnType<typeof createWebFunction>
 
 export const createWebFunction = (id: string) => {
   const name = `${$app.name}-${$app.stage}-${id}`
+  const region = aws.getRegionOutput().region
+  const account = aws.getCallerIdentityOutput().accountId
   const dir = path.join($cli.paths.work, 'web-function', id)
   const codeBytes = bundle(dir)
 
   // Lambda pins each revision to an object version, so the bucket has to keep them.
-  const bucket = new aws.s3.Bucket(`${id}Code`, { region: WEB_REGION, forceDestroy: true })
+  const bucket = new aws.s3.Bucket(`${id}Code`, { forceDestroy: true })
   const versioning = new aws.s3.BucketVersioning(`${id}CodeVersioning`, {
-    region: WEB_REGION,
     bucket: bucket.id,
     versioningConfiguration: { status: 'Enabled' },
   })
   // Lambda reads the code as itself, on behalf of this function's revisions only.
   const policy = new aws.s3.BucketPolicy(`${id}CodePolicy`, {
-    region: WEB_REGION,
     bucket: bucket.id,
     policy: $jsonStringify({
       Version: '2012-10-17',
@@ -54,12 +52,7 @@ export const createWebFunction = (id: string) => {
           Resource: $interpolate`${bucket.arn}/*`,
           Condition: {
             ArnLike: {
-              'aws:SourceArn': aws
-                .getCallerIdentityOutput()
-                .accountId.apply(
-                  (account) =>
-                    `arn:aws:lambda:${WEB_REGION}:${account}:web-function/${name}/revision/*`
-                ),
+              'aws:SourceArn': $interpolate`arn:aws:lambda:${region}:${account}:web-function/${name}/revision/*`,
             },
           },
         },
@@ -69,7 +62,6 @@ export const createWebFunction = (id: string) => {
   const code = new aws.s3.BucketObjectv2(
     `${id}CodeZip`,
     {
-      region: WEB_REGION,
       bucket: bucket.id,
       key: `${id}.zip`,
       source: new $util.asset.FileArchive(dir),
@@ -81,7 +73,6 @@ export const createWebFunction = (id: string) => {
   const logGroups = [name, `${name}.local`].map(
     (group, i) =>
       new aws.cloudwatch.LogGroup(`${id}Logs${i ? 'Local' : ''}`, {
-        region: WEB_REGION,
         name: `/aws/lambda/web/${group}`,
         retentionInDays: 30,
       })
@@ -156,7 +147,7 @@ export const createWebFunction = (id: string) => {
       id,
       name,
       kind: 'web' as const,
-      region: WEB_REGION,
+      region,
       endpoint: ENDPOINT,
       domain: endpoint.domainName,
       logGroup: logGroups[1]!.name,

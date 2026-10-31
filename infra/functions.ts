@@ -43,7 +43,7 @@ export const VARIANTS: Variant[] = [
   // A public preview since August 2026. The aws provider pinned in sst.config.ts is the first
   // SST can use that accepts it.
   { id: 'Node26', kind: 'node', runtime: 'nodejs26.x' },
-  // Only on arm64, with the 2 GB every Web Function gets, in eu-west-1.
+  // Only on arm64, with the 2 GB every Web Function gets.
   { id: 'Node24Web', kind: 'web' },
 ]
 

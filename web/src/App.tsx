@@ -569,7 +569,6 @@ export const App = () => {
           <WebFunctions
             view={webView}
             metrics={METRICS}
-            region={webs[0]!.region!}
             compared={compareWeb}
             onCompare={(on) => {
               track('web_compare_toggled', { on: Number(on) })
@@ -679,8 +678,7 @@ export const App = () => {
           <dd className="m-0">size of the deployed code</dd>
           <dt className="font-medium text-ink">Region</dt>
           <dd className="m-0">
-            {STACK_REGION}, Frankfurt. The Web Function runs in {VARIANTS.Node24Web!.region},
-            Ireland, the only EU region with Web Functions so far, always at 2 GB
+            {STACK_REGION}, Frankfurt, for everything, the Web Function included
           </dd>
         </dl>
         <p className="max-w-prose">

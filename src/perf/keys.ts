@@ -58,8 +58,6 @@ export type Sample = {
    * Missing from older runs.
    */
   version?: string
-  /** Where it ran, when that isn't the stack's region: only a Web Function's says. */
-  region?: string
   /** A Web Function's: how long the cold request took, as PerfMeasure saw it. */
   roundTripMs?: number
   /**

@@ -12,11 +12,12 @@ export default $config({
         // defaults to 7.20.0, which rejects it.
         // AWS_PROFILE comes from .env locally; CI leaves it unset and passes credentials instead.
         aws: { version: '7.52.0', profile: process.env.AWS_PROFILE || undefined },
-        // Only Lambda Web Functions use it, which eu-central-1 doesn't have yet; see
-        // infra/web-function.ts.
+        // For Lambda Web Functions, which the aws provider has no resources for yet; see
+        // infra/web-function.ts. In the same region as the aws provider, from .env or CI.
         'aws-native': {
           version: '1.84.1',
-          region: 'eu-west-1',
+          // Typed as the regions it knew of when released.
+          region: process.env.AWS_REGION as awsnative.types.enums.Region,
           profile: process.env.AWS_PROFILE || undefined,
         },
       },

@@ -32,7 +32,7 @@ const DIFFERENCES = [
     'Requests, CPU time while busy, memory while the environment lives',
     'Requests, and duration times memory',
   ],
-  ['Regions', 'Five so far, eu-west-1 the only one in the EU', 'All of them'],
+  ['Regions', 'Some so far, eu-central-1 among them', 'All of them'],
 ] as const
 
 const ROW = 'grid gap-x-4 gap-y-1 sm:grid-cols-[6rem_minmax(0,1fr)_minmax(0,1fr)]'
@@ -147,7 +147,6 @@ const Figure = ({ metric: m, view }: { metric: Metric; view: View }) => {
 export const WebFunctions = ({
   view,
   metrics,
-  region,
   compared,
   onCompare,
 }: {
@@ -155,7 +154,6 @@ export const WebFunctions = ({
   view: View
   /** The page's metrics; the section shows the cold start, warm start and memory. */
   metrics: Metric[]
-  region: string
   compared: boolean
   onCompare: (on: boolean) => void
 }) => {
@@ -177,7 +175,7 @@ export const WebFunctions = ({
           </label>
         </div>
         <p className="max-w-prose text-pretty text-ink-2">
-          Node.js 24 as a Web Function in {region}, at the 2 GB every one gets.
+          Node.js 24 as a Web Function, at the 2 GB every one gets.
         </p>
       </div>
       <Explainer />
