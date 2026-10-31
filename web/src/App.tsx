@@ -346,16 +346,17 @@ export const App = () => {
     const inRange = history.filter((r) => r.date.getTime() > since)
 
     /**
-     * `fns` over the runs in range from the first that measured any of them, so a function added
-     * since doesn't leave its charts empty up to that run.
+     * `fns` over the runs in range from the first that measured any of `from`, all of them unless
+     * given, so a function added since doesn't leave its charts empty up to that run.
      */
     const viewOf = (
       fns: Fn[],
       hiddenOf: Set<string>,
       toggleOf: (base: string) => void,
-      baseline?: Fn
+      baseline?: Fn,
+      from = fns
     ): View => {
-      const first = inRange.findIndex((r) => fns.some((f) => r.points.has(f.id)))
+      const first = inRange.findIndex((r) => from.some((f) => r.points.has(f.id)))
       const runs = first > 0 ? inRange.slice(first) : inRange
       const at = (finishedAt?: string) => {
         const i = runs.findIndex((r) => r.finishedAt === finishedAt)
@@ -434,7 +435,8 @@ export const App = () => {
         webs.some((w) => w.web!.counterpart === f.base)
     )
     // Its charts show every function they have: only the result list hides rows.
-    const webView = viewOf([...webs, ...counterparts], new Set(), () => {}, counterparts[0])
+    // From the first run that measured a Web Function, however far back the counterparts go.
+    const webView = viewOf([...webs, ...counterparts], new Set(), () => {}, counterparts[0], webs)
     // The result list ranks the Web Functions among the functions.
     const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
 

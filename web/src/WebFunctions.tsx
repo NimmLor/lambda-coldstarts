@@ -1,6 +1,6 @@
 import { track } from './analytics'
 import { Chart, type Metric } from './Chart'
-import { STACK_REGION, type View } from './data'
+import type { View } from './data'
 import { REPO, WRAP } from './layout'
 
 const DOCS = 'https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html'
@@ -137,10 +137,7 @@ export const WebFunctions = ({
           </label>
         </div>
         <p className="max-w-prose text-pretty text-ink-2">
-          Node.js 24 as a Web Function in {region}, at the 2 GB every one gets
-          {compared
-            ? `, against Node.js 24 as an Event Function, the kind above, on arm64 at ${view.memoryMb} MB in ${STACK_REGION}.`
-            : '.'}
+          Node.js 24 as a Web Function in {region}, at the 2 GB every one gets.
         </p>
       </div>
       <Explainer />
