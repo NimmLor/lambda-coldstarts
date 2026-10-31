@@ -301,7 +301,8 @@ export const Chart = ({
                     }}
                   />
                 ))}
-              {inside && (
+              {/* Nothing to read out at a run before any shown function was measured. */}
+              {inside && series.some((s) => s.values[hover] !== undefined) && (
                 <Readout
                   left={x(hover)}
                   title={`${when(runs[hover]!.date)} UTC`}

@@ -4,6 +4,7 @@ import { Chart, type Metric } from './Chart'
 import {
   DASHES,
   type Family,
+  type Fn,
   ORDER,
   type Run,
   type RunPoints,
@@ -295,7 +296,8 @@ export const App = () => {
   const [arch, setArch] = useStored('arch', 'arm64', isString)
   const [memory, setMemory] = useStored('memory', 256, isNumber)
   const [range, setRange] = useState(30)
-  const [hover, setHover] = useState<number>()
+  /** The run under the pointer, by its finishedAt, which every view finds among its own runs. */
+  const [hoverAt, setHoverAt] = useState<string>()
   /** The run picked over the mean, by its finishedAt; it stays across ranges and sizes it is in. */
   const [pinned, setPinned] = useState<string>()
   const [focus, setFocus] = useState<string>()
@@ -344,46 +346,70 @@ export const App = () => {
     const ranges = RANGES.filter((_, i) => i === 0 || span >= RANGES[i - 1]! * DAY_MS)
     const shownRange = ranges.includes(range) ? range : ranges.at(-1)!
     const since = latest.date.getTime() - shownRange * DAY_MS
-    const runs = history.filter((r) => r.date.getTime() > since)
-    const pinnedAt = runs.findIndex((r) => r.finishedAt === pinned)
-    // A hover shows its run over the picked one, which comes back once the pointer leaves.
-    const hovered =
-      hover !== undefined && hover < runs.length ? hover : pinnedAt >= 0 ? pinnedAt : undefined
+    const inRange = history.filter((r) => r.date.getTime() > since)
+
+    /**
+     * `fns` over the runs in range from the first that measured any of them, so a function added
+     * since doesn't leave its charts empty up to that run.
+     */
+    const viewOf = (
+      fns: Fn[],
+      hiddenOf: Set<string>,
+      toggleOf: (base: string) => void,
+      baseline?: Fn
+    ): View => {
+      const first = inRange.findIndex((r) => fns.some((f) => r.points.has(f.id)))
+      const runs = first > 0 ? inRange.slice(first) : inRange
+      const at = (finishedAt?: string) => {
+        const i = runs.findIndex((r) => r.finishedAt === finishedAt)
+        return i >= 0 ? i : undefined
+      }
+      // A hover shows its run over the picked one, which comes back once the pointer leaves.
+      const hovered = at(hoverAt) ?? at(pinned)
+      const visible = fns.filter((f) => !hiddenOf.has(f.base))
+      const shown = visible.length ? visible : fns
+      const shownBases = new Set(shown.map((f) => f.base))
+      return {
+        runs,
+        latest,
+        memoryMb: shownMemory,
+        fns,
+        shown,
+        scaled: latest.functions.filter((f) => shownBases.has(f.base)),
+        hidden: hiddenOf,
+        hover: hovered,
+        focus,
+        baseline,
+        agg: (f, key: Stat) =>
+          hovered !== undefined
+            ? runs[hovered]!.points.get(f.id)?.[key]
+            : mean(runs.map((r) => r.points.get(f.id)?.[key])),
+        setHover: (i) => setHoverAt(i === undefined ? undefined : runs[i]?.finishedAt),
+        setFocus,
+        toggle: toggleOf,
+      }
+    }
+
     const sized = functions.filter((f) => f.arch === shownArch)
     const fns = sized
       .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
-    const visible = fns.filter((f) => !hidden.has(f.base))
-    const shown = visible.length ? visible : fns
-    const shownBases = new Set(shown.map((f) => f.base))
-    const view: View = {
-      runs,
-      latest,
-      memoryMb: shownMemory,
+    const view = viewOf(
       fns,
-      shown,
-      scaled: latest.functions.filter((f) => shownBases.has(f.base)),
       hidden,
-      hover: hovered,
-      focus,
-      baseline: fns.find((f) => f.base === compare),
-      agg: (f, key: Stat) =>
-        hovered !== undefined
-          ? runs[hovered]!.points.get(f.id)?.[key]
-          : mean(runs.map((r) => r.points.get(f.id)?.[key])),
-      setHover,
-      setFocus,
       toggle,
-    }
+      fns.find((f) => f.base === compare)
+    )
+    const { runs, hover: hovered } = view
     const pickMemory = (mb: number) => {
       track('memory_picked', { memory_mb: mb })
       setMemory(mb)
-      setHover(undefined)
+      setHoverAt(undefined)
     }
     const pickRange = (r: number) => {
       track('range_picked', { days: r })
       setRange(r)
-      setHover(undefined)
+      setHoverAt(undefined)
     }
     // The mean over each range, then every run in the shown one, newest first.
     const means = ranges.map((r) => `mean:${r}`)
@@ -394,7 +420,7 @@ export const App = () => {
     }
     const pick = (key: string) => {
       track('run_picked', { run: key.startsWith('mean:') ? 'mean' : 'run' })
-      setHover(undefined)
+      setHoverAt(undefined)
       if (!key.startsWith('mean:')) return setPinned(key)
       setPinned(undefined)
       setRange(Number(key.slice(5)))
@@ -410,16 +436,12 @@ export const App = () => {
         f.memoryMb === shownMemory &&
         webs.some((w) => w.web!.counterpart === f.base)
     )
-    const webFns = [...webs, ...counterparts]
-    const webShown = webFns.filter((f) => !webHidden.has(f.base))
-    const webView: View = {
-      ...view,
-      fns: webFns,
-      shown: webShown.length ? webShown : webFns,
-      hidden: webHidden,
-      baseline: counterparts[0],
-      toggle: toggler(webHidden, setWebHidden),
-    }
+    const webView = viewOf(
+      [...webs, ...counterparts],
+      webHidden,
+      toggler(webHidden, setWebHidden),
+      counterparts[0]
+    )
 
     return (
       <>
@@ -443,7 +465,7 @@ export const App = () => {
                   onPick={(a) => {
                     track('arch_picked', { arch: a })
                     setArch(a)
-                    setHover(undefined)
+                    setHoverAt(undefined)
                   }}
                 />
                 <Segmented
@@ -515,7 +537,7 @@ export const App = () => {
           </div>
 
           <div
-            onMouseLeave={() => setHover(undefined)}
+            onMouseLeave={() => setHoverAt(undefined)}
             className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3"
           >
             <Chart
