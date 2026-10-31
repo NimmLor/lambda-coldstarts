@@ -34,11 +34,15 @@ export default $config({
 
     const { createFunctions, selected } = await import('./infra/functions')
     const { createWebFunction } = await import('./infra/web-function')
+    const { createMicrovm } = await import('./infra/microvm')
     const { createPerf } = await import('./infra/perf')
     const functions = createFunctions()
     const webFunctions = selected()
       .filter((v) => v.kind === 'web')
       .map((v) => createWebFunction(v.id))
+    const microvms = selected()
+      .filter((v) => v.kind === 'microvm')
+      .map((v) => createMicrovm(v.id))
 
     return {
       functions: Object.fromEntries(
@@ -47,7 +51,8 @@ export default $config({
       webFunctions: Object.fromEntries(
         webFunctions.map((w) => [w.target.id, { name: w.name, domain: w.target.domain }])
       ),
-      perf: createPerf(functions, webFunctions),
+      microvms: Object.fromEntries(microvms.map((m) => [m.target.id, { image: m.imageArn }])),
+      perf: createPerf(functions, webFunctions, microvms),
     }
   },
 })

@@ -16,6 +16,9 @@ Benchmarks Lambda cold starts across Bun, LLRT and Node. Layout, commands and en
   `--color-line-<id>` in `web/src/tokens.css`.
 - A Web Function variant (`kind: 'web'`) is deployed by `infra/web-function.ts` and measured by
   `src/perf/web.ts`; give it `web` in `web/src/data.ts`.
+- A MicroVM variant (`kind: 'microvm'`) is deployed by `infra/microvm.ts` and measured by
+  `src/perf/microvm.ts`; give it `microvm` in `web/src/data.ts`. It resumes a snapshot, so its
+  samples have no `initMs`: the site shows it only in its own section, by `roundTripMs`.
 - A Bun flag a variant needs goes in `NEEDED_FLAGS` in `infra/build.ts`: released Bun accepts
   unknown flags silently and would build a plain executable under the variant's name.
 - Compare `--trim` and `--aot` variants against `BunCompileCanary`, not `BunCompile`; the canary

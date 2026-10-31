@@ -55,9 +55,9 @@ it('interpolates percentiles, so p90 of ten cold starts is not just the slowest'
       sample('F', i + 1, initMs)
     )
   )
-  expect(f!.initMs.p50).toBe(104.5)
-  expect(f!.initMs.p90).toBe(147.2)
-  expect(f!.initMs.max).toBe(500)
+  expect(f!.initMs!.p50).toBe(104.5)
+  expect(f!.initMs!.p90).toBe(147.2)
+  expect(f!.initMs!.max).toBe(500)
 })
 
 it('summarizes the in-process startup of the rounds that report it', () => {
@@ -78,4 +78,33 @@ it('keeps the version a handler reported, and has none for runs without it', () 
   ])
   expect(reported!.version).toBe('node 24.11.1')
   expect(old!.version).toBeNull()
+})
+
+it('summarizes a MicroVM by its round trips, after the functions that have an init', () => {
+  const launch = (round: number, roundTripMs: number, firstRequestMs: number): Sample => ({
+    functionId: 'MicroVm',
+    round,
+    runtime: 'public.ecr.aws/lambda/nodejs:24',
+    arch: 'arm64',
+    memoryMb: 2048,
+    codeSizeMb: 0,
+    maxMemoryMb: 60,
+    roundTripMs,
+    firstRequestMs,
+    requestId: `mvm-${round}`,
+    measuredAt: '2026-10-27T11:00:00.000Z',
+  })
+  const [fn, microvm] = summarize([
+    launch(1, 1400, 1100),
+    { ...sample('Fn', 1, 300), roundTripMs: 420 },
+    launch(2, 1600, 1300),
+  ])
+  expect(fn!.functionId).toBe('Fn')
+  expect(fn!.roundTripMs?.avg).toBe(420)
+  expect(fn!.firstRequestMs).toBeNull()
+  expect(microvm!.initMs).toBeNull()
+  expect(microvm!.initDurations).toEqual([])
+  expect(microvm!.durationMsAvg).toBeNull()
+  expect(microvm!.roundTripMs).toEqual({ p50: 1500, p90: 1580, avg: 1500, min: 1400, max: 1600 })
+  expect(microvm!.firstRequestMs?.avg).toBe(1200)
 })

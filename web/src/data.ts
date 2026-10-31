@@ -35,6 +35,11 @@ type Variant = {
    * where it's compared with `counterpart`: the same runtime as a function.
    */
   web?: { counterpart: string }
+  /**
+   * A Lambda MicroVM, which has a section of its own too, against `counterpart`. It has no init, so
+   * it's measured by its round trips instead, and shows nowhere else.
+   */
+  microvm?: { counterpart: string }
   /** How it's deployed, for the row's tooltip. */
   about: string
 }
@@ -131,6 +136,14 @@ export const VARIANTS: Record<string, Variant> = {
     about:
       'A node:http server on Lambda Web Functions, with the 2 GB and 2 vCPUs every environment gets',
   },
+  Node24MicroVm: {
+    name: 'Node.js 24, MicroVM',
+    family: 'Node',
+    build: 'bun build --target=node --format=esm --minify',
+    microvm: { counterpart: 'Node24' },
+    about:
+      'A node:http server in Lambda’s Node.js 24 image on a Lambda MicroVM with a 2 GB baseline, resumed from a snapshot',
+  },
 }
 export const ORDER = Object.keys(VARIANTS)
 
@@ -147,23 +160,33 @@ export type Fn = Variant & {
 
 /** One function's numbers in one run. */
 export type Point = {
-  cold: number
-  p50: number
-  p90: number
+  /** The init statistics, which a MicroVM doesn't have. */
+  cold?: number
+  p50?: number
+  p90?: number
   initDurations: number[]
   /** The part of a cold start spent inside the process; missing from older runs. */
   startup?: number
   warm?: number
   warmP90?: number
+  /**
+   * How long the cold invocation or request took from PerfMeasure, or a MicroVM's launch until its
+   * first response; missing from older runs.
+   */
+  trip?: number
+  /** A MicroVM's first request alone, which waited for it to be running. */
+  firstRequest?: number
   mem: number
-  dur: number
+  /** Missing for a MicroVM. */
+  dur?: number
   size: number
   /** Lambda's runtime, e.g. `nodejs24.x` or `provided.al2023`. */
   runtime: string
   /** What it ran on, e.g. `llrt-lambda-arm64-no-sdk@v0.9.0-beta`; missing from older runs. */
   version?: string
 }
-export type Stat = 'cold' | 'p50' | 'p90' | 'startup' | 'warm' | 'warmP90' | 'mem' | 'dur'
+export type Stat =
+  'cold' | 'p50' | 'p90' | 'startup' | 'warm' | 'warmP90' | 'trip' | 'firstRequest' | 'mem' | 'dur'
 
 export type RunPoints = {
   date: Date
@@ -205,15 +228,18 @@ export const toPoints = (run: Run): RunPoints => {
       run.functions.map((f, i) => [
         functions[i]!.id,
         {
-          cold: f.initMs.avg,
-          p50: f.initMs.p50,
-          p90: f.initMs.p90,
+          cold: f.initMs?.avg,
+          p50: f.initMs?.p50,
+          p90: f.initMs?.p90,
           initDurations: f.initDurations,
           startup: f.startupMs?.avg,
           warm: f.warmMs?.avg,
           warmP90: f.warmMs?.p90,
+          // Summaries from before these were measured lack them.
+          trip: f.roundTripMs?.avg,
+          firstRequest: f.firstRequestMs?.avg,
           mem: f.maxMemoryMbAvg,
-          dur: f.durationMsAvg,
+          dur: f.durationMsAvg ?? undefined,
           size: f.codeSizeMb,
           runtime: f.runtime,
           version: f.version ?? undefined,

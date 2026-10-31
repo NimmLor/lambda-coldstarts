@@ -22,6 +22,8 @@ type Variant =
   | { id: string; kind: 'node'; runtime: NodeRuntime }
   // A Lambda Web Function rather than a function, deployed by infra/web-function.ts.
   | { id: string; kind: 'web' }
+  // A Lambda MicroVM image, deployed by infra/microvm.ts.
+  | { id: string; kind: 'microvm' }
 
 export const VARIANTS: Variant[] = [
   { id: 'BunRuntime', kind: 'bun', variant: 'bun' },
@@ -45,6 +47,8 @@ export const VARIANTS: Variant[] = [
   { id: 'Node26', kind: 'node', runtime: 'nodejs26.x' },
   // Only on arm64, with the 2 GB every Web Function gets.
   { id: 'Node24Web', kind: 'web' },
+  // Only on arm64, with a 2 GB baseline.
+  { id: 'Node24MicroVm', kind: 'microvm' },
 ]
 
 /** Tags every benchmarked function, which is how PerfMeasure's permissions pick them; see infra/perf.ts. */
@@ -136,7 +140,7 @@ export const createFunctions = () => {
 
   for (const architecture of architectures) {
     for (const v of selected()) {
-      if (v.kind === 'web') continue
+      if (v.kind === 'web' || v.kind === 'microvm') continue
       // Built once, deployed at every memory size.
       const { bundle, reason } =
         v.kind === 'node' ? { bundle: undefined, reason: undefined } : bundleOf(v, architecture)

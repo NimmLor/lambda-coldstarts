@@ -2,7 +2,8 @@
  * One round of a run of the PerfRun state machine (infra/perf.ts), like lambda-perf's invoker:
  * forces a cold start of the target, invokes it once, then `warm` more times in the environment
  * that started, and stores Lambda's REPORT numbers in PerfResults. A Web Function's round goes
- * through web.ts instead. The state machine calls it once per round and retries it when it throws.
+ * through web.ts instead, and a MicroVM's through microvm.ts. The state machine calls it once per
+ * round and retries it when it throws.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import {
@@ -14,6 +15,7 @@ import {
 } from '@aws-sdk/client-lambda'
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { expiresAt, type Sample, sampleSk, samplesPk } from './keys'
+import { type MicrovmTarget, measureMicrovm } from './microvm'
 import { parseReport } from './report-line'
 import { measureWeb, type WebTarget } from './web'
 
@@ -22,7 +24,7 @@ type FunctionTarget = { id: string; name: string; kind?: undefined }
 export type MeasureEvent = {
   runId: string
   round: number
-  target: FunctionTarget | WebTarget
+  target: FunctionTarget | WebTarget | MicrovmTarget
   /** Invocations after the cold one, which find its environment warm. */
   warm: number
 }
@@ -39,16 +41,20 @@ const EVENT = new TextEncoder().encode(
   JSON.stringify({ rawPath: '/perf', requestContext: { http: { method: 'GET' } } })
 )
 
+const round2 = (value: number) => Math.round(value * 100) / 100
+
 const invoke = async (target: FunctionTarget) => {
+  const start = performance.now()
   const result = await lambda.send(
     new InvokeCommand({ FunctionName: target.name, LogType: 'Tail', Payload: EVENT })
   )
+  const roundTripMs = round2(performance.now() - start)
   const payload = new TextDecoder().decode(result.Payload)
   if (result.FunctionError) {
     throw new Error(`${target.id} failed (${result.FunctionError}): ${payload}`)
   }
   const report = parseReport(Buffer.from(result.LogResult ?? '', 'base64').toString('utf8'))
-  return { report, payload }
+  return { report, payload, roundTripMs }
 }
 
 const measureFunction = async (
@@ -76,7 +82,7 @@ const measureFunction = async (
     { FunctionName: target.name }
   )
 
-  const { report, payload } = await invoke(target)
+  const { report, payload, roundTripMs } = await invoke(target)
   // Without an Init Duration the invocation found a warm environment after all; the retry gets a cold one.
   if (report.initMs === undefined) {
     throw new Error(`${target.id} started warm in round ${round}`)
@@ -104,6 +110,7 @@ const measureFunction = async (
     maxMemoryMb: report.maxMemoryMb,
     warmMs,
     startupMs: body.container?.startupMs,
+    roundTripMs,
     // What the function was built with, see infra/functions.ts; the Node ones say which Node they are.
     version: config.Description || body.runtime,
     requestId: report.requestId,
@@ -111,10 +118,14 @@ const measureFunction = async (
 }
 
 export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
+  const measured =
+    target.kind === 'web'
+      ? measureWeb(target, round, warm)
+      : target.kind === 'microvm'
+        ? measureMicrovm(target, round)
+        : measureFunction(target, round, warm)
   const sample: Sample = {
-    ...(target.kind === 'web'
-      ? await measureWeb(target, round, warm)
-      : await measureFunction(target, round, warm)),
+    ...(await measured),
     measuredAt: new Date().toISOString(),
   }
   await db.send(

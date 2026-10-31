@@ -10,6 +10,7 @@
  */
 import { RETENTION_DAYS, RUNS_PK } from '../src/perf/keys'
 import { BENCH_TAG } from './functions'
+import type { Microvm } from './microvm'
 import type { WebFunction } from './web-function'
 
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
@@ -55,13 +56,15 @@ const NO_INDEX = {
 
 export const createPerf = (
   functions: Record<string, sst.aws.Function>,
-  webFunctions: WebFunction[]
+  webFunctions: WebFunction[],
+  microvms: Microvm[]
 ) => {
   const production = $app.stage === 'production'
-  // What each round of the Rounds map measures; src/perf/measure.ts tells the two kinds apart.
+  // What each round of the Rounds map measures; src/perf/measure.ts tells the kinds apart.
   const targets = [
     ...Object.entries(functions).map(([id, fn]) => ({ id, name: fn.name })),
     ...webFunctions.map((w) => w.target),
+    ...microvms.map((m) => m.target),
   ]
 
   const table = new sst.aws.Dynamo('PerfResults', {
@@ -130,6 +133,23 @@ export const createPerf = (
           resources: [$interpolate`${w.bucketArn}/*`],
         },
         { actions: ['logs:GetLogEvents'], resources: [$interpolate`${w.logGroupArn}:*`] },
+      ]),
+      // A MicroVM's rounds each run one from the image, get a token to reach it and terminate it;
+      // see src/perf/microvm.ts. Lambda authorizes all three against the image, and running one
+      // passes it Lambda's network connectors.
+      ...microvms.flatMap((m) => [
+        {
+          actions: [
+            'lambda:RunMicrovm',
+            'lambda:CreateMicrovmAuthToken',
+            'lambda:TerminateMicrovm',
+          ],
+          resources: [m.imageArn],
+        },
+        {
+          actions: ['lambda:PassNetworkConnector'],
+          resources: [m.target.ingressConnector, m.target.egressConnector],
+        },
       ]),
     ],
   })

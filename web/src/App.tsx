@@ -22,6 +22,7 @@ import lambdaIcon from './icons/lambda.svg'
 import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
 import { isBoolean, isNumber, isString, useStored } from './stored'
+import { MicroVms } from './MicroVms'
 import { Table } from './Table'
 import { WebFunctions } from './WebFunctions'
 
@@ -207,10 +208,15 @@ const InlinePick = <T extends string | number>({
 
 const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
-  // A Web Function is Node.js 24 again, on another kind of Lambda.
+  // A Web Function and a MicroVM are Node.js 24 again, on other kinds of Lambda.
   const count = (family: Family) =>
-    [...variants].filter((b) => VARIANTS[b]?.family === family && !VARIANTS[b]?.web).length
-  const web = [...variants].some((b) => VARIANTS[b]?.web)
+    [...variants].filter(
+      (b) => VARIANTS[b]?.family === family && !VARIANTS[b]?.web && !VARIANTS[b]?.microvm
+    ).length
+  const kinds = [
+    [...variants].some((b) => VARIANTS[b]?.web) && 'as a Lambda Web Function',
+    [...variants].some((b) => VARIANTS[b]?.microvm) && 'in a Lambda MicroVM',
+  ].filter(Boolean)
   return (
     <header
       className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}
@@ -224,7 +230,7 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
       </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${web ? ', plus Node.js 24 as a Lambda Web Function' : ''}, each cold started ${latest.rounds} times every 4 hours. `
+          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${kinds.length ? `, plus Node.js 24 ${kinds.join(' and ')}` : ''}, each cold started ${latest.rounds} times every 4 hours. `
           : 'Each runtime is cold started every 4 hours. '}
         Each point on the charts is one run. The table averages the range you pick.
       </p>
@@ -306,6 +312,8 @@ export const App = () => {
   const [compare, setCompare] = useState('Node24')
   /** Whether the Web Functions' section shows their counterparts beside them; kept too. */
   const [compareWeb, setCompareWeb] = useStored('compareWeb', true, isBoolean)
+  /** The same for the MicroVMs' section. */
+  const [compareMicrovm, setCompareMicrovm] = useStored('compareMicrovm', true, isBoolean)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -334,8 +342,8 @@ export const App = () => {
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
     const shownArch = archs.includes(arch) ? arch : archs[0]!
-    // The Web Functions have a section of their own, further down.
-    const functions = latest.functions.filter((f) => !f.web)
+    // The Web Functions and MicroVMs have sections of their own, further down.
+    const functions = latest.functions.filter((f) => !f.web && !f.microvm)
     const memories = [...new Set(functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
     const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
     // A range is offered once there are runs older than the next shorter one shows.
@@ -439,7 +447,23 @@ export const App = () => {
     // Its charts show every function they have: only the result list hides rows.
     // From the first run that measured a Web Function, however far back the counterparts go.
     const webView = viewOf([...webs, ...counterparts], new Set(), () => {}, counterparts[0], webs)
-    // The result list ranks the Web Functions among the functions.
+    // The same for each MicroVM, whose counterpart is compared by its round trips.
+    const microvms = latest.functions.filter((f) => f.microvm)
+    const microvmCounterparts = latest.functions.filter(
+      (f) =>
+        compareMicrovm &&
+        f.arch === 'arm64' &&
+        f.memoryMb === shownMemory &&
+        microvms.some((m) => m.microvm!.counterpart === f.base)
+    )
+    const microvmView = viewOf(
+      [...microvms, ...microvmCounterparts],
+      new Set(),
+      () => {},
+      microvmCounterparts[0],
+      microvms
+    )
+    // The result list ranks the Web Functions among the functions. A MicroVM has no init to rank.
     const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
 
     return (
@@ -579,6 +603,18 @@ export const App = () => {
           />
         )}
 
+        {microvms.length > 0 && (
+          <MicroVms
+            view={microvmView}
+            metrics={METRICS}
+            compared={compareMicrovm}
+            onCompare={(on) => {
+              track('microvm_compare_toggled', { on: Number(on) })
+              setCompareMicrovm(on)
+            }}
+          />
+        )}
+
         <section className="band mt-16 py-12 sm:py-16">
           <div className={`${WRAP} flex flex-col gap-8`}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
@@ -656,7 +692,8 @@ export const App = () => {
           <dt className="font-medium text-ink">Cold start</dt>
           <dd className="m-0">
             Lambda init duration; for the Web Function, its environment’s initialization, from
-            starting the runtime until the server listens
+            starting the runtime until the server listens. The MicroVM has none: it resumes a
+            snapshot of the server, taken when its image was built
           </dd>
           <dt className="font-medium text-ink">To handler</dt>
           <dd className="m-0">
@@ -671,16 +708,27 @@ export const App = () => {
           </dd>
           <dt className="font-medium text-ink">Duration</dt>
           <dd className="m-0">handler time of the cold invocation, or the cold request</dd>
+          <dt className="font-medium text-ink">First answer</dt>
+          <dd className="m-0">
+            for the MicroVM, from calling RunMicrovm until its first response, as PerfMeasure in the
+            same region sees it; for the Event Function beside it, from calling Invoke on a cold
+            function until the response
+          </dd>
+          <dt className="font-medium text-ink">First request</dt>
+          <dd className="m-0">
+            the last part of the MicroVM’s first answer: its first request, which the endpoint holds
+            until the MicroVM is running
+          </dd>
           <dt className="font-medium text-ink">Memory used</dt>
           <dd className="m-0">
             peak memory, as Lambda reports it; for the Web Function, the whole environment’s once
-            it’s initialized
+            it’s initialized; for the MicroVM, the server process’s, by its own account
           </dd>
           <dt className="font-medium text-ink">Size</dt>
           <dd className="m-0">size of the deployed code</dd>
           <dt className="font-medium text-ink">Region</dt>
           <dd className="m-0">
-            {STACK_REGION}, Frankfurt, for everything, the Web Function included
+            {STACK_REGION}, Frankfurt, for everything, the Web Function and the MicroVM included
           </dd>
         </dl>
         <p className="max-w-prose">
