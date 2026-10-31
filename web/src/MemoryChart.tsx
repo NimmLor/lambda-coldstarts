@@ -1,21 +1,24 @@
 import { useState } from 'react'
-import { AXES, Readout, X_LABELS, Y_LABEL, Y_LABELS } from './Chart'
+import { AXES, type Metric, Readout, X_LABELS, Y_LABEL, Y_LABELS } from './Chart'
 import { ChartIcon } from './ChartIcon'
 import { DASHES, type Fn, niceMax, type View, when } from './data'
 
-const HEIGHT = 300
-
 /**
- * Each shown variant's cold start at every memory size it runs at, on the shown architecture: the
+ * Each shown variant's `metric` at every memory size it runs at, on the shown architecture: the
  * hovered run's, or the mean over the range. Clicking a size's column shows that size everywhere.
  */
 export const MemoryChart = ({
+  metric: m,
+  wide,
   view,
   sized,
   memories,
   onPick,
   className = '',
 }: {
+  metric: Metric
+  /** Beside the wide cold start chart, at its height, rather than in a row of small charts. */
+  wide: boolean
   view: View
   /** Every function on the shown architecture, at every memory size. */
   sized: Fn[]
@@ -31,41 +34,46 @@ export const MemoryChart = ({
   const x = (i: number) => ((i + 0.5) / memories.length) * 100
   const at = (base: string, mb: number) => {
     const fn = sized.find((s) => s.base === base && s.memoryMb === mb)
-    return fn && agg(fn, 'cold')
+    return fn && agg(fn, m.key)
   }
   const series = shown.map((f) => ({ f, values: memories.map((mb) => at(f.base, mb)) }))
   // On both architectures, so the axis holds still when the other is shown.
-  const max = niceMax(Math.max(0, ...scaled.map((f) => agg(f, 'cold') ?? 0)))
+  const max = niceMax(Math.max(0, ...scaled.map((f) => agg(f, m.key) ?? 0)))
   const y = (v: number) => 100 - (v / max) * 100
   const grid = [0, 0.25, 0.5, 0.75, 1].map((g) => ({
     top: 100 - g * 100,
-    label: (max * g).toFixed(0),
+    label: (max * g).toFixed(max < 5 ? 1 : 0),
   }))
+  const height = wide ? 300 : m.height
   // The focused line last, so it's drawn on top.
   const ordered = series.toSorted((a, b) => Number(a.f.base === focus) - Number(b.f.base === focus))
   const selected = memories.indexOf(memoryMb)
 
   return (
     <article className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
-      <h2 className="flex items-baseline gap-2 text-xl text-ink">
-        <ChartIcon name="sizes" className="size-5" />
-        Cold start by memory
-      </h2>
-      <div className={AXES}>
-        <div className={`relative ${Y_LABELS}`} style={{ height: HEIGHT }}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted">
+        <h2 className={`flex items-baseline gap-2 text-ink ${wide ? 'text-xl' : 'text-lg'}`}>
+          <ChartIcon name="sizes" className={wide ? 'size-5' : 'size-[1.125rem]'} />
+          {m.title} by memory
+        </h2>
+        {m.unit}, {hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'}
+      </div>
+      {/* At the bottom, so its sizes line up with the dates under the small charts beside it. */}
+      <div className={`${AXES} ${wide ? '' : 'mt-auto'}`}>
+        <div className={`relative ${Y_LABELS}`} style={{ height }}>
           {grid.map((g) => (
             <span key={g.top} className={Y_LABEL} style={{ top: `${g.top}%` }}>
               {g.label}
             </span>
           ))}
         </div>
-        <div className="relative" style={{ height: HEIGHT }}>
+        <div className="relative" style={{ height }}>
           <div className="absolute inset-y-0 w-px bg-cool" style={{ left: `${x(selected)}%` }} />
           <svg
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
             role="img"
-            aria-label="Cold start in ms at each memory size, one line per function"
+            aria-label={`${m.title} in ${m.unit} at each memory size, one line per function`}
             className="absolute inset-0 size-full overflow-visible"
           >
             {grid.map((g, i) => (
@@ -102,13 +110,13 @@ export const MemoryChart = ({
               left={x(pointed)}
               title={`${memories[pointed]} MB, ${hover !== undefined ? `${when(runs[hover]!.date)} UTC` : 'mean'}`}
               rows={series.map((s) => ({ f: s.f, value: s.values[pointed] }))}
-              unit="ms"
-              digits={1}
+              unit={m.unit}
+              digits={m.digits}
               focus={focus}
               // A Web Function has one size, which every size is compared with.
               baseline={
                 baseline &&
-                (baseline.web ? agg(baseline, 'cold') : at(baseline.base, memories[pointed]!))
+                (baseline.web ? agg(baseline, m.key) : at(baseline.base, memories[pointed]!))
               }
             />
           )}
@@ -146,9 +154,9 @@ export const MemoryChart = ({
               className={`measured absolute -translate-x-1/2 text-xs whitespace-nowrap ${mb === memoryMb ? 'text-cool' : 'text-muted'}`}
               style={{ left: `${x(i)}%` }}
             >
-              {/* Five sizes with their unit don't fit under a phone-wide chart. */}
+              {/* Five sizes with their unit don't fit under a phone-wide chart, or a third-wide one. */}
               {mb}
-              <span className="max-sm:hidden"> MB</span>
+              <span className={wide ? 'max-sm:hidden' : 'max-sm:hidden md:max-lg:hidden'}> MB</span>
             </span>
           ))}
         </div>
