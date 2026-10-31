@@ -381,6 +381,106 @@ declare module "sst" {
       "type": "sst.aws.Function"
       "url": string
     }
+    "LlrtFullSdkArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtFullSdkX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkArm64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkArm64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkArm64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkArm64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkArm64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkX64M1024": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkX64M128": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkX64M1769": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkX64M256": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
+    "LlrtStdSdkX64M512": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
     "LlrtX64M1024": {
       "name": string
       "type": "sst.aws.Function"
@@ -560,6 +660,14 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
       "url": string
+    }
+    "PerfArchive": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
+    "PerfExport": {
+      "name": string
+      "type": "sst.aws.Function"
     }
     "PerfMeasure": {
       "name": string

@@ -31,6 +31,8 @@
   --color-line-BunCompileAotTrim: #ff2e97;
   --color-line-Llrt: oklch(82% 0.14 115);
   --color-line-LlrtBytecode: oklch(74% 0.12 255);
+  --color-line-LlrtStdSdk: oklch(68% 0.13 125);
+  --color-line-LlrtFullSdk: oklch(89% 0.11 100);
   --color-line-Node22: oklch(78% 0.13 150);
   --color-line-Node24: oklch(78% 0.11 185);
   --color-line-Node26: oklch(74% 0.12 225);
