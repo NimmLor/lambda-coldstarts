@@ -20,6 +20,7 @@ import { Glance } from './Glance'
 import lambdaIcon from './icons/lambda.svg'
 import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
+import { isBoolean, isNumber, isString, useStored } from './stored'
 import { Table } from './Table'
 import { WebFunctions } from './WebFunctions'
 
@@ -290,9 +291,9 @@ export const App = () => {
   const [history, setHistory] = useState<RunPoints[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
-  const [arch, setArch] = useState('arm64')
-  // One full vCPU, and the only size before there were more.
-  const [memory, setMemory] = useState(1769)
+  // 256 MB on arm64, like the glance at the top, until the visitor picks another, which is kept.
+  const [arch, setArch] = useStored('arch', 'arm64', isString)
+  const [memory, setMemory] = useStored('memory', 256, isNumber)
   const [range, setRange] = useState(30)
   const [hover, setHover] = useState<number>()
   /** The run picked over the mean, by its finishedAt; it stays across ranges and sizes it is in. */
@@ -303,6 +304,8 @@ export const App = () => {
   const [webHidden, setWebHidden] = useState(new Set<string>())
   /** The variant the readouts measure every other against, or '' for none. */
   const [compare, setCompare] = useState('Node24')
+  /** Whether the Web Functions' section shows their counterparts beside them; kept too. */
+  const [compareWeb, setCompareWeb] = useStored('compareWeb', true, isBoolean)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -402,6 +405,7 @@ export const App = () => {
     const webs = latest.functions.filter((f) => f.web)
     const counterparts = latest.functions.filter(
       (f) =>
+        compareWeb &&
         f.arch === 'arm64' &&
         f.memoryMb === shownMemory &&
         webs.some((w) => w.web!.counterpart === f.base)
@@ -569,7 +573,16 @@ export const App = () => {
         </section>
 
         {webs.length > 0 && (
-          <WebFunctions view={webView} metrics={METRICS} region={webs[0]!.region!} />
+          <WebFunctions
+            view={webView}
+            metrics={METRICS}
+            region={webs[0]!.region!}
+            compared={compareWeb}
+            onCompare={(on) => {
+              track('web_compare_toggled', { on: Number(on) })
+              setCompareWeb(on)
+            }}
+          />
         )}
       </>
     )

@@ -98,29 +98,49 @@ const Explainer = () => (
 )
 
 /**
- * The Lambda Web Functions, apart from the functions above, against their counterparts: the same
- * runtime as a function on arm64 at the picked memory size.
+ * The Lambda Web Functions, apart from the functions above, and unless turned off, against their
+ * counterparts: the same runtime as an Event Function on arm64 at the picked memory size.
  */
 export const WebFunctions = ({
   view,
   metrics,
   region,
+  compared,
+  onCompare,
 }: {
-  /** The Web Functions and their counterparts. */
+  /** The Web Functions, and their counterparts when `compared`. */
   view: View
   /** The cold start's chart first. */
   metrics: Metric[]
   region: string
+  compared: boolean
+  onCompare: (on: boolean) => void
 }) => {
   const [cold, ...small] = metrics
-  const caption = (m: Metric) => `${m.unit}, mean per run · Event Function at ${view.memoryMb} MB`
+  const caption = (m: Metric) =>
+    compared
+      ? `${m.unit}, mean per run · Event Function at ${view.memoryMb} MB`
+      : `${m.unit}, mean per run`
   return (
     <section className={`${WRAP} flex flex-col gap-6 pt-16 sm:pt-20`}>
       <div className="flex flex-col gap-3">
-        <h2 className="text-2xl">Lambda Web Functions</h2>
+        <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+          <h2 className="text-2xl">Lambda Web Functions</h2>
+          <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm text-ink-2">
+            <input
+              type="checkbox"
+              checked={compared}
+              onChange={(e) => onCompare(e.currentTarget.checked)}
+              className="size-4 cursor-pointer accent-cool"
+            />
+            Compare with Event Function
+          </label>
+        </div>
         <p className="max-w-prose text-pretty text-ink-2">
-          Node.js 24 as a Web Function in {region}, at the 2 GB every one gets, against Node.js 24
-          as an Event Function, the kind above, on arm64 at {view.memoryMb} MB in {STACK_REGION}.
+          Node.js 24 as a Web Function in {region}, at the 2 GB every one gets
+          {compared
+            ? `, against Node.js 24 as an Event Function, the kind above, on arm64 at ${view.memoryMb} MB in ${STACK_REGION}.`
+            : '.'}
         </p>
       </div>
       <Explainer />
