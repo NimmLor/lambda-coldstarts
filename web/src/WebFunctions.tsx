@@ -175,7 +175,7 @@ export const WebFunctions = ({
           </label>
         </div>
         <p className="max-w-prose text-pretty text-ink-2">
-          Node.js 24 as a Web Function, at the 2 GB every one gets.
+          Node.js 24 as a Web Function, on arm64 with the 2 GB and 2 vCPUs every environment gets.
         </p>
       </div>
       <Explainer />
