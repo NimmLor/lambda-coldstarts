@@ -561,6 +561,14 @@ declare module "sst" {
       "type": "sst.aws.Function"
       "url": string
     }
+    "PerfArchive": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
+    "PerfExport": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "PerfMeasure": {
       "name": string
       "type": "sst.aws.Function"
