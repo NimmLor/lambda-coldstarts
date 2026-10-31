@@ -38,8 +38,10 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🪶  | `LlrtFullSdk`                  | `Llrt` on LLRT's full-sdk Lambda build, with every AWS SDK client built in           |
 | 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)           |
 | 🌐  | `Node24Web`                    | a `node:http` server on a [Lambda Web Function](#-the-web-function)                  |
+| 📦  | `Node24MicroVm`                | the same server in a [Lambda MicroVM](#-the-microvm), resumed from a snapshot        |
+| 📦  | `BunCompileAotTrimMicroVm`     | that server as an `--aot --trim` executable in a MicroVM, without the AOT shim       |
 
-Everything runs in **eu-central-1**, `Node24Web` included.
+Everything runs in **eu-central-1**, `Node24Web` and the MicroVMs included.
 
 Bun and LLRT run on `provided.al2023`. Bun serves invocations through a small runtime loop
 ([`src/runtime.ts`](src/runtime.ts)), LLRT through its own ([`src/llrt.ts`](src/llrt.ts)), and Node
@@ -146,7 +148,7 @@ then fires concurrent cold invocations. The numbers come from Lambda's own `REPO
 - 🔁 **Invoke / round trip**: Lambda's `Duration`, and what the client saw
 
 Results land in `bench-results/` as Markdown and JSON. `bench` measures functions only; the Web
-Function is measured by the scheduled runs.
+Function and the MicroVM are measured by the scheduled runs.
 
 ### 🌐 The Web Function
 
@@ -168,6 +170,47 @@ has no component for them yet. Their API differs, and so does how it's measured
 - 📜 **No REPORT line**: init, duration and memory come from the environment's `platform.initReport`
   and `platform.requestComplete` events, read from its log stream (named by the
   `lambda-web-logstream` response header) in the `.local` log group.
+
+### 📦 The MicroVM
+
+[Lambda MicroVMs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html) are
+Firecracker VMs for running untrusted code, one per user, session or job. Lambda builds an image
+from a Dockerfile, starts the program and snapshots it running; every MicroVM resumes from that
+snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
+[`src/microvm.ts`](src/microvm.ts) on Lambda's `nodejs:24` container image with `aws-native`, and
+[`src/perf/microvm.ts`](src/perf/microvm.ts) measures it:
+
+- 🧊 **No init to measure.** Node started once, when the image was built, so there's nothing to
+  compare with an Init Duration, and Lambda reports no durations, platform events or metrics.
+- ⏱️ **First answer instead**: each round runs a new MicroVM and times, from PerfMeasure, calling
+  RunMicrovm, getting an auth token and its first response. The endpoint holds a request for about
+  1.3 s while the MicroVM resumes, then answers 502 with `x-aws-proxy-error: MICROVM_CONNECT_FAILED`,
+  which the 4 and 8 GB sizes often outlast; the round asks again until one is answered. A
+  turned-away first request costs about 2 s more, so those sizes' first answers come in two modes.
+  `firstRequestMs` is the last part alone. The site sets it against an Event Function's cold invoke
+  round trip (`roundTripMs`, which every round now records), from the same PerfMeasure.
+- 🐢 **No warm round trips.** At 128 MB, PerfMeasure gets CPU in 20 ms slices, and a warm request
+  of ~5 ms comes back as 20, 40 or 60. The cold ones barely move: a MicroVM's first answer took
+  1.34–1.36 s from a 1769 MB PerfMeasure and 1.32–1.43 s from the 128 MB one.
+- 📏 **Every size Lambda offers, on arm64**: baselines of 0.5, 1, 2, 4 and 8 GB with a vCPU per 2 GB,
+  each bursting to four times both, as `Node24MicroVmM512` to `Node24MicroVmM8192`. The memory is
+  the image's, so each size is an image of its own. Lambda builds a snapshot for Graviton3 and one
+  for Graviton4 and picks either per MicroVM; `graviton` says which. An account builds 5 images
+  at once, so a deploy builds at most 4, about 2 minutes each, and leaves one for another stage.
+- 🥟 **`BunCompileAotTrimMicroVm`** runs src/microvm.ts as an `--aot --trim` executable, which
+  `bun run build` builds into `dist/arm64` beside the Lambda variants, on Lambda's minimal
+  `al2023-minimal` container at 2 GB. It needs no [AOT shim](#-the-aot-shim): a MicroVM is a whole VM
+  with 512 MB at least, so neither `mincore` nor the 256 MB map fails. It answers as fast as
+  Node.js, as both resume a snapshot of a server that's already up, in less than half the memory.
+- 🧮 **One size at a time**, after the functions: an account may run 8 GB of MicroVMs at once
+  unless the quota is raised, all of it the largest size's. A round that finds the quota taken, by
+  another stage's MicroVM say, waits up to 90 s before it starts its clock.
+- 🧹 **Every MicroVM is terminated** at the end of its round, and lives 2 minutes at most should
+  that fail. A round costs a few seconds of compute plus the snapshot it resumes from, 0.4 GB at
+  0.5 GB up to 1.1 GB at 8 GB: all five sizes come to about half a cent a round at us-east-1's
+  prices, at most ~$11 a month on the 4-hour schedule.
+- 📌 **The base image is pinned** (`al2023-1` version 2). Lambda stops running a version 90 days
+  after the next one comes out; `ListManagedMicrovmImageVersions` lists them.
 
 ## 🕐 Scheduled runs
 

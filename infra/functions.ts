@@ -17,11 +17,14 @@ type BuiltVariant =
   | { id: string; kind: 'bun'; variant: BunVariant }
   | { id: string; kind: 'llrt'; variant: LlrtVariant }
 
-type Variant =
+export type Variant =
   | BuiltVariant
   | { id: string; kind: 'node'; runtime: NodeRuntime }
   // A Lambda Web Function rather than a function, deployed by infra/web-function.ts.
   | { id: string; kind: 'web' }
+  // Lambda MicroVM images, deployed by infra/microvm.ts: Lambda's Node.js 24 container, or with
+  // `bun`, src/microvm.ts as that Bun executable. At `sizes` in MB, or at every size Lambda offers.
+  | { id: string; kind: 'microvm'; bun?: 'aot-trim'; sizes?: number[] }
 
 export const VARIANTS: Variant[] = [
   { id: 'BunRuntime', kind: 'bun', variant: 'bun' },
@@ -45,6 +48,10 @@ export const VARIANTS: Variant[] = [
   { id: 'Node26', kind: 'node', runtime: 'nodejs26.x' },
   // Only on arm64, with the 2 GB every Web Function gets.
   { id: 'Node24Web', kind: 'web' },
+  // Only on arm64, at every size Lambda offers; see infra/microvm.ts.
+  { id: 'Node24MicroVm', kind: 'microvm' },
+  // The same server as a trimmed --aot executable, without the AOT shim, at Lambda's default size.
+  { id: 'BunCompileAotTrimMicroVm', kind: 'microvm', bun: 'aot-trim', sizes: [2048] },
 ]
 
 /** Tags every benchmarked function, which is how PerfMeasure's permissions pick them; see infra/perf.ts. */
@@ -136,7 +143,7 @@ export const createFunctions = () => {
 
   for (const architecture of architectures) {
     for (const v of selected()) {
-      if (v.kind === 'web') continue
+      if (v.kind === 'web' || v.kind === 'microvm') continue
       // Built once, deployed at every memory size.
       const { bundle, reason } =
         v.kind === 'node' ? { bundle: undefined, reason: undefined } : bundleOf(v, architecture)

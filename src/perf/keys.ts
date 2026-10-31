@@ -35,7 +35,11 @@ export const runIdOf = ({ pk, sk }: { pk: string; sk: string }) => {
 export const sampleSk = (functionId: string, round: number) =>
   `${functionId}#${String(round).padStart(3, '0')}`
 
-/** One cold start and the warm invocations after it, as stored; what summary.ts aggregates. */
+/**
+ * One cold start and the warm invocations after it, as stored; what summary.ts aggregates. A
+ * MicroVM's is one launch until its first answer: it resumes a snapshot rather than initializing,
+ * and Lambda reports no numbers of its own for it.
+ */
 export type Sample = {
   functionId: string
   round: number
@@ -43,10 +47,13 @@ export type Sample = {
   arch: string
   memoryMb: number
   codeSizeMb: number
-  initMs: number
-  durationMs: number
+  /** Missing for a MicroVM, which has no init. */
+  initMs?: number
+  /** Missing for a MicroVM. */
+  durationMs?: number
   /** Missing for a Web Function, which bills CPU time rather than duration. */
   billedMs?: number
+  /** For a MicroVM, the server process's peak RSS, by its own account. */
   maxMemoryMb: number
   /** Lambda's Duration of each warm invocation after the cold one. Missing from runs before they were measured. */
   warmMs?: number[]
@@ -58,8 +65,21 @@ export type Sample = {
    * Missing from older runs.
    */
   version?: string
-  /** A Web Function's: how long the cold request took, as PerfMeasure saw it. */
+  /**
+   * How long the cold invocation or request took, as PerfMeasure saw it. A MicroVM's runs from
+   * calling RunMicrovm until the first response arrives. Missing from an Event Function's runs
+   * before it was measured. PerfMeasure has a sliver of a vCPU, which rounds the few milliseconds
+   * a warm round trip takes up to its 20 ms time slices, so only the cold one is kept.
+   */
   roundTripMs?: number
+  /**
+   * A MicroVM's: how long its first requests took, until one was answered: the endpoint turns them
+   * away while the MicroVM is still resuming. The rest of `roundTripMs` went to RunMicrovm and
+   * CreateMicrovmAuthToken.
+   */
+  firstRequestMs?: number
+  /** A MicroVM's: which Graviton it ran on, which Lambda picks for each MicroVM. */
+  graviton?: string
   /**
    * A Web Function's: Lambda started the environment before the request went out, so the
    * request waited for less of `initMs` than a cold start would.

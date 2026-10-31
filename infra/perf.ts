@@ -10,6 +10,7 @@
  */
 import { RETENTION_DAYS, RUNS_PK } from '../src/perf/keys'
 import { BENCH_TAG } from './functions'
+import type { Microvm } from './microvm'
 import type { WebFunction } from './web-function'
 
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
@@ -55,14 +56,16 @@ const NO_INDEX = {
 
 export const createPerf = (
   functions: Record<string, sst.aws.Function>,
-  webFunctions: WebFunction[]
+  webFunctions: WebFunction[],
+  microvms: Microvm[]
 ) => {
   const production = $app.stage === 'production'
-  // What each round of the Rounds map measures; src/perf/measure.ts tells the two kinds apart.
-  const targets = [
+  // What each round of the Rounds maps measures; src/perf/measure.ts tells the kinds apart.
+  const functionTargets = [
     ...Object.entries(functions).map(([id, fn]) => ({ id, name: fn.name })),
     ...webFunctions.map((w) => w.target),
   ]
+  const microvmTargets = microvms.flatMap((m) => m.targets)
 
   const table = new sst.aws.Dynamo('PerfResults', {
     fields: { pk: 'string', sk: 'string' },
@@ -131,6 +134,23 @@ export const createPerf = (
         },
         { actions: ['logs:GetLogEvents'], resources: [$interpolate`${w.logGroupArn}:*`] },
       ]),
+      // A MicroVM's rounds each run one from the image, get a token to reach it and terminate it;
+      // see src/perf/microvm.ts. Lambda authorizes all three against the image, and running one
+      // passes it Lambda's network connectors.
+      ...microvms.flatMap((m) => [
+        {
+          actions: [
+            'lambda:RunMicrovm',
+            'lambda:CreateMicrovmAuthToken',
+            'lambda:TerminateMicrovm',
+          ],
+          resources: m.targets.map((t) => t.imageArn),
+        },
+        {
+          actions: ['lambda:PassNetworkConnector'],
+          resources: [m.ingressConnector, m.egressConnector],
+        },
+      ]),
     ],
   })
 
@@ -160,50 +180,65 @@ export const createPerf = (
   // child's, so the children get the run's id with their input.
   const runId = '{% $states.context.Execution.StartTime %}'
 
-  const measureRound = sst.aws.StepFunctions.lambdaInvoke({
-    name: 'Measure',
-    function: measure,
-    payload: {
-      runId: '{% $states.input.runId %}',
-      target: '{% $states.input.target %}',
-      round: '{% $states.input.round %}',
-      warm: WARM,
-    },
-    output: {},
-  }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
+  /**
+   * A Map over `targets`, `maxConcurrency` at a time. Each target's rounds run as an Express child
+   * workflow, billed by duration instead of by state transition. A child that runs out of its 5
+   * minutes loses its remaining rounds, like a Skipped one, through ToleratedFailurePercentage on
+   * PerfRun below. `prefix` keeps the state names unique, as Step Functions wants.
+   */
+  const measureEach = (
+    name: string,
+    prefix: string,
+    targets: unknown[],
+    maxConcurrency: number
+  ) => {
+    const measureRound = sst.aws.StepFunctions.lambdaInvoke({
+      name: `${prefix}Measure`,
+      function: measure,
+      payload: {
+        runId: '{% $states.input.runId %}',
+        target: '{% $states.input.target %}',
+        round: '{% $states.input.round %}',
+        warm: WARM,
+      },
+      output: {},
+    }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
 
-  // One round after another: each one changes the function's configuration, which can't overlap.
-  const rounds = sst.aws.StepFunctions.map({
-    name: 'Rounds',
-    items: Array.from({ length: ROUNDS }, (_, i) => i + 1),
-    itemSelector: {
-      runId: '{% $states.input.runId %}',
-      target: '{% $states.input.target %}',
-      round: '{% $states.context.Map.Item.Value %}',
-    },
-    maxConcurrency: 1,
-    processor: measureRound,
-    output: {},
-  })
+    // One round after another: each one changes the function's configuration, which can't overlap.
+    const rounds = sst.aws.StepFunctions.map({
+      name: `${prefix}Rounds`,
+      items: Array.from({ length: ROUNDS }, (_, i) => i + 1),
+      itemSelector: {
+        runId: '{% $states.input.runId %}',
+        target: '{% $states.input.target %}',
+        round: '{% $states.context.Map.Item.Value %}',
+      },
+      maxConcurrency: 1,
+      processor: measureRound,
+      output: {},
+    })
 
-  // A function that keeps failing loses its remaining rounds, not the whole run.
-  const skipped = sst.aws.StepFunctions.pass({
-    name: 'Skipped',
-    output: { error: '{% $states.input.Error %}' },
-  })
+    // A target that keeps failing loses its remaining rounds, not the whole run.
+    const skipped = sst.aws.StepFunctions.pass({
+      name: `${prefix}Skipped`,
+      output: { error: '{% $states.input.Error %}' },
+    })
 
-  // Each function's rounds run as an Express child workflow, billed by duration instead of by state
-  // transition. A child that runs out of its 5 minutes loses its remaining rounds, like a Skipped
-  // one, through ToleratedFailurePercentage on PerfRun below.
-  const run = sst.aws.StepFunctions.map({
-    name: 'Functions',
-    mode: 'express',
-    items: targets,
-    itemSelector: { runId, target: '{% $states.context.Map.Item.Value %}' },
-    maxConcurrency: CONCURRENCY,
-    processor: rounds.catch(skipped),
-    output: {},
-  })
+    return sst.aws.StepFunctions.map({
+      name,
+      mode: 'express',
+      items: targets,
+      itemSelector: { runId, target: '{% $states.context.Map.Item.Value %}' },
+      maxConcurrency,
+      processor: rounds.catch(skipped),
+      output: {},
+    })
+  }
+
+  const run = measureEach('Functions', '', functionTargets, CONCURRENCY)
+  // One size at a time, after the functions: the account may run 8 GB of MicroVMs at once, all
+  // of it the largest size's, and the functions' rounds keep Lambda's control plane busy.
+  const runMicrovms = measureEach('Microvms', 'Microvm', microvmTargets, 1)
 
   const recordRun = sst.aws.StepFunctions.task({
     name: 'RecordRun',
@@ -216,7 +251,7 @@ export const createPerf = (
         finishedAt: { S: '{% $now() %}' },
         rounds: { N: String(ROUNDS) },
         warmInvocations: { N: String(WARM) },
-        functionCount: { N: String(targets.length) },
+        functionCount: { N: String(functionTargets.length + microvmTargets.length) },
         // expiresAt(runId) in src/perf/keys.ts.
         expiresAt: {
           N: `{% $string($floor($toMillis($states.context.Execution.StartTime) / 1000) + ${RETENTION_DAYS * 86_400}) %}`,
@@ -233,14 +268,16 @@ export const createPerf = (
   }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
 
   const stateMachine = new sst.aws.StepFunctions('PerfRun', {
-    definition: run.next(recordRun).next(summarizeRun),
+    definition: run.next(runMicrovms).next(recordRun).next(summarizeRun),
     transform: {
       // SST's Map has no ToleratedFailurePercentage. Without it, one failed child fails the Map
       // Run, and RecordRun and Summarize never run for the functions that finished.
       stateMachine: (args) => {
         args.definition = $output(args.definition).apply((definition) => {
           const parsed = JSON.parse(definition)
-          parsed.States[run.name].ToleratedFailurePercentage = 100
+          for (const map of [run, runMicrovms]) {
+            parsed.States[map.name].ToleratedFailurePercentage = 100
+          }
           return JSON.stringify(parsed)
         })
       },
