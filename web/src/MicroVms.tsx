@@ -113,8 +113,9 @@ export const MicroVms = ({
   <section className={`${WRAP} flex flex-col gap-6 pt-16 sm:pt-20`}>
     <SectionHead title="Lambda MicroVMs" compared={compared} onCompare={onCompare}>
       Node.js 24 in a MicroVM, on arm64 at each baseline Lambda offers, from 0.5 GB and a quarter of
-      a vCPU to 8 GB and 4 vCPUs. Timed by how long a caller waits for an answer, as it has no cold
-      start in the sense above.
+      a vCPU to 8 GB and 4 vCPUs, and Bun’s trimmed AOT executable at 2 GB, without the shim it
+      needs on Lambda. Timed by how long a caller waits for an answer, as it has no cold start in
+      the sense above.
     </SectionHead>
     <About />
     <Board

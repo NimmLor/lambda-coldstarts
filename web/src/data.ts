@@ -144,6 +144,15 @@ export const VARIANTS: Record<string, Variant> = {
     about:
       'A node:http server in Lambda’s Node.js 24 image on a Lambda MicroVM, resumed from a snapshot',
   },
+  BunCompileAotTrimMicroVm: {
+    name: 'Bun AOT, trimmed, MicroVM',
+    family: 'Bun',
+    build: 'bun build --compile --aot --trim',
+    canary: true,
+    microvm: { counterpart: 'BunCompileAotTrim' },
+    about:
+      'The same server as a trimmed AOT executable on a Lambda MicroVM, without the AOT shim, resumed from a snapshot',
+  },
 }
 export const ORDER = Object.keys(VARIANTS)
 

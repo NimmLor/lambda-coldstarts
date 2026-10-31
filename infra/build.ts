@@ -266,3 +266,33 @@ export const buildBunBundle = ({
   writeFileSync(versionFile(bundle), `bun ${read(bin, ['--revision'])}`)
   return bundle
 }
+
+/** The HTTP server a MicroVM runs; see infra/microvm.ts. */
+export const MICROVM_ENTRY = 'src/microvm.ts'
+
+/**
+ * src/microvm.ts as a `variant` executable, `app` in `bundle` (emptied first), for a MicroVM image,
+ * and returns `bundle`. A MicroVM is a whole VM with 512 MB at least: neither of the things
+ * aot-shim.c works around happens in one, so the executable runs without it.
+ */
+export const buildMicrovmServer = ({
+  variant,
+  bundle,
+  arch,
+}: {
+  variant: 'aot-trim'
+  bundle: string
+  arch: LambdaArch
+}) => {
+  assertAvailable(variant, arch)
+  rmSync(bundle, { recursive: true, force: true })
+  mkdirSync(bundle, { recursive: true })
+  const bin = bunAotBin()
+  run(bin, [
+    ...aotBuildArgs(variant, path.resolve(MICROVM_ENTRY)),
+    '--outfile',
+    path.join(bundle, 'app'),
+  ])
+  writeFileSync(versionFile(bundle), `bun ${read(bin, ['--revision'])}`)
+  return bundle
+}

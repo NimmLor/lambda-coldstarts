@@ -27,6 +27,8 @@ export type MicrovmTarget = {
   /** What the server runs in, which Sample's `runtime` records. */
   containerImage: string
   codeBytes: number
+  /** What built a Bun server, which the process can't tell; see `Sample`'s `version`. */
+  version?: string
 }
 
 /** Where src/microvm.ts listens, which the token grants access to. */
@@ -130,7 +132,7 @@ export const measureMicrovm = async (
       memoryMb: target.memoryMb,
       codeSizeMb: Math.round((target.codeBytes / 1024 / 1024) * 10) / 10,
       maxMemoryMb: body.memory.maxRssMb,
-      version: body.runtime,
+      version: target.version ?? body.runtime,
       roundTripMs: round2(answeredAt - start),
       firstRequestMs: round2(answeredAt - sentAt),
       graviton: response.headers.get('x-graviton') ?? undefined,

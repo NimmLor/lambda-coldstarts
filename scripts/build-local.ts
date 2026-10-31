@@ -1,13 +1,14 @@
 /**
  * Builds every Bun and LLRT variant into ./dist/<arch>/<Variant> and, on Linux, runs each `bootstrap` against a
- * fake Lambda Runtime API: a quick check that a bundle starts and answers before deploying it.
+ * fake Lambda Runtime API: a quick check that a bundle starts and answers before deploying it. On
+ * arm64, it builds the MicroVMs' Bun servers too, and asks each for a report over HTTP.
  *
  *   bun scripts/build-local.ts [BunCompile ...]
  */
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { serve } from 'bun'
-import { lambdaArch, toLambdaArch } from '../infra/build'
+import { buildMicrovmServer, lambdaArch, toLambdaArch, unavailableReason } from '../infra/build'
 import { buildBundle, handlerOf, unavailable, VARIANTS } from '../infra/functions'
 
 const arch = lambdaArch()
@@ -104,6 +105,58 @@ for (const v of VARIANTS) {
     bundleMb: Math.round(((await dirSize(bundle)) / 1024 / 1024) * 10) / 10,
   }
   if (canRun) Object.assign(row, await smokeTest(bundle, handlerOf(v)))
+  rows.push(row)
+}
+
+/** Starts a MicroVM's server and asks it for a report, as the MicroVM's first request would. */
+const smokeTestServer = async (bundle: string) => {
+  const app = path.join(bundle, 'app')
+  const child = Bun.spawn([app], {
+    env: { PATH: process.env.PATH, VARIANT: path.basename(bundle) },
+    stdout: 'inherit',
+    stderr: 'inherit',
+  })
+  try {
+    const deadline = Date.now() + 15_000
+    for (;;) {
+      // src/microvm.ts listens on the port Lambda routes to.
+      const response = await fetch('http://127.0.0.1:8080/perf').catch(() => undefined)
+      if (response?.ok) {
+        const report = JSON.parse(await response.text())
+        return {
+          startupMs: report.container.startupMs,
+          rssMb: report.memory.rssMb,
+          runtime: report.runtime,
+          answered: 1,
+        }
+      }
+      if (Date.now() > deadline || child.exitCode !== null)
+        throw new Error(`${app} answered nothing`)
+      await Bun.sleep(100)
+    }
+  } finally {
+    child.kill()
+  }
+}
+
+// MicroVMs run on arm64 only.
+for (const v of arch === 'arm64' ? VARIANTS : []) {
+  if (v.kind !== 'microvm' || !v.bun || (wanted.length && !wanted.includes(v.id))) continue
+  const reason = unavailableReason(v.bun, arch)
+  if (reason) {
+    console.warn(`Skipping ${v.id}: ${reason}`)
+    continue
+  }
+  const bundle = buildMicrovmServer({
+    variant: v.bun,
+    bundle: path.resolve('dist', arch, v.id),
+    arch,
+  })
+  const row: Record<string, unknown> = {
+    variant: v.id,
+    bundleMb: Math.round(((await dirSize(bundle)) / 1024 / 1024) * 10) / 10,
+  }
+  if (canRun) Object.assign(row, await smokeTestServer(bundle))
   rows.push(row)
 }
 

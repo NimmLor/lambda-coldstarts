@@ -40,9 +40,9 @@ export default $config({
     const webFunctions = selected()
       .filter((v) => v.kind === 'web')
       .map((v) => createWebFunction(v.id))
-    const microvms = selected()
-      .filter((v) => v.kind === 'microvm')
-      .map((v) => createMicrovm(v.id))
+    const microvms = selected().flatMap((v) =>
+      v.kind === 'microvm' ? (createMicrovm(v) ?? []) : []
+    )
 
     return {
       functions: Object.fromEntries(

@@ -39,8 +39,9 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)           |
 | 🌐  | `Node24Web`                    | a `node:http` server on a [Lambda Web Function](#-the-web-function)                  |
 | 📦  | `Node24MicroVm`                | the same server in a [Lambda MicroVM](#-the-microvm), resumed from a snapshot        |
+| 📦  | `BunCompileAotTrimMicroVm`     | that server as an `--aot --trim` executable in a MicroVM, without the AOT shim       |
 
-Everything runs in **eu-central-1**, `Node24Web` and `Node24MicroVm` included.
+Everything runs in **eu-central-1**, `Node24Web` and the MicroVMs included.
 
 Bun and LLRT run on `provided.al2023`. Bun serves invocations through a small runtime loop
 ([`src/runtime.ts`](src/runtime.ts)), LLRT through its own ([`src/llrt.ts`](src/llrt.ts)), and Node
@@ -194,7 +195,13 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
 - 📏 **Every size Lambda offers, on arm64**: baselines of 0.5, 1, 2, 4 and 8 GB with a vCPU per 2 GB,
   each bursting to four times both, as `Node24MicroVmM512` to `Node24MicroVmM8192`. The memory is
   the image's, so each size is an image of its own. Lambda builds a snapshot for Graviton3 and one
-  for Graviton4 and picks either per MicroVM; `graviton` says which.
+  for Graviton4 and picks either per MicroVM; `graviton` says which. An account builds 5 images
+  at once, so a deploy builds at most 4, about 2 minutes each, and leaves one for another stage.
+- 🥟 **`BunCompileAotTrimMicroVm`** runs src/microvm.ts as an `--aot --trim` executable, which
+  `bun run build` builds into `dist/arm64` beside the Lambda variants, on Lambda's minimal
+  `al2023-minimal` container at 2 GB. It needs no [AOT shim](#-the-aot-shim): a MicroVM is a whole VM
+  with 512 MB at least, so neither `mincore` nor the 256 MB map fails. It answers as fast as
+  Node.js, as both resume a snapshot of a server that's already up, in less than half the memory.
 - 🧮 **One size at a time**, after the functions: an account may run 8 GB of MicroVMs at once
   unless the quota is raised, all of it the largest size's. A round that finds the quota taken, by
   another stage's MicroVM say, waits up to 90 s before it starts its clock.

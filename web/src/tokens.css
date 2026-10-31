@@ -46,6 +46,8 @@
   --color-line-Node24MicroVm-2048: oklch(80% 0.13 70);
   --color-line-Node24MicroVm-4096: oklch(72% 0.15 58);
   --color-line-Node24MicroVm-8192: oklch(64% 0.16 46);
+  /* Beside the amber Node.js sizes, Node.js 24's teal and the Bun AOT executable's pink. */
+  --color-line-BunCompileAotTrimMicroVm: oklch(72% 0.14 255);
   --color-line-other: oklch(74% 0.12 270);
 
   /* The glyph beside each chart's headline in ChartIcon.tsx: ice, flame, chip, clock, sizes. */

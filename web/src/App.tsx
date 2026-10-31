@@ -215,7 +215,7 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
     ).length
   const kinds = [
     [...variants].some((b) => VARIANTS[b]?.web) && 'as a Lambda Web Function',
-    [...variants].some((b) => VARIANTS[b]?.microvm) && 'in a Lambda MicroVM',
+    [...variants].some((b) => VARIANTS[b]?.microvm) && 'in Lambda MicroVMs',
   ].filter(Boolean)
   return (
     <header
@@ -447,10 +447,11 @@ export const App = () => {
     // Its charts show every function they have: only the result list hides rows.
     // From the first run that measured a Web Function, however far back the counterparts go.
     const webView = viewOf([...webs, ...counterparts], new Set(), () => {}, counterparts[0], webs)
-    // The same for the MicroVMs, smallest first, whose counterpart is compared by its round trips.
+    // The same for the MicroVMs, in legend order and smallest first, whose counterparts are compared
+    // by their round trips.
     const microvms = latest.functions
       .filter((f) => f.microvm)
-      .sort((a, b) => a.memoryMb - b.memoryMb)
+      .sort((a, b) => ORDER.indexOf(a.base) - ORDER.indexOf(b.base) || a.memoryMb - b.memoryMb)
     const microvmCounterparts = latest.functions.filter(
       (f) =>
         compareMicrovm &&
@@ -463,7 +464,8 @@ export const App = () => {
       [...microvms, ...microvmCounterparts],
       new Set(),
       () => {},
-      microvmCounterparts[0],
+      // Node.js 24 when it's there, as everywhere else.
+      microvmCounterparts.find((f) => f.base === 'Node24') ?? microvmCounterparts[0],
       microvms
     )
     // The result list ranks the Web Functions among the functions. A MicroVM has no init to rank.
