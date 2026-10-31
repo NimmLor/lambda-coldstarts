@@ -47,7 +47,7 @@ export const VARIANTS: Variant[] = [
   { id: 'Node26', kind: 'node', runtime: 'nodejs26.x' },
   // Only on arm64, with the 2 GB every Web Function gets.
   { id: 'Node24Web', kind: 'web' },
-  // Only on arm64, with a 2 GB baseline.
+  // Only on arm64, at every size Lambda offers; see infra/microvm.ts.
   { id: 'Node24MicroVm', kind: 'microvm' },
 ]
 

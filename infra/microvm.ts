@@ -1,8 +1,8 @@
 /**
- * The Lambda MicroVM variant: src/microvm.ts as an HTTP server in a MicroVM image, in the stack's
- * region like everything else. Lambda builds the image from a zip of the bundle and a Dockerfile,
- * starts the server and snapshots it; PerfMeasure runs a MicroVM from that snapshot every round
- * and terminates it again (src/perf/microvm.ts).
+ * The Lambda MicroVM variant: src/microvm.ts as an HTTP server in a MicroVM image for each size
+ * Lambda offers, in the stack's region like everything else. Lambda builds each image from a zip
+ * of the bundle and a Dockerfile, starts the server and snapshots it; PerfMeasure runs a MicroVM
+ * from that snapshot every round and terminates it again (src/perf/microvm.ts).
  */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -23,8 +23,11 @@ const BASE_IMAGE = { name: 'al2023-1', version: '2' }
  */
 const CONTAINER_IMAGE = 'public.ecr.aws/lambda/nodejs:24'
 
-/** The baseline every MicroVM of the image gets: 2 GB and 1 vCPU, bursting to 8 GB and 4 vCPUs. */
-const MEMORY_MB = 2048
+/**
+ * The baselines Lambda offers, an image each: a vCPU per 2 GB, and up to four times both while
+ * busy. The memory is the image's, so every size needs its own.
+ */
+const MEMORY_SIZES = [512, 1024, 2048, 4096, 8192]
 
 /** The port src/microvm.ts listens on, where Lambda sends requests and its build hooks. */
 const PORT = 8080
@@ -61,7 +64,7 @@ const bundle = (dir: string) => {
 export type Microvm = ReturnType<typeof createMicrovm>
 
 export const createMicrovm = (id: string) => {
-  const name = `${$app.name}-${$app.stage}-${id}`
+  const prefix = `${$app.name}-${$app.stage}`
   const region = aws.getRegionOutput().region
   const dir = path.join($cli.paths.work, 'microvm', id)
   const codeBytes = bundle(dir)
@@ -80,10 +83,10 @@ export const createMicrovm = (id: string) => {
     source: new $util.asset.FileArchive(dir),
   })
 
-  // Where the builds log; Lambda would otherwise create it and keep the logs forever. The MicroVMs
-  // have no execution role, so they log nothing.
+  // Where every size's builds log; Lambda would otherwise create a group for each and keep the logs
+  // forever. The MicroVMs have no execution role, so they log nothing.
   const logGroup = new aws.cloudwatch.LogGroup(`${id}Logs`, {
-    name: `/aws/lambda-microvms/${name}`,
+    name: `/aws/lambda-microvms/${prefix}-${id}`,
     retentionInDays: 30,
   })
 
@@ -119,45 +122,50 @@ export const createMicrovm = (id: string) => {
   const connector = (connectorName: string) =>
     $interpolate`arn:aws:lambda:${region}:aws:network-connector:aws-network-connector:${connectorName}`
 
-  const image = new awsnative.lambda.MicrovmImage(id, {
-    name,
-    description: `src/microvm.ts on ${CONTAINER_IMAGE}, benchmarked by PerfMeasure`,
-    baseImageArn: $interpolate`arn:aws:lambda:${region}:aws:microvm-image:${BASE_IMAGE.name}`,
-    baseImageVersion: BASE_IMAGE.version,
-    buildRoleArn: buildRole.arn,
-    codeArtifact: { uri: $interpolate`s3://${bucket.id}/${code.key}` },
-    logging: { cloudWatch: { logGroup: logGroup.name } },
-    // For the build, which pulls the container image from ECR Public.
-    egressNetworkConnectors: [connector('INTERNET_EGRESS')],
-    cpuConfigurations: [{ architecture: 'ARM_64' }],
-    resources: [{ minimumMemoryInMiB: MEMORY_MB }],
-    additionalOsCapabilities: [],
-    hooks: {
-      port: PORT,
-      microvmImageHooks: {
-        ready: 'ENABLED',
-        readyTimeoutInSeconds: 60,
-        validate: 'ENABLED',
-        validateTimeoutInSeconds: 60,
-      },
-    },
-    environmentVariables: [{ key: 'VARIANT', value: id }],
-  })
+  const ingressConnector = connector('ALL_INGRESS')
+  const egressConnector = connector('INTERNET_EGRESS')
 
-  return {
-    imageArn: image.imageArn,
-    /** What PerfMeasure needs to run a MicroVM of the image and reach it. */
-    target: {
-      id,
+  const targets = MEMORY_SIZES.map((memoryMb) => {
+    // Named like a function at more than one memory size: `Node24MicroVmM2048`.
+    const sizeId = `${id}M${memoryMb}`
+    const image = new awsnative.lambda.MicrovmImage(sizeId, {
+      name: `${prefix}-${sizeId}`,
+      description: `src/microvm.ts on ${CONTAINER_IMAGE}, benchmarked by PerfMeasure`,
+      baseImageArn: $interpolate`arn:aws:lambda:${region}:aws:microvm-image:${BASE_IMAGE.name}`,
+      baseImageVersion: BASE_IMAGE.version,
+      buildRoleArn: buildRole.arn,
+      codeArtifact: { uri: $interpolate`s3://${bucket.id}/${code.key}` },
+      logging: { cloudWatch: { logGroup: logGroup.name } },
+      // For the build, which pulls the container image from ECR Public.
+      egressNetworkConnectors: [egressConnector],
+      cpuConfigurations: [{ architecture: 'ARM_64' }],
+      resources: [{ minimumMemoryInMiB: memoryMb }],
+      additionalOsCapabilities: [],
+      hooks: {
+        port: PORT,
+        microvmImageHooks: {
+          ready: 'ENABLED',
+          readyTimeoutInSeconds: 60,
+          validate: 'ENABLED',
+          validateTimeoutInSeconds: 60,
+        },
+      },
+      environmentVariables: [{ key: 'VARIANT', value: sizeId }],
+    })
+    // What PerfMeasure needs to run a MicroVM of the image and reach it.
+    return {
+      id: sizeId,
       kind: 'microvm' as const,
       region,
       imageArn: image.imageArn,
       // Lambda's own: HTTPS in, and the internet out, which a MicroVM gets whatever it's given.
-      ingressConnector: connector('ALL_INGRESS'),
-      egressConnector: connector('INTERNET_EGRESS'),
-      memoryMb: MEMORY_MB,
+      ingressConnector,
+      egressConnector,
+      memoryMb,
       containerImage: CONTAINER_IMAGE,
       codeBytes,
-    },
-  }
+    }
+  })
+
+  return { targets, ingressConnector, egressConnector }
 }

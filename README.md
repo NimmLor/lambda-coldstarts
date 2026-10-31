@@ -189,9 +189,13 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
 - 🐢 **No warm round trips.** At 128 MB, PerfMeasure gets CPU in 20 ms slices, and a warm request
   of ~5 ms comes back as 20, 40 or 60. The cold ones barely move: a MicroVM's first answer took
   1.34–1.36 s from a 1769 MB PerfMeasure and 1.32–1.43 s from the 128 MB one.
-- 📏 **2 GB and 1 vCPU, on arm64**: the default baseline, which bursts to 8 GB and 4 vCPUs. Lambda
-  builds a snapshot for Graviton3 and one for Graviton4 and picks either per MicroVM; `graviton`
-  says which.
+- 📏 **Every size Lambda offers, on arm64**: baselines of 0.5, 1, 2, 4 and 8 GB with a vCPU per 2 GB,
+  each bursting to four times both, as `Node24MicroVmM512` to `Node24MicroVmM8192`. The memory is
+  the image's, so each size is an image of its own. Lambda builds a snapshot for Graviton3 and one
+  for Graviton4 and picks either per MicroVM; `graviton` says which.
+- 🧮 **One size at a time**, after the functions: an account may run 8 GB of MicroVMs at once
+  unless the quota is raised, all of it the largest size's. A round that finds the quota taken, by
+  another stage's MicroVM say, waits up to 90 s before it starts its clock.
 - 🧹 **Every MicroVM is terminated** at the end of its round, and lives 2 minutes at most should
   that fail. A round costs a few seconds of compute and up to ~0.6 GB of snapshot reads: about a
   tenth of a cent at us-east-1's prices.

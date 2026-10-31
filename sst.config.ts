@@ -51,7 +51,9 @@ export default $config({
       webFunctions: Object.fromEntries(
         webFunctions.map((w) => [w.target.id, { name: w.name, domain: w.target.domain }])
       ),
-      microvms: Object.fromEntries(microvms.map((m) => [m.target.id, { image: m.imageArn }])),
+      microvms: Object.fromEntries(
+        microvms.flatMap((m) => m.targets.map((t) => [t.id, { image: t.imageArn }]))
+      ),
       perf: createPerf(functions, webFunctions, microvms),
     }
   },

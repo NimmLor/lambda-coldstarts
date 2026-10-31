@@ -9,6 +9,7 @@ import {
   CreateMicrovmAuthTokenCommand,
   LambdaMicrovmsClient,
   RunMicrovmCommand,
+  ServiceQuotaExceededException,
   TerminateMicrovmCommand,
 } from '@aws-sdk/client-lambda-microvms'
 import type { Sample } from './keys'
@@ -34,6 +35,12 @@ const PORT = 8080
 /** How long Lambda lets a MicroVM live should terminating it fail: well past a round's last request. */
 const MAX_LIFETIME_S = 120
 
+/**
+ * How long a round waits for room under the account's MicroVM memory quota, 8 GB unless raised,
+ * which another stage's MicroVMs or one still terminating can hold.
+ */
+const QUOTA_WAIT_MS = 90_000
+
 const round2 = (value: number) => Math.round(value * 100) / 100
 
 const clients = new Map<string, LambdaMicrovmsClient>()
@@ -46,23 +53,39 @@ const clientFor = (region: string) => {
   return client
 }
 
+/**
+ * A new MicroVM from the image, which resumes from its snapshot, and when the call that started it
+ * went out: the ones refused for want of memory under the quota don't count.
+ */
+const runMicrovm = async (client: LambdaMicrovmsClient, target: MicrovmTarget) => {
+  const deadline = Date.now() + QUOTA_WAIT_MS
+  for (;;) {
+    const start = performance.now()
+    try {
+      const microvm = await client.send(
+        new RunMicrovmCommand({
+          imageIdentifier: target.imageArn,
+          ingressNetworkConnectors: [target.ingressConnector],
+          // The server makes no requests of its own, but no connector turns the internet off: an
+          // empty list gets the image's.
+          egressNetworkConnectors: [target.egressConnector],
+          maximumDurationInSeconds: MAX_LIFETIME_S,
+        })
+      )
+      return { ...microvm, start }
+    } catch (e) {
+      if (!(e instanceof ServiceQuotaExceededException) || Date.now() > deadline) throw e
+      await new Promise((resolve) => setTimeout(resolve, 5_000))
+    }
+  }
+}
+
 export const measureMicrovm = async (
   target: MicrovmTarget,
   round: number
 ): Promise<Omit<Sample, 'measuredAt'>> => {
   const client = clientFor(target.region)
-  const start = performance.now()
-  // A new MicroVM every round: each one resumes from the image's snapshot.
-  const { microvmId, endpoint } = await client.send(
-    new RunMicrovmCommand({
-      imageIdentifier: target.imageArn,
-      ingressNetworkConnectors: [target.ingressConnector],
-      // The server makes no requests of its own, but no connector turns the internet off: an
-      // empty list gets the image's.
-      egressNetworkConnectors: [target.egressConnector],
-      maximumDurationInSeconds: MAX_LIFETIME_S,
-    })
-  )
+  const { microvmId, endpoint, start } = await runMicrovm(client, target)
   try {
     // Lambda issues it while the MicroVM is still pending.
     const { authToken } = await client.send(

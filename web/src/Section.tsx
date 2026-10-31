@@ -96,8 +96,13 @@ export const Figure = ({ metric: m, view }: { metric: Metric; view: View }) => {
                 />
                 <span className="truncate">
                   {f.name}
-                  {/* The section's own kind has one size, which its introduction names. */}
-                  {!f.web && !f.microvm && <span className="text-muted"> · {f.memoryMb} MB</span>}
+                  {/* A Web Function has one size, which the introduction names; MicroVMs come in GB. */}
+                  {!f.web && (
+                    <span className="text-muted">
+                      {' · '}
+                      {f.microvm ? `${f.memoryMb / 1024} GB` : `${f.memoryMb} MB`}
+                    </span>
+                  )}
                 </span>
               </dt>
               <dd className="m-0 flex items-baseline gap-2 whitespace-nowrap">
@@ -144,16 +149,18 @@ export const SectionHead = ({
 
 /**
  * A figure for each of `figures`, and under them the first one over time, against the
- * counterparts in `view` when `compared`.
+ * counterparts in `view` when `compared`, then `children` across the board.
  */
 export const Board = ({
   view,
   figures,
   compared,
+  children,
 }: {
   view: View
   figures: Metric[]
   compared: boolean
+  children?: ReactNode
 }) => {
   const [first] = figures
   return (
@@ -176,6 +183,7 @@ export const Board = ({
         }
         className="col-span-full"
       />
+      {children}
     </div>
   )
 }

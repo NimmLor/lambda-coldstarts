@@ -142,7 +142,7 @@ export const VARIANTS: Record<string, Variant> = {
     build: 'bun build --target=node --format=esm --minify',
     microvm: { counterpart: 'Node24' },
     about:
-      'A node:http server in Lambda’s Node.js 24 image on a Lambda MicroVM with a 2 GB baseline, resumed from a snapshot',
+      'A node:http server in Lambda’s Node.js 24 image on a Lambda MicroVM, resumed from a snapshot',
   },
 }
 export const ORDER = Object.keys(VARIANTS)
