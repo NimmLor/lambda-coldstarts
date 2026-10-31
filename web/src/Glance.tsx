@@ -113,8 +113,61 @@ const Panel = ({ metric: m, rows: all }: { metric: (typeof METRICS)[number]; row
 }
 
 /**
+ * How many times faster arm64 cold-starts than x86_64, over the functions that run on both, of
+ * `base` or of every variant: each one's x86_64 cold start over its arm64 one at the same memory
+ * size, averaged geometrically, as ratios are. Undefined without such a pair.
+ */
+const archRatio = (runs: RunPoints[], functions: Fn[], base?: string) => {
+  const logs = functions.flatMap((arm) => {
+    if (arm.arch !== 'arm64' || (base && arm.base !== base)) return []
+    const x86 = functions.find(
+      (f) => f.arch === 'x86_64' && f.base === arm.base && f.memoryMb === arm.memoryMb
+    )
+    if (!x86) return []
+    const armCold = mean(runs.map((r) => r.points.get(arm.id)?.cold))
+    const x86Cold = mean(runs.map((r) => r.points.get(x86.id)?.cold))
+    return armCold && x86Cold ? [Math.log(x86Cold / armCold)] : []
+  })
+  return logs.length ? Math.exp(logs.reduce((sum, l) => sum + l, 0) / logs.length) : undefined
+}
+
+/** One line under the panels: arm64's cold start against x86_64's, overall and for Node.js 24. */
+const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[] }) => {
+  const figures = [
+    ['All functions', archRatio(runs, functions)],
+    ['Node.js 24', archRatio(runs, functions, BASELINE)],
+  ] as const
+  if (figures.every(([, ratio]) => ratio === undefined)) return null
+  return (
+    <article className="col-span-full flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2 bg-paper-2 px-5 py-4 sm:px-6">
+      <div className="flex flex-wrap items-baseline gap-x-3">
+        <h3 className="text-lg">arm64 vs. x86_64</h3>
+        <span className="text-sm text-muted">cold start, at every memory size</span>
+      </div>
+      <dl className="m-0 flex flex-wrap gap-x-8 gap-y-1">
+        {figures.map(
+          ([label, ratio]) =>
+            ratio !== undefined && (
+              <div key={label} className="flex items-baseline gap-2.5">
+                <dt className="text-sm text-ink-2">{label}</dt>
+                <dd className="m-0 text-sm text-muted">
+                  arm64{' '}
+                  <span className="measured text-md text-ink">
+                    {(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×
+                  </span>{' '}
+                  {ratio >= 1 ? 'faster' : 'slower'}
+                </dd>
+              </div>
+            )
+        )}
+      </dl>
+    </article>
+  )
+}
+
+/**
  * LLRT, Bun's trimmed AOT executable, Node.js 24, and Node.js 24 as a Web Function and in a
- * MicroVM side by side, whatever the dashboard below shows.
+ * MicroVM side by side, whatever the dashboard below shows, and under them arm64 against x86_64.
  */
 export const Glance = ({ history }: { history: RunPoints[] }) => {
   const latest = history.at(-1)
@@ -156,6 +209,7 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
         {METRICS.map((m) => (
           <Panel key={m.key} metric={m} rows={rows} />
         ))}
+        <Architectures runs={runs} functions={latest.functions} />
       </div>
     </section>
   )
