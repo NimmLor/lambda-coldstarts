@@ -105,7 +105,11 @@ export const MemoryChart = ({
               unit="ms"
               digits={1}
               focus={focus}
-              baseline={baseline && at(baseline.base, memories[pointed]!)}
+              // A Web Function has one size, which every size is compared with.
+              baseline={
+                baseline &&
+                (baseline.web ? agg(baseline, 'cold') : at(baseline.base, memories[pointed]!))
+              }
             />
           )}
           {series

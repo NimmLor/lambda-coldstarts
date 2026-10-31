@@ -392,11 +392,14 @@ export const App = () => {
     const fns = sized
       .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
+    const webs = latest.functions.filter((f) => f.web)
+    // The functions can be compared with a Web Function too, at its one size.
+    const comparable = [...fns, ...webs]
     const view = viewOf(
       fns,
       hidden,
       toggle,
-      fns.find((f) => f.base === compare)
+      comparable.find((f) => f.base === compare)
     )
     const { runs, hover: hovered } = view
     const pickMemory = (mb: number) => {
@@ -426,7 +429,6 @@ export const App = () => {
     const [cold, ...small] = METRICS
 
     // Each Web Function and the function it's compared with, on the arm64 it's limited to.
-    const webs = latest.functions.filter((f) => f.web)
     const counterparts = latest.functions.filter(
       (f) =>
         compareWeb &&
@@ -506,8 +508,8 @@ export const App = () => {
           <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 text-sm text-muted">
             <Picker
               label="Compare with"
-              options={['', ...fns.map((f) => f.base)]}
-              value={fns.some((f) => f.base === compare) ? compare : ''}
+              options={['', ...comparable.map((f) => f.base)]}
+              value={comparable.some((f) => f.base === compare) ? compare : ''}
               text={(b) => (b ? (VARIANTS[b]?.name ?? b) : 'None')}
               onPick={(b) => {
                 track('compare_picked', { variant: b || 'none' })
