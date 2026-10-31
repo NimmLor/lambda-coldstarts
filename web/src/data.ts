@@ -30,9 +30,16 @@ type Variant = {
   /** Built by the Bun build that `--trim` and `--aot` need rather than a release. */
   canary?: boolean
   preview?: boolean
+  /** Where it runs, when that isn't the stack's eu-central-1. */
+  region?: string
+  /** The one memory size it has, which it shows at whichever size is picked. */
+  fixedMemoryMb?: number
   /** How it's deployed, for the row's tooltip. */
   about: string
 }
+
+/** Where every function runs but those with a `region` of their own; see sst.config.ts. */
+export const STACK_REGION = 'eu-central-1'
 
 const SST_BUNDLE = 'esbuild --bundle --format=esm --minify'
 const LLRT_BUNDLE = 'bun build --target=node --format=esm --minify'
@@ -114,6 +121,15 @@ export const VARIANTS: Record<string, Variant> = {
     build: SST_BUNDLE,
     preview: true,
     about: 'SST’s default bundle, on a runtime still in preview',
+  },
+  Node24Web: {
+    name: 'Node.js 24, Web Function',
+    family: 'Node',
+    build: 'bun build --target=node --format=esm --minify',
+    region: 'eu-west-1',
+    fixedMemoryMb: 2048,
+    about:
+      'A node:http server on Lambda Web Functions, which eu-central-1 doesn’t have yet: it runs in eu-west-1, with the 2 GB and 2 vCPUs every environment gets',
   },
 }
 export const ORDER = Object.keys(VARIANTS)

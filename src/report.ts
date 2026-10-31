@@ -49,7 +49,8 @@ const readRequest = (event: unknown) => {
 
 export type ReportInput = {
   event: unknown
-  remainingTimeMs: number
+  /** Until the invocation times out; a Web Function's requests have no deadline to report. */
+  remainingTimeMs?: number
   /** Size of the file the process was started from: the Bun executable or the Node binary. */
   executableBytes: number
 }

@@ -17,7 +17,11 @@ type BuiltVariant =
   | { id: string; kind: 'bun'; variant: BunVariant }
   | { id: string; kind: 'llrt'; variant: LlrtVariant }
 
-type Variant = BuiltVariant | { id: string; kind: 'node'; runtime: NodeRuntime }
+type Variant =
+  | BuiltVariant
+  | { id: string; kind: 'node'; runtime: NodeRuntime }
+  // A Lambda Web Function rather than a function, deployed by infra/web-function.ts.
+  | { id: string; kind: 'web' }
 
 export const VARIANTS: Variant[] = [
   { id: 'BunRuntime', kind: 'bun', variant: 'bun' },
@@ -39,6 +43,8 @@ export const VARIANTS: Variant[] = [
   // A public preview since August 2026. The aws provider pinned in sst.config.ts is the first
   // SST can use that accepts it.
   { id: 'Node26', kind: 'node', runtime: 'nodejs26.x' },
+  // Only on arm64, with the 2 GB every Web Function gets, in eu-west-1.
+  { id: 'Node24Web', kind: 'web' },
 ]
 
 /** Tags every benchmarked function, which is how PerfMeasure's permissions pick them; see infra/perf.ts. */
@@ -71,7 +77,7 @@ const memorySizes = () => {
 }
 
 /** `VARIANTS=BunCompile,Node24` deploys just those; unset deploys all of them. */
-const selected = () => {
+export const selected = () => {
   const only = process.env.VARIANTS?.split(',').map((id) => id.trim())
   if (!only) return VARIANTS
   const unknown = only.filter((id) => !VARIANTS.some((v) => v.id === id))
@@ -130,6 +136,7 @@ export const createFunctions = () => {
 
   for (const architecture of architectures) {
     for (const v of selected()) {
+      if (v.kind === 'web') continue
       // Built once, deployed at every memory size.
       const { bundle, reason } =
         v.kind === 'node' ? { bundle: undefined, reason: undefined } : bundleOf(v, architecture)

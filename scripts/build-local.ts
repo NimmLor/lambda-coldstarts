@@ -87,7 +87,7 @@ const smokeTest = async (bundle: string, handler: string) => {
 
 const rows: Record<string, unknown>[] = []
 for (const v of VARIANTS) {
-  if (v.kind === 'node' || (wanted.length && !wanted.includes(v.id))) continue
+  if (v.kind === 'node' || v.kind === 'web' || (wanted.length && !wanted.includes(v.id))) continue
   const reason = unavailable(v, arch)
   if (reason) {
     console.warn(`Skipping ${v.id}: ${reason}`)

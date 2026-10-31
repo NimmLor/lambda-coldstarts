@@ -7,6 +7,7 @@ import {
   ORDER,
   type Run,
   type RunPoints,
+  STACK_REGION,
   type Stat,
   VARIANTS,
   type View,
@@ -203,8 +204,10 @@ const InlinePick = <T extends string | number>({
 
 const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
+  // A Web Function is Node.js 24 again, on another kind of Lambda.
   const count = (family: Family) =>
-    [...variants].filter((b) => VARIANTS[b]?.family === family).length
+    [...variants].filter((b) => VARIANTS[b]?.family === family && !VARIANTS[b]?.region).length
+  const web = [...variants].some((b) => VARIANTS[b]?.region)
   return (
     <header
       className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}
@@ -218,7 +221,7 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
       </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions, each cold started ${latest.rounds} times every 4 hours. `
+          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${web ? ', plus Node.js 24 as a Lambda Web Function' : ''}, each cold started ${latest.rounds} times every 4 hours. `
           : 'Each runtime is cold started every 4 hours. '}
         Each point on the charts is one run. The table averages the range you pick.
       </p>
@@ -325,7 +328,10 @@ export const App = () => {
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
     const shownArch = archs.includes(arch) ? arch : archs[0]!
-    const memories = [...new Set(latest.functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
+    // A function with a size of its own shows at every size, rather than being one.
+    const memories = [
+      ...new Set(latest.functions.filter((f) => !f.fixedMemoryMb).map((f) => f.memoryMb)),
+    ].sort((a, b) => a - b)
     const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
     // A range is offered once there are runs older than the next shorter one shows.
     const span = latest.date.getTime() - history[0]!.date.getTime()
@@ -339,7 +345,7 @@ export const App = () => {
       hover !== undefined && hover < runs.length ? hover : pinnedAt >= 0 ? pinnedAt : undefined
     const sized = latest.functions.filter((f) => f.arch === shownArch)
     const fns = sized
-      .filter((f) => f.memoryMb === shownMemory)
+      .filter((f) => f.memoryMb === shownMemory || f.fixedMemoryMb)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
     const visible = fns.filter((f) => !hidden.has(f.base))
     const shown = visible.length ? visible : fns
@@ -580,9 +586,18 @@ export const App = () => {
           startup time and memory use as JSON. No packages, no network calls: the numbers are the
           runtime’s, not the code’s.
         </p>
+        <p className="max-w-prose">
+          Everything runs in <code>{STACK_REGION}</code>, Frankfurt, except the Web Function: Lambda
+          Web Functions aren’t in <code>{STACK_REGION}</code> yet, so it runs in{' '}
+          <code>{VARIANTS.Node24Web!.region}</code>, Ireland. Every Web Function environment has 2
+          GB and 2 vCPUs, so it shows at whichever memory size you pick.
+        </p>
         <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
           <dt className="font-medium text-ink">Cold start</dt>
-          <dd className="m-0">Lambda init duration</dd>
+          <dd className="m-0">
+            Lambda init duration; for the Web Function, its environment’s initialization, from
+            starting the runtime until the server listens
+          </dd>
           <dt className="font-medium text-ink">To handler</dt>
           <dd className="m-0">
             the part of the cold start inside the process: from process start until the handler is
@@ -590,11 +605,17 @@ export const App = () => {
             runtime asking for its first event
           </dd>
           <dt className="font-medium text-ink">Warm start</dt>
-          <dd className="m-0">handler time on an instance that’s already up</dd>
+          <dd className="m-0">
+            handler time on an instance that’s already up; for the Web Function, the request’s
+            duration, as Lambda reports it
+          </dd>
           <dt className="font-medium text-ink">Duration</dt>
-          <dd className="m-0">handler time of the cold invocation</dd>
+          <dd className="m-0">handler time of the cold invocation, or the cold request</dd>
           <dt className="font-medium text-ink">Memory used</dt>
-          <dd className="m-0">peak memory, as Lambda reports it</dd>
+          <dd className="m-0">
+            peak memory, as Lambda reports it; for the Web Function, the whole environment’s once
+            it’s initialized
+          </dd>
           <dt className="font-medium text-ink">Size</dt>
           <dd className="m-0">size of the deployed code</dd>
         </dl>

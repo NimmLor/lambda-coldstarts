@@ -36,6 +36,7 @@
   --color-line-Node22: oklch(78% 0.13 150);
   --color-line-Node24: oklch(78% 0.11 185);
   --color-line-Node26: oklch(74% 0.12 225);
+  --color-line-Node24Web: oklch(88% 0.08 195);
   --color-line-other: oklch(74% 0.12 270);
 
   /* The glyph beside each chart's headline in ChartIcon.tsx: ice, flame, chip, clock, sizes. */

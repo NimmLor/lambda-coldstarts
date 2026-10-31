@@ -1,8 +1,8 @@
 /**
  * One round of a run of the PerfRun state machine (infra/perf.ts), like lambda-perf's invoker:
  * forces a cold start of the target, invokes it once, then `warm` more times in the environment
- * that started, and stores Lambda's REPORT numbers in PerfResults. The state machine calls it once
- * per round and retries it when it throws.
+ * that started, and stores Lambda's REPORT numbers in PerfResults. A Web Function's round goes
+ * through web.ts instead. The state machine calls it once per round and retries it when it throws.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import {
@@ -15,11 +15,14 @@ import {
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { expiresAt, type Sample, sampleSk, samplesPk } from './keys'
 import { parseReport } from './report-line'
+import { measureWeb, type WebTarget } from './web'
+
+type FunctionTarget = { id: string; name: string; kind?: undefined }
 
 export type MeasureEvent = {
   runId: string
   round: number
-  target: { id: string; name: string }
+  target: FunctionTarget | WebTarget
   /** Invocations after the cold one, which find its environment warm. */
   warm: number
 }
@@ -36,7 +39,7 @@ const EVENT = new TextEncoder().encode(
   JSON.stringify({ rawPath: '/perf', requestContext: { http: { method: 'GET' } } })
 )
 
-const invoke = async (target: MeasureEvent['target']) => {
+const invoke = async (target: FunctionTarget) => {
   const result = await lambda.send(
     new InvokeCommand({ FunctionName: target.name, LogType: 'Tail', Payload: EVENT })
   )
@@ -48,7 +51,11 @@ const invoke = async (target: MeasureEvent['target']) => {
   return { report, payload }
 }
 
-export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
+const measureFunction = async (
+  target: FunctionTarget,
+  round: number,
+  warm: number
+): Promise<Omit<Sample, 'measuredAt'>> => {
   const config = await lambda.send(
     new GetFunctionConfigurationCommand({ FunctionName: target.name })
   )
@@ -84,7 +91,7 @@ export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
   }
 
   const body = JSON.parse(JSON.parse(payload).body)
-  const sample: Sample = {
+  return {
     functionId: target.id,
     round,
     runtime: config.Runtime ?? '?',
@@ -100,6 +107,14 @@ export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
     // What the function was built with, see infra/functions.ts; the Node ones say which Node they are.
     version: config.Description || body.runtime,
     requestId: report.requestId,
+  }
+}
+
+export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
+  const sample: Sample = {
+    ...(target.kind === 'web'
+      ? await measureWeb(target, round, warm)
+      : await measureFunction(target, round, warm)),
     measuredAt: new Date().toISOString(),
   }
   await db.send(
@@ -113,5 +128,5 @@ export const handler = async ({ runId, round, target, warm }: MeasureEvent) => {
       },
     })
   )
-  return { functionId: target.id, round, initMs: report.initMs }
+  return { functionId: target.id, round, initMs: sample.initMs }
 }

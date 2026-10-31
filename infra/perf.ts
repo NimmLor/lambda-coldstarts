@@ -10,6 +10,7 @@
  */
 import { RETENTION_DAYS, RUNS_PK } from '../src/perf/keys'
 import { BENCH_TAG } from './functions'
+import type { WebFunction } from './web-function'
 
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
 /** Invocations after each round's cold start, which find its environment warm. */
@@ -52,8 +53,16 @@ const NO_INDEX = {
   },
 }
 
-export const createPerf = (functions: Record<string, sst.aws.Function>) => {
+export const createPerf = (
+  functions: Record<string, sst.aws.Function>,
+  webFunctions: WebFunction[]
+) => {
   const production = $app.stage === 'production'
+  // What each round of the Rounds map measures; src/perf/measure.ts tells the two kinds apart.
+  const targets = [
+    ...Object.entries(functions).map(([id, fn]) => ({ id, name: fn.name })),
+    ...webFunctions.map((w) => w.target),
+  ]
 
   const table = new sst.aws.Dynamo('PerfResults', {
     fields: { pk: 'string', sk: 'string' },
@@ -95,6 +104,33 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
           },
         ],
       },
+      // A Web Function's rounds each make a revision, point the endpoint at it, sign requests to
+      // it and read the environment's platform events from its logs; see src/perf/web.ts.
+      ...webFunctions.flatMap((w) => [
+        {
+          actions: ['lambda:CreateWebFunctionRevision'],
+          resources: [w.functionArn],
+        },
+        {
+          actions: ['lambda:GetWebFunctionRevision'],
+          resources: [$interpolate`${w.functionArn}/revision/*`],
+        },
+        {
+          actions: [
+            'lambda:GetWebFunctionEndpoint',
+            'lambda:UpdateWebFunctionEndpoint',
+            'lambda:InvokeWebFunctionEndpoint',
+          ],
+          resources: [w.endpointArn],
+        },
+        // CreateWebFunctionRevision passes the role and reads the code with the caller's rights.
+        { actions: ['iam:PassRole'], resources: [w.roleArn] },
+        {
+          actions: ['s3:GetObject', 's3:GetObjectVersion'],
+          resources: [$interpolate`${w.bucketArn}/*`],
+        },
+        { actions: ['logs:GetLogEvents'], resources: [$interpolate`${w.logGroupArn}:*`] },
+      ]),
     ],
   })
 
@@ -162,7 +198,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
   const run = sst.aws.StepFunctions.map({
     name: 'Functions',
     mode: 'express',
-    items: Object.entries(functions).map(([id, fn]) => ({ id, name: fn.name })),
+    items: targets,
     itemSelector: { runId, target: '{% $states.context.Map.Item.Value %}' },
     maxConcurrency: CONCURRENCY,
     processor: rounds.catch(skipped),
@@ -180,7 +216,7 @@ export const createPerf = (functions: Record<string, sst.aws.Function>) => {
         finishedAt: { S: '{% $now() %}' },
         rounds: { N: String(ROUNDS) },
         warmInvocations: { N: String(WARM) },
-        functionCount: { N: String(Object.keys(functions).length) },
+        functionCount: { N: String(targets.length) },
         // expiresAt(runId) in src/perf/keys.ts.
         expiresAt: {
           N: `{% $string($floor($toMillis($states.context.Execution.StartTime) / 1000) + ${RETENTION_DAYS * 86_400}) %}`,
