@@ -248,6 +248,11 @@ export type View = {
   fns: Fn[]
   /** The ones not hidden, or all of them when every one is. */
   shown: Fn[]
+  /**
+   * The shown variants on every architecture at every memory size, which the axes scale to, so they
+   * hold still when either is switched.
+   */
+  scaled: Fn[]
   hidden: Set<string>
   /** Index of the hovered or picked run within `runs`. */
   hover?: number

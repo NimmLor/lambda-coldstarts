@@ -166,14 +166,14 @@ export const Chart = ({
   view: View
   className?: string
 }) => {
-  const { runs, memoryMb, shown, hover, focus, agg, baseline } = view
+  const { runs, memoryMb, shown, scaled, hover, focus, agg, baseline } = view
   // Every chart follows the hovered run; only the one under the pointer reads it out.
   const [inside, setInside] = useState(false)
   const n = runs.length
   const x = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100)
   const series = shown.map((f) => ({ f, values: runs.map((r) => r.points.get(f.id)?.[m.key]) }))
   const max = niceMax(
-    Math.max(0, ...series.flatMap((s) => s.values.filter((v) => v !== undefined)))
+    Math.max(0, ...runs.flatMap((r) => scaled.flatMap((f) => r.points.get(f.id)?.[m.key] ?? [])))
   )
   const y = (v: number) => 100 - (v / max) * 100
   const grid = [0, 0.25, 0.5, 0.75, 1].map((g) => ({

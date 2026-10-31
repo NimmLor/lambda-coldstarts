@@ -135,7 +135,8 @@ export const Table = ({ view }: { view: View }) => {
   const { runs, latest, fns, shown, hidden, hover, focus, agg } = view
   const tickRun = hover !== undefined ? runs[hover]! : latest
   const tickMax = niceMax(
-    Math.max(0, ...fns.flatMap((f) => tickRun.points.get(f.id)?.initDurations ?? []))
+    // Every function's, hidden ones included as their rows stay, on every architecture and size.
+    Math.max(0, ...latest.functions.flatMap((f) => tickRun.points.get(f.id)?.initDurations ?? []))
   )
   const mins = Object.fromEntries(
     (['cold', 'warm', 'mem', 'dur'] as const).map((k) => [
