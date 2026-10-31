@@ -9,7 +9,7 @@ const DAY_MS = 864e5
 const ARCH = 'arm64'
 const MEMORY_MB = 256
 const DAYS = 3
-/** The ones compared, in the order every panel lists them, with names short enough for a third of the page. */
+/** The ones compared, in the order every panel lists them, with names short enough for a quarter of the page. */
 const CONTENDERS: { base: string; name: string; memoryMb?: number }[] = [
   { base: 'Llrt', name: 'LLRT' },
   { base: 'BunCompileAotTrim', name: 'Bun AOT, trimmed' },
@@ -22,7 +22,7 @@ const CONTENDERS: { base: string; name: string; memoryMb?: number }[] = [
 /** What each leader is measured against: the newest Node.js Lambda runs without a preview. */
 const BASELINE = 'Node24'
 
-type Key = 'cold' | 'trip' | 'warm' | 'mem' | 'size'
+type Key = 'cold' | 'trip' | 'warm' | 'mem'
 const METRICS: {
   key: Key
   title: string
@@ -33,24 +33,15 @@ const METRICS: {
   microvm: boolean
 }[] = [
   { key: 'cold', title: 'Cold start', unit: 'ms', digits: 1, better: 'faster', microvm: false },
-  { key: 'warm', title: 'Warm start', unit: 'ms', digits: 2, better: 'faster', microvm: false },
-  { key: 'mem', title: 'Memory used', unit: 'MB', digits: 1, better: 'less', microvm: true },
-  { key: 'size', title: 'Size', unit: 'MB', digits: 1, better: 'smaller', microvm: true },
   // How long a caller waits for a fresh instance's answer, the one number every kind has.
   { key: 'trip', title: 'First answer', unit: 'ms', digits: 0, better: 'faster', microvm: true },
+  { key: 'warm', title: 'Warm start', unit: 'ms', digits: 2, better: 'faster', microvm: false },
+  { key: 'mem', title: 'Memory used', unit: 'MB', digits: 1, better: 'less', microvm: true },
 ]
 
 type Row = { fn: Fn; name: string; values: Record<Key, number | undefined> }
 
-const Panel = ({
-  metric: m,
-  rows: all,
-  className = '',
-}: {
-  metric: (typeof METRICS)[number]
-  rows: Row[]
-  className?: string
-}) => {
+const Panel = ({ metric: m, rows: all }: { metric: (typeof METRICS)[number]; rows: Row[] }) => {
   const rows = m.microvm ? all : all.filter((r) => !r.fn.microvm)
   const present = rows.filter((r) => r.values[m.key] !== undefined)
   const max = Math.max(0, ...present.map((r) => r.values[m.key]!))
@@ -59,7 +50,7 @@ const Panel = ({
   const ratio = leader && baseline !== undefined ? baseline / leader.values[m.key]! : undefined
 
   return (
-    <article className={`flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6 ${className}`}>
+    <article className="flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6">
       <div className="flex items-baseline justify-between gap-3 text-sm text-muted">
         <h3 className="text-lg">{m.title}</h3>
         {m.unit}
@@ -133,8 +124,7 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
   const rows: Row[] = CONTENDERS.flatMap(({ base, name, memoryMb = MEMORY_MB }) => {
     const fn = latest.functions.find((f) => f.id === `${base}/${ARCH}/${memoryMb}`)
     if (!fn) return []
-    // Node.js functions report no code size: 0, which the table shows as missing too.
-    const avg = (key: Key) => mean(runs.map((r) => r.points.get(fn.id)?.[key] || undefined))
+    const avg = (key: Key) => mean(runs.map((r) => r.points.get(fn.id)?.[key]))
     return [
       {
         fn,
@@ -144,7 +134,6 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
           trip: avg('trip'),
           warm: avg('warm'),
           mem: avg('mem'),
-          size: avg('size'),
         },
       },
     ]
@@ -163,21 +152,9 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
           {rows.some((r) => r.fn.microvm) && ' · MicroVM at 2 GB'}
         </p>
       </div>
-      {/* Three panels in a row, then two wider ones; two in a row on a tablet, the last across. */}
-      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule sm:grid-cols-2 lg:grid-cols-6">
-        {METRICS.map((m, i) => (
-          <Panel
-            key={m.key}
-            metric={m}
-            rows={rows}
-            className={
-              i < 3
-                ? 'lg:col-span-2'
-                : i === METRICS.length - 1
-                  ? 'sm:col-span-2 lg:col-span-3'
-                  : 'lg:col-span-3'
-            }
-          />
+      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule sm:grid-cols-2 lg:grid-cols-4">
+        {METRICS.map((m) => (
+          <Panel key={m.key} metric={m} rows={rows} />
         ))}
       </div>
     </section>
