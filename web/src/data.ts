@@ -208,11 +208,15 @@ const describe = (f: FunctionSummary): Fn => {
   }
   return {
     ...variant,
+    // The MicroVMs' section shows every size at once, each its own line, so each says which it is.
+    ...(variant.microvm && { name: `${variant.name} · ${f.memoryMb / 1024} GB` }),
     id: `${base}/${f.arch}/${f.memoryMb}`,
     base,
     arch: f.arch,
     memoryMb: f.memoryMb,
-    color: `var(--color-line-${base}, var(--color-line-other))`,
+    color: variant.microvm
+      ? `var(--color-line-${base}-${f.memoryMb}, var(--color-line-${base}))`
+      : `var(--color-line-${base}, var(--color-line-other))`,
   }
 }
 

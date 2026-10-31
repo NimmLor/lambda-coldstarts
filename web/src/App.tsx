@@ -23,7 +23,6 @@ import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
 import { isBoolean, isNumber, isString, useStored } from './stored'
 import { MicroVms } from './MicroVms'
-import { Segmented } from './Segmented'
 import { Table } from './Table'
 import { WebFunctions } from './WebFunctions'
 
@@ -33,6 +32,8 @@ const DAY_MS = 864e5
 /** How often PerfSchedule starts a run (infra/perf.ts). */
 const RUN_EVERY_MS = 4 * 36e5
 const RANGES = [14, 30, 90]
+/** The MicroVM size Lambda picks unless told otherwise. */
+const MICROVM_DEFAULT_MB = 2048
 
 const METRICS: Metric[] = [
   {
@@ -72,6 +73,53 @@ const METRICS: Metric[] = [
     icon: 'dur',
   },
 ]
+
+const Segmented = <T extends string | number>({
+  label,
+  options,
+  value,
+  onPick,
+  text = String,
+  unit,
+}: {
+  label: string
+  options: readonly T[]
+  value: T | undefined
+  onPick: (v: T) => void
+  text?: (v: T) => string
+  /** After each option in the phone's picker, which has no label to carry it. */
+  unit?: string
+}) => (
+  <>
+    <div className="flex shrink-0 items-center gap-2.5 max-sm:hidden">
+      <span className="text-xs font-medium text-muted">{label}</span>
+      <div className="cells" role="group" aria-label={label}>
+        {options.map((v) => (
+          <button key={v} type="button" aria-pressed={v === value} onClick={() => onPick(v)}>
+            {text(v)}
+          </button>
+        ))}
+      </div>
+    </div>
+    {/* A phone has no room for every cell: the system picker, its value saying what it is. */}
+    <span className="select sm:hidden">
+      <select
+        aria-label={label}
+        value={String(value)}
+        onChange={(e) => onPick(options.find((o) => String(o) === e.target.value)!)}
+      >
+        {options.map((o) => (
+          <option key={o} value={String(o)}>
+            {unit ? `${text(o)} ${unit}` : text(o)}
+          </option>
+        ))}
+      </select>
+      <svg aria-hidden="true" viewBox="0 0 10 6" className="select__caret">
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    </span>
+  </>
+)
 
 /** A choice among too many for cells: the system picker at every width, as wide as its value. */
 const Picker = ({
@@ -268,8 +316,6 @@ export const App = () => {
   const [compareWeb, setCompareWeb] = useStored('compareWeb', true, isBoolean)
   /** The same for the MicroVMs' section. */
   const [compareMicrovm, setCompareMicrovm] = useStored('compareMicrovm', true, isBoolean)
-  /** The MicroVM size the section shows, 2 GB, Lambda's default, until another is picked; kept. */
-  const [microvmMemory, setMicrovmMemory] = useStored('microvmMemory', 2048, isNumber)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -403,13 +449,10 @@ export const App = () => {
     // Its charts show every function they have: only the result list hides rows.
     // From the first run that measured a Web Function, however far back the counterparts go.
     const webView = viewOf([...webs, ...counterparts], new Set(), () => {}, counterparts[0], webs)
-    // The same for the MicroVM of the picked size, whose counterpart is compared by its round trips.
-    const microvms = latest.functions.filter((f) => f.microvm)
-    const microvmSizes = microvms.map((f) => f.memoryMb)
-    const shownMicrovmMemory = microvmSizes.includes(microvmMemory)
-      ? microvmMemory
-      : Math.max(...microvmSizes)
-    const microvm = microvms.filter((f) => f.memoryMb === shownMicrovmMemory)
+    // The same for the MicroVMs, smallest first, whose counterpart is compared by its round trips.
+    const microvms = latest.functions
+      .filter((f) => f.microvm)
+      .sort((a, b) => a.memoryMb - b.memoryMb)
     const microvmCounterparts = latest.functions.filter(
       (f) =>
         compareMicrovm &&
@@ -417,15 +460,23 @@ export const App = () => {
         f.memoryMb === shownMemory &&
         microvms.some((m) => m.microvm!.counterpart === f.base)
     )
-    // From the first run that measured a MicroVM of any size.
+    // From the first run that measured a MicroVM, however far back the counterparts go.
     const microvmView = viewOf(
-      [...microvm, ...microvmCounterparts],
+      [...microvms, ...microvmCounterparts],
       new Set(),
       () => {},
       microvmCounterparts[0],
       microvms
     )
-    const microvmSizesView = viewOf(microvm, new Set(), () => {}, microvmCounterparts[0], microvms)
+    // Memory barely moves with the size, so its figure shows Lambda's default, 2 GB, alone.
+    const defaultMicrovm = microvms.filter((f) => f.memoryMb === MICROVM_DEFAULT_MB)
+    const microvmMemoryView = viewOf(
+      [...(defaultMicrovm.length ? defaultMicrovm : microvms), ...microvmCounterparts],
+      new Set(),
+      () => {},
+      microvmCounterparts[0],
+      microvms
+    )
     // The result list ranks the Web Functions among the functions. A MicroVM has no init to rank.
     const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
 
@@ -569,14 +620,7 @@ export const App = () => {
         {microvms.length > 0 && (
           <MicroVms
             view={microvmView}
-            sizesView={microvmSizesView}
-            sized={microvms}
-            picked={shownMicrovmMemory}
-            onPick={(mb) => {
-              track('microvm_size_picked', { memory_mb: mb })
-              setMicrovmMemory(mb)
-              setHoverAt(undefined)
-            }}
+            memoryView={microvmMemoryView}
             metrics={METRICS}
             compared={compareMicrovm}
             onCompare={(on) => {

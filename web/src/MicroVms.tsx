@@ -1,10 +1,8 @@
 import { track } from './analytics'
 import type { Metric } from './Chart'
-import type { Fn, View } from './data'
+import type { View } from './data'
 import { REPO, WRAP } from './layout'
-import { MemoryChart } from './MemoryChart'
 import { Board, Differences, Explainer, SectionHead } from './Section'
-import { Segmented } from './Segmented'
 
 const DOCS = 'https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html'
 const CONCEPTS = 'https://docs.aws.amazon.com/lambda/latest/dg/microvms-how-it-works.html'
@@ -94,73 +92,39 @@ const About = () => (
 )
 
 /**
- * The Lambda MicroVMs, apart from everything above: at the size picked here, a figure for each of
- * the first answer, the first request and memory, and the first answer over time, against their
+ * The Lambda MicroVMs, apart from everything above: a figure for each of the first answer and the
+ * first request at every size, and memory at 2 GB, and the first answer over time, against their
  * counterparts unless turned off: the same runtime as an Event Function on arm64 at the memory size
- * picked above. Then the first answer at every size. With no init, they're in neither the charts
- * above nor the result list.
+ * picked above. With no init, they're in neither the charts above nor the result list.
  */
 export const MicroVms = ({
   view,
-  sizesView,
-  sized,
-  picked,
-  onPick,
+  memoryView,
   metrics,
   compared,
   onCompare,
 }: {
-  /** The MicroVM of the picked size, and its counterparts when `compared`. */
+  /** The MicroVMs at every size, smallest first, and their counterparts when `compared`. */
   view: View
-  /** The MicroVM of the picked size alone, against the same counterpart, for the chart by size. */
-  sizesView: View
-  /** The MicroVMs at every size. */
-  sized: Fn[]
-  /** The size picked, in MB. */
-  picked: number
-  onPick: (memoryMb: number) => void
+  /** The same with one size, for memory, which barely changes with it. */
+  memoryView: View
   /** The page's metrics; the section shows memory after its own round trips. */
   metrics: Metric[]
   compared: boolean
   onCompare: (on: boolean) => void
-}) => {
-  const sizes = [...new Set(sized.map((f) => f.memoryMb))].sort((a, b) => a - b)
-  return (
-    <section className={`${WRAP} flex flex-col gap-6 pt-16 sm:pt-20`}>
-      <SectionHead title="Lambda MicroVMs" compared={compared} onCompare={onCompare}>
-        Node.js 24 in a MicroVM, on arm64 at each baseline Lambda offers, from 0.5 GB and a quarter
-        of a vCPU to 8 GB and 4 vCPUs. Timed by how long a caller waits for an answer, as it has no
-        cold start in the sense above.
-      </SectionHead>
-      <About />
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <Segmented
-          label="Size"
-          options={sizes}
-          value={picked}
-          text={(mb) => String(mb / 1024)}
-          unit="GB"
-          onPick={onPick}
-        />
-        <span className="text-xs text-muted max-sm:hidden">GB, with a vCPU per 2 GB</span>
-      </div>
-      <Board
-        view={view}
-        figures={[...TRIPS, ...metrics.filter((m) => m.key === 'mem')]}
-        compared={compared}
-      >
-        <MemoryChart
-          view={sizesView}
-          sized={sized}
-          memories={sizes}
-          onPick={onPick}
-          stat="trip"
-          title="First answer by size"
-          picked={picked}
-          unit="GB"
-          className="col-span-full"
-        />
-      </Board>
-    </section>
-  )
-}
+}) => (
+  <section className={`${WRAP} flex flex-col gap-6 pt-16 sm:pt-20`}>
+    <SectionHead title="Lambda MicroVMs" compared={compared} onCompare={onCompare}>
+      Node.js 24 in a MicroVM, on arm64 at each baseline Lambda offers, from 0.5 GB and a quarter of
+      a vCPU to 8 GB and 4 vCPUs. Timed by how long a caller waits for an answer, as it has no cold
+      start in the sense above.
+    </SectionHead>
+    <About />
+    <Board
+      view={view}
+      figures={[...TRIPS, ...metrics.filter((m) => m.key === 'mem')]}
+      figureView={(m) => (m.key === 'mem' ? memoryView : view)}
+      compared={compared}
+    />
+  </section>
+)

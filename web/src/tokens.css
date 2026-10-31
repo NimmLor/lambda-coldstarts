@@ -40,6 +40,12 @@
   --color-line-Node26: oklch(74% 0.12 225);
   --color-line-Node24Web: oklch(80% 0.11 285);
   --color-line-Node24MicroVm: oklch(80% 0.13 70);
+  /* Each MicroVM size, which its section shows at once: amber, darker and redder as it grows. */
+  --color-line-Node24MicroVm-512: oklch(91% 0.09 92);
+  --color-line-Node24MicroVm-1024: oklch(86% 0.12 82);
+  --color-line-Node24MicroVm-2048: oklch(80% 0.13 70);
+  --color-line-Node24MicroVm-4096: oklch(72% 0.15 58);
+  --color-line-Node24MicroVm-8192: oklch(64% 0.16 46);
   --color-line-other: oklch(74% 0.12 270);
 
   /* The glyph beside each chart's headline in ChartIcon.tsx: ice, flame, chip, clock, sizes. */
