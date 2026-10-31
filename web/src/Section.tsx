@@ -150,13 +150,10 @@ export const Board = ({
   view,
   figures,
   compared,
-  figureView = () => view,
 }: {
   view: View
   figures: Metric[]
   compared: boolean
-  /** What a figure shows, when not all of `view`. */
-  figureView?: (metric: Metric) => View
 }) => {
   const [first] = figures
   return (
@@ -165,7 +162,7 @@ export const Board = ({
       className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3"
     >
       {figures.map((m) => (
-        <Figure key={m.key} metric={m} view={figureView(m)} />
+        <Figure key={m.key} metric={m} view={view} />
       ))}
       <Chart
         // Under the first figure, which has its plain title.

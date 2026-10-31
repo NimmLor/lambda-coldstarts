@@ -92,22 +92,19 @@ const About = () => (
 )
 
 /**
- * The Lambda MicroVMs, apart from everything above: a figure for each of the first answer and the
- * first request at every size, and memory at 2 GB, and the first answer over time, against their
+ * The Lambda MicroVMs, apart from everything above: a figure for each of the first answer, the
+ * first request and memory at every size, and the first answer over time, against their
  * counterparts unless turned off: the same runtime as an Event Function on arm64 at the memory size
  * picked above. With no init, they're in neither the charts above nor the result list.
  */
 export const MicroVms = ({
   view,
-  memoryView,
   metrics,
   compared,
   onCompare,
 }: {
   /** The MicroVMs at every size, smallest first, and their counterparts when `compared`. */
   view: View
-  /** The same with one size, for memory, which barely changes with it. */
-  memoryView: View
   /** The page's metrics; the section shows memory after its own round trips. */
   metrics: Metric[]
   compared: boolean
@@ -123,7 +120,6 @@ export const MicroVms = ({
     <Board
       view={view}
       figures={[...TRIPS, ...metrics.filter((m) => m.key === 'mem')]}
-      figureView={(m) => (m.key === 'mem' ? memoryView : view)}
       compared={compared}
     />
   </section>

@@ -32,8 +32,6 @@ const DAY_MS = 864e5
 /** How often PerfSchedule starts a run (infra/perf.ts). */
 const RUN_EVERY_MS = 4 * 36e5
 const RANGES = [14, 30, 90]
-/** The MicroVM size Lambda picks unless told otherwise. */
-const MICROVM_DEFAULT_MB = 2048
 
 const METRICS: Metric[] = [
   {
@@ -468,15 +466,6 @@ export const App = () => {
       microvmCounterparts[0],
       microvms
     )
-    // Memory barely moves with the size, so its figure shows Lambda's default, 2 GB, alone.
-    const defaultMicrovm = microvms.filter((f) => f.memoryMb === MICROVM_DEFAULT_MB)
-    const microvmMemoryView = viewOf(
-      [...(defaultMicrovm.length ? defaultMicrovm : microvms), ...microvmCounterparts],
-      new Set(),
-      () => {},
-      microvmCounterparts[0],
-      microvms
-    )
     // The result list ranks the Web Functions among the functions. A MicroVM has no init to rank.
     const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
 
@@ -620,7 +609,6 @@ export const App = () => {
         {microvms.length > 0 && (
           <MicroVms
             view={microvmView}
-            memoryView={microvmMemoryView}
             metrics={METRICS}
             compared={compareMicrovm}
             onCompare={(on) => {
