@@ -159,11 +159,14 @@ export const Chart = ({
   metric: m,
   wide,
   view,
+  caption,
   className = '',
 }: {
   metric: Metric
   wide: boolean
   view: View
+  /** What the values are, beside the title; by default the unit and the memory size. */
+  caption?: string
   className?: string
 }) => {
   const { runs, memoryMb, shown, scaled, hover, focus, agg, baseline } = view
@@ -198,7 +201,7 @@ export const Chart = ({
             <ChartIcon name={m.icon} className={wide ? 'size-5' : 'size-[1.125rem]'} />
             {m.title}
           </h2>
-          {m.unit}, mean per run at {memoryMb} MB
+          {caption ?? `${m.unit}, mean per run at ${memoryMb} MB`}
         </div>
         {best && (
           <span className="inline-flex items-center gap-2">
@@ -260,6 +263,28 @@ export const Chart = ({
               />
             ))}
           </svg>
+          {/* A run with no run beside it to draw a line to, such as a function's first, is a dot. */}
+          {ordered.flatMap((s) =>
+            s.values.flatMap((v, i) =>
+              v === undefined ||
+              s.values[i - 1] !== undefined ||
+              s.values[i + 1] !== undefined ||
+              i === hover
+                ? []
+                : [
+                    <div
+                      key={`${s.f.id}:${i}`}
+                      className="absolute size-1.5 -translate-1/2 rounded-full"
+                      style={{
+                        left: `${x(i)}%`,
+                        top: `${y(v)}%`,
+                        background: s.f.color,
+                        opacity: !focus || focus === s.f.base ? 1 : 0.15,
+                      }}
+                    />,
+                  ]
+            )
+          )}
           {hover !== undefined && (
             <>
               <div className="absolute inset-y-0 w-px bg-rule-2" style={{ left: `${x(hover)}%` }} />

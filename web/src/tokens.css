@@ -21,7 +21,8 @@
   --color-bad: oklch(70% 0.17 25);
   --color-bad-soft: oklch(24.5% 0.035 25);
 
-  /* One line per variant in data.ts: Bun warm, Node.js cool, LLRT in between.
+  /* One line per variant in data.ts: Bun warm, Node.js cool, LLRT in between. The Web Function
+     has a section of its own, beside Node.js 24 only, so it just needs to stand apart from that.
      The headline Bun variant takes Bun's brand pink; the AOT one moves to magenta to stay apart from it. */
   --color-line-BunRuntime: oklch(78% 0.13 85);
   --color-line-BunCompile: oklch(78% 0.13 60);
@@ -36,7 +37,7 @@
   --color-line-Node22: oklch(78% 0.13 150);
   --color-line-Node24: oklch(78% 0.11 185);
   --color-line-Node26: oklch(74% 0.12 225);
-  --color-line-Node24Web: oklch(88% 0.08 195);
+  --color-line-Node24Web: oklch(80% 0.11 285);
   --color-line-other: oklch(74% 0.12 270);
 
   /* The glyph beside each chart's headline in ChartIcon.tsx: ice, flame, chip, clock, sizes. */

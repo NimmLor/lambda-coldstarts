@@ -158,8 +158,8 @@ has no component for them yet. Their API differs, and so does how it's measured
 
 - 🌍 **eu-west-1**, not eu-central-1, which doesn't have Web Functions yet. The code sits in a
   versioned bucket there.
-- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets: the site shows it at
-  whichever memory size you pick.
+- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site gives it a
+  section of its own, against `Node24` on arm64 at whichever memory size you pick.
 - 🔄 **A cold start** is a new revision that differs in `BENCH_NONCE`, which the endpoint is then
   pointed at. For a second or two after the endpoint says it's updated, requests still reach the old
   revision's environment, so the round keeps asking until a server answers its first request.

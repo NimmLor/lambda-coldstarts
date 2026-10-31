@@ -21,6 +21,7 @@ import lambdaIcon from './icons/lambda.svg'
 import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
 import { Table } from './Table'
+import { WebFunctions } from './WebFunctions'
 
 /** PerfApi, behind the same CloudFront distribution; see infra/perf.ts and dev.ts. */
 const API = '/api'
@@ -206,8 +207,8 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
   // A Web Function is Node.js 24 again, on another kind of Lambda.
   const count = (family: Family) =>
-    [...variants].filter((b) => VARIANTS[b]?.family === family && !VARIANTS[b]?.region).length
-  const web = [...variants].some((b) => VARIANTS[b]?.region)
+    [...variants].filter((b) => VARIANTS[b]?.family === family && !VARIANTS[b]?.web).length
+  const web = [...variants].some((b) => VARIANTS[b]?.web)
   return (
     <header
       className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}
@@ -298,6 +299,8 @@ export const App = () => {
   const [pinned, setPinned] = useState<string>()
   const [focus, setFocus] = useState<string>()
   const [hidden, setHidden] = useState(new Set<string>())
+  /** The same, for the Web Functions' section. */
+  const [webHidden, setWebHidden] = useState(new Set<string>())
   /** The variant the readouts measure every other against, or '' for none. */
   const [compare, setCompare] = useState('Node24')
 
@@ -319,19 +322,19 @@ export const App = () => {
 
   const latest = history.at(-1)
 
-  const toggle = (base: string) => {
-    const next = new Set(hidden)
+  const toggler = (set: Set<string>, setter: (next: Set<string>) => void) => (base: string) => {
+    const next = new Set(set)
     if (!next.delete(base)) next.add(base)
-    setHidden(next)
+    setter(next)
   }
+  const toggle = toggler(hidden, setHidden)
 
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
     const shownArch = archs.includes(arch) ? arch : archs[0]!
-    // A function with a size of its own shows at every size, rather than being one.
-    const memories = [
-      ...new Set(latest.functions.filter((f) => !f.fixedMemoryMb).map((f) => f.memoryMb)),
-    ].sort((a, b) => a - b)
+    // The Web Functions have a section of their own, further down.
+    const functions = latest.functions.filter((f) => !f.web)
+    const memories = [...new Set(functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
     const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
     // A range is offered once there are runs older than the next shorter one shows.
     const span = latest.date.getTime() - history[0]!.date.getTime()
@@ -343,9 +346,9 @@ export const App = () => {
     // A hover shows its run over the picked one, which comes back once the pointer leaves.
     const hovered =
       hover !== undefined && hover < runs.length ? hover : pinnedAt >= 0 ? pinnedAt : undefined
-    const sized = latest.functions.filter((f) => f.arch === shownArch)
+    const sized = functions.filter((f) => f.arch === shownArch)
     const fns = sized
-      .filter((f) => f.memoryMb === shownMemory || f.fixedMemoryMb)
+      .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
     const visible = fns.filter((f) => !hidden.has(f.base))
     const shown = visible.length ? visible : fns
@@ -395,6 +398,25 @@ export const App = () => {
     }
     const [cold, ...small] = METRICS
 
+    // Each Web Function and the function it's compared with, on the arm64 it's limited to.
+    const webs = latest.functions.filter((f) => f.web)
+    const counterparts = latest.functions.filter(
+      (f) =>
+        f.arch === 'arm64' &&
+        f.memoryMb === shownMemory &&
+        webs.some((w) => w.web!.counterpart === f.base)
+    )
+    const webFns = [...webs, ...counterparts]
+    const webShown = webFns.filter((f) => !webHidden.has(f.base))
+    const webView: View = {
+      ...view,
+      fns: webFns,
+      shown: webShown.length ? webShown : webFns,
+      hidden: webHidden,
+      baseline: counterparts[0],
+      toggle: toggler(webHidden, setWebHidden),
+    }
+
     return (
       <>
         <section className={WRAP}>
@@ -442,7 +464,7 @@ export const App = () => {
               <LastRun run={latest} />
               <span>{latest.rounds} rounds</span>
               <span className="hidden sm:inline">
-                {new Set(latest.functions.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
+                {new Set(functions.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
                 {memories.length} sizes
               </span>
             </p>
@@ -545,6 +567,10 @@ export const App = () => {
             <Table view={view} />
           </div>
         </section>
+
+        {webs.length > 0 && (
+          <WebFunctions view={webView} metrics={METRICS} region={webs[0]!.region!} />
+        )}
       </>
     )
   }

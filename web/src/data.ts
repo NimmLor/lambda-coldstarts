@@ -32,8 +32,11 @@ type Variant = {
   preview?: boolean
   /** Where it runs, when that isn't the stack's eu-central-1. */
   region?: string
-  /** The one memory size it has, which it shows at whichever size is picked. */
-  fixedMemoryMb?: number
+  /**
+   * A Lambda Web Function, which has a section of its own rather than a place among the others,
+   * where it's compared with `counterpart`: the same runtime as a function.
+   */
+  web?: { counterpart: string }
   /** How it's deployed, for the row's tooltip. */
   about: string
 }
@@ -127,7 +130,7 @@ export const VARIANTS: Record<string, Variant> = {
     family: 'Node',
     build: 'bun build --target=node --format=esm --minify',
     region: 'eu-west-1',
-    fixedMemoryMb: 2048,
+    web: { counterpart: 'Node24' },
     about:
       'A node:http server on Lambda Web Functions, which eu-central-1 doesn’t have yet: it runs in eu-west-1, with the 2 GB and 2 vCPUs every environment gets',
   },
