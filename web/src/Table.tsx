@@ -195,6 +195,8 @@ export const Table = ({ view }: { view: View }) => {
               {f.canary && <Badge tone="outline">canary Bun</Badge>}
               {f.preview && <Badge tone="amber">preview</Badge>}
               {f.region && <Badge tone="outline">{f.region}</Badge>}
+              {/* Every row but this has the size the heading names. */}
+              {f.web && <Badge tone="outline">{`${f.memoryMb / 1024} GB`}</Badge>}
             </span>
           </div>
           <div className="col-span-full flex flex-col gap-1 text-xs/normal">

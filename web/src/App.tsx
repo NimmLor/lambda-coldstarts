@@ -302,8 +302,6 @@ export const App = () => {
   const [pinned, setPinned] = useState<string>()
   const [focus, setFocus] = useState<string>()
   const [hidden, setHidden] = useState(new Set<string>())
-  /** The same, for the Web Functions' section. */
-  const [webHidden, setWebHidden] = useState(new Set<string>())
   /** The variant the readouts measure every other against, or '' for none. */
   const [compare, setCompare] = useState('Node24')
   /** Whether the Web Functions' section shows their counterparts beside them; kept too. */
@@ -327,12 +325,11 @@ export const App = () => {
 
   const latest = history.at(-1)
 
-  const toggler = (set: Set<string>, setter: (next: Set<string>) => void) => (base: string) => {
-    const next = new Set(set)
+  const toggle = (base: string) => {
+    const next = new Set(hidden)
     if (!next.delete(base)) next.add(base)
-    setter(next)
+    setHidden(next)
   }
-  const toggle = toggler(hidden, setHidden)
 
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
@@ -436,12 +433,10 @@ export const App = () => {
         f.memoryMb === shownMemory &&
         webs.some((w) => w.web!.counterpart === f.base)
     )
-    const webView = viewOf(
-      [...webs, ...counterparts],
-      webHidden,
-      toggler(webHidden, setWebHidden),
-      counterparts[0]
-    )
+    // Its charts show every function they have: only the result list hides rows.
+    const webView = viewOf([...webs, ...counterparts], new Set(), () => {}, counterparts[0])
+    // The result list ranks the Web Functions among the functions.
+    const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
 
     return (
       <>
@@ -497,7 +492,14 @@ export const App = () => {
           </div>
         </div>
 
-        <section className={`${WRAP} mt-6 flex flex-col gap-6`}>
+        <section className={`${WRAP} mt-10 flex flex-col gap-6`}>
+          <div className="flex flex-col gap-3">
+            <h2 className="text-2xl">Lambda Event Functions</h2>
+            <p className="max-w-prose text-pretty text-ink-2">
+              Every runtime as a regular Lambda function, which AWS now calls an Event Function, at{' '}
+              {shownMemory} MB on {shownArch} in {STACK_REGION}.
+            </p>
+          </div>
           {/* Above the charts, which alone it changes: the toolbar has no room left for it. */}
           <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 text-sm text-muted">
             <Picker
@@ -561,6 +563,19 @@ export const App = () => {
           </div>
         </section>
 
+        {webs.length > 0 && (
+          <WebFunctions
+            view={webView}
+            metrics={METRICS}
+            region={webs[0]!.region!}
+            compared={compareWeb}
+            onCompare={(on) => {
+              track('web_compare_toggled', { on: Number(on) })
+              setCompareWeb(on)
+            }}
+          />
+        )}
+
         <section className="band mt-16 py-12 sm:py-16">
           <div className={`${WRAP} flex flex-col gap-8`}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
@@ -590,22 +605,9 @@ export const App = () => {
                 Click a row to hide it.
               </p>
             </div>
-            <Table view={view} />
+            <Table view={listView} />
           </div>
         </section>
-
-        {webs.length > 0 && (
-          <WebFunctions
-            view={webView}
-            metrics={METRICS}
-            region={webs[0]!.region!}
-            compared={compareWeb}
-            onCompare={(on) => {
-              track('web_compare_toggled', { on: Number(on) })
-              setCompareWeb(on)
-            }}
-          />
-        )}
       </>
     )
   }

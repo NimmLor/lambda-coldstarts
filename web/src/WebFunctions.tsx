@@ -2,7 +2,6 @@ import { track } from './analytics'
 import { Chart, type Metric } from './Chart'
 import { STACK_REGION, type View } from './data'
 import { REPO, WRAP } from './layout'
-import { Table } from './Table'
 
 const DOCS = 'https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html'
 const LAUNCH =
@@ -98,8 +97,9 @@ const Explainer = () => (
 )
 
 /**
- * The Lambda Web Functions, apart from the functions above, and unless turned off, against their
- * counterparts: the same runtime as an Event Function on arm64 at the picked memory size.
+ * The Lambda Web Functions' charts, apart from the functions above, and unless turned off, against
+ * their counterparts: the same runtime as an Event Function on arm64 at the picked memory size.
+ * The result list below ranks them with the functions.
  */
 export const WebFunctions = ({
   view,
@@ -159,7 +159,6 @@ export const WebFunctions = ({
           <Chart key={m.key} metric={m} wide={false} view={view} caption={caption(m)} />
         ))}
       </div>
-      <Table view={view} />
     </section>
   )
 }
