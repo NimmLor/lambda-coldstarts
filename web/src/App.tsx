@@ -434,7 +434,7 @@ export const App = () => {
       setPinned(undefined)
       setRange(Number(key.slice(5)))
     }
-    const [cold, ...small] = METRICS
+    const [cold, warm, mem, dur] = METRICS
 
     // Each Web Function and the function it's compared with, on the arm64 it's limited to.
     const counterparts = latest.functions.filter(
@@ -583,6 +583,8 @@ export const App = () => {
             />
             {memories.length > 1 && (
               <MemoryChart
+                metric={cold!}
+                wide
                 view={view}
                 sized={sized}
                 memories={memories}
@@ -590,9 +592,21 @@ export const App = () => {
                 className="col-span-full lg:col-span-1"
               />
             )}
-            {small.map((m) => (
-              <Chart key={m.key} metric={m} wide={false} view={view} />
-            ))}
+            <Chart metric={warm!} wide={false} view={view} />
+            <Chart metric={mem!} wide={false} view={view} />
+            {/* With one size there's nothing to plot across sizes. */}
+            {memories.length > 1 ? (
+              <MemoryChart
+                metric={warm!}
+                wide={false}
+                view={view}
+                sized={sized}
+                memories={memories}
+                onPick={pickMemory}
+              />
+            ) : (
+              <Chart metric={dur!} wide={false} view={view} />
+            )}
           </div>
         </section>
 
