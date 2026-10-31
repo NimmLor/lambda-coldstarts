@@ -131,7 +131,40 @@ const archRatio = (runs: RunPoints[], functions: Fn[], base?: string) => {
   return logs.length ? Math.exp(logs.reduce((sum, l) => sum + l, 0) / logs.length) : undefined
 }
 
-/** One line under the panels: arm64's cold start against x86_64's, overall and for Node.js 24. */
+/** A ratio as its stat: arm64's bar against x86_64's, the slower one full width. */
+const ArchFigure = ({ label, ratio }: { label: string; ratio: number }) => {
+  const slower = Math.max(1, 1 / ratio)
+  const bars = [
+    ['arm64', 1 / ratio / slower, 'bg-cool'],
+    ['x86_64', 1 / slower, 'bg-muted'],
+  ] as const
+  return (
+    <article className="flex min-w-0 flex-col gap-3 bg-paper-2 p-5 sm:p-6">
+      <h4 className="text-sm text-ink-2">{label}</h4>
+      <p className="m-0 flex items-baseline gap-2">
+        <span className="measured text-2xl text-ink">
+          {(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×
+        </span>
+        <span className="text-sm text-muted">{ratio >= 1 ? 'faster' : 'slower'} on arm64</span>
+      </p>
+      <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
+        {bars.map(([arch, width, color]) => (
+          <div key={arch} className="contents">
+            <dt className="measured text-xs text-muted">{arch}</dt>
+            <dd className="m-0 h-1.5 rounded-full bg-paper-3">
+              <div
+                className={`h-full rounded-full ${color}`}
+                style={{ width: `${width * 100}%` }}
+              />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  )
+}
+
+/** A row under the panels: arm64's cold start against x86_64's, overall and for Node.js 24. */
 const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[] }) => {
   const figures = [
     ['All functions', archRatio(runs, functions)],
@@ -139,29 +172,19 @@ const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[]
   ] as const
   if (figures.every(([, ratio]) => ratio === undefined)) return null
   return (
-    <article className="col-span-full flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2 bg-paper-2 px-5 py-4 sm:px-6">
-      <div className="flex flex-wrap items-baseline gap-x-3">
+    <div className="col-span-full grid grid-cols-1 gap-px bg-rule sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-col gap-2 bg-paper-2 p-5 sm:col-span-2 sm:p-6">
         <h3 className="text-lg">arm64 vs. x86_64</h3>
-        <span className="text-sm text-muted">cold start, at every memory size</span>
+        <p className="m-0 max-w-prose text-sm text-pretty text-muted">
+          How much faster functions cold-start on arm64 than on x86_64, at every memory size. Web
+          Functions and MicroVMs run on arm64 only.
+        </p>
       </div>
-      <dl className="m-0 flex flex-wrap gap-x-8 gap-y-1">
-        {figures.map(
-          ([label, ratio]) =>
-            ratio !== undefined && (
-              <div key={label} className="flex items-baseline gap-2.5">
-                <dt className="text-sm text-ink-2">{label}</dt>
-                <dd className="m-0 text-sm text-muted">
-                  arm64{' '}
-                  <span className="measured text-md text-ink">
-                    {(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×
-                  </span>{' '}
-                  {ratio >= 1 ? 'faster' : 'slower'}
-                </dd>
-              </div>
-            )
-        )}
-      </dl>
-    </article>
+      {figures.map(
+        ([label, ratio]) =>
+          ratio !== undefined && <ArchFigure key={label} label={label} ratio={ratio} />
+      )}
+    </div>
   )
 }
 
