@@ -45,7 +45,8 @@ export type Sample = {
   codeSizeMb: number
   initMs: number
   durationMs: number
-  billedMs: number
+  /** Missing for a Web Function, which bills CPU time rather than duration. */
+  billedMs?: number
   maxMemoryMb: number
   /** Lambda's Duration of each warm invocation after the cold one. Missing from runs before they were measured. */
   warmMs?: number[]
@@ -57,6 +58,13 @@ export type Sample = {
    * Missing from older runs.
    */
   version?: string
+  /** A Web Function's: how long the cold request took, as PerfMeasure saw it. */
+  roundTripMs?: number
+  /**
+   * A Web Function's: Lambda started the environment before the request went out, so the
+   * request waited for less of `initMs` than a cold start would.
+   */
+  prewarmed?: boolean
   requestId: string
   measuredAt: string
 }

@@ -43,7 +43,10 @@ const Figure = ({
   </div>
 )
 
-/** A dashed outline for how a build was made; a filled amber chip for a runtime AWS hasn't released yet. */
+/**
+ * A dashed outline for how a build was made or where it runs; a filled amber chip for a runtime
+ * AWS hasn't released yet.
+ */
 const TONES = {
   outline: 'border-dashed border-rule-2 text-ink-2',
   amber: 'border-rule bg-accent-soft text-accent',
@@ -191,6 +194,8 @@ export const Table = ({ view }: { view: View }) => {
               {f.name}
               {f.canary && <Badge tone="outline">canary Bun</Badge>}
               {f.preview && <Badge tone="amber">preview</Badge>}
+              {/* Every row but this has the size the heading names. */}
+              {f.web && <Badge tone="outline">{`${f.memoryMb / 1024} GB`}</Badge>}
             </span>
           </div>
           <div className="col-span-full flex flex-col gap-1 text-xs/normal">

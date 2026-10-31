@@ -4,9 +4,11 @@ import { Chart, type Metric } from './Chart'
 import {
   DASHES,
   type Family,
+  type Fn,
   ORDER,
   type Run,
   type RunPoints,
+  STACK_REGION,
   type Stat,
   VARIANTS,
   type View,
@@ -19,7 +21,9 @@ import { Glance } from './Glance'
 import lambdaIcon from './icons/lambda.svg'
 import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
+import { isBoolean, isNumber, isString, useStored } from './stored'
 import { Table } from './Table'
+import { WebFunctions } from './WebFunctions'
 
 /** PerfApi, behind the same CloudFront distribution; see infra/perf.ts and dev.ts. */
 const API = '/api'
@@ -203,8 +207,10 @@ const InlinePick = <T extends string | number>({
 
 const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
+  // A Web Function is Node.js 24 again, on another kind of Lambda.
   const count = (family: Family) =>
-    [...variants].filter((b) => VARIANTS[b]?.family === family).length
+    [...variants].filter((b) => VARIANTS[b]?.family === family && !VARIANTS[b]?.web).length
+  const web = [...variants].some((b) => VARIANTS[b]?.web)
   return (
     <header
       className={`${WRAP} grid gap-x-8 gap-y-6 pt-10 pb-10 sm:pt-16 lg:grid-cols-12 lg:items-end`}
@@ -218,7 +224,7 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
       </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest
-          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions, each cold started ${latest.rounds} times every 4 hours. `
+          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${web ? ', plus Node.js 24 as a Lambda Web Function' : ''}, each cold started ${latest.rounds} times every 4 hours. `
           : 'Each runtime is cold started every 4 hours. '}
         Each point on the charts is one run. The table averages the range you pick.
       </p>
@@ -286,17 +292,20 @@ export const App = () => {
   const [history, setHistory] = useState<RunPoints[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
-  const [arch, setArch] = useState('arm64')
-  // One full vCPU, and the only size before there were more.
-  const [memory, setMemory] = useState(1769)
+  // 256 MB on arm64, like the glance at the top, until the visitor picks another, which is kept.
+  const [arch, setArch] = useStored('arch', 'arm64', isString)
+  const [memory, setMemory] = useStored('memory', 256, isNumber)
   const [range, setRange] = useState(30)
-  const [hover, setHover] = useState<number>()
+  /** The run under the pointer, by its finishedAt, which every view finds among its own runs. */
+  const [hoverAt, setHoverAt] = useState<string>()
   /** The run picked over the mean, by its finishedAt; it stays across ranges and sizes it is in. */
   const [pinned, setPinned] = useState<string>()
   const [focus, setFocus] = useState<string>()
   const [hidden, setHidden] = useState(new Set<string>())
   /** The variant the readouts measure every other against, or '' for none. */
   const [compare, setCompare] = useState('Node24')
+  /** Whether the Web Functions' section shows their counterparts beside them; kept too. */
+  const [compareWeb, setCompareWeb] = useStored('compareWeb', true, isBoolean)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -325,53 +334,83 @@ export const App = () => {
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
     const shownArch = archs.includes(arch) ? arch : archs[0]!
-    const memories = [...new Set(latest.functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
+    // The Web Functions have a section of their own, further down.
+    const functions = latest.functions.filter((f) => !f.web)
+    const memories = [...new Set(functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
     const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
     // A range is offered once there are runs older than the next shorter one shows.
     const span = latest.date.getTime() - history[0]!.date.getTime()
     const ranges = RANGES.filter((_, i) => i === 0 || span >= RANGES[i - 1]! * DAY_MS)
     const shownRange = ranges.includes(range) ? range : ranges.at(-1)!
     const since = latest.date.getTime() - shownRange * DAY_MS
-    const runs = history.filter((r) => r.date.getTime() > since)
-    const pinnedAt = runs.findIndex((r) => r.finishedAt === pinned)
-    // A hover shows its run over the picked one, which comes back once the pointer leaves.
-    const hovered =
-      hover !== undefined && hover < runs.length ? hover : pinnedAt >= 0 ? pinnedAt : undefined
-    const sized = latest.functions.filter((f) => f.arch === shownArch)
+    const inRange = history.filter((r) => r.date.getTime() > since)
+
+    /**
+     * `fns` over the runs in range from the first that measured any of `from`, all of them unless
+     * given, so a function added since doesn't leave its charts empty up to that run.
+     */
+    const viewOf = (
+      fns: Fn[],
+      hiddenOf: Set<string>,
+      toggleOf: (base: string) => void,
+      baseline?: Fn,
+      from = fns
+    ): View => {
+      const first = inRange.findIndex((r) => from.some((f) => r.points.has(f.id)))
+      const runs = first > 0 ? inRange.slice(first) : inRange
+      const at = (finishedAt?: string) => {
+        const i = runs.findIndex((r) => r.finishedAt === finishedAt)
+        return i >= 0 ? i : undefined
+      }
+      // A hover shows its run over the picked one, which comes back once the pointer leaves.
+      const hovered = at(hoverAt) ?? at(pinned)
+      const visible = fns.filter((f) => !hiddenOf.has(f.base))
+      const shown = visible.length ? visible : fns
+      const shownBases = new Set(shown.map((f) => f.base))
+      return {
+        runs,
+        latest,
+        memoryMb: shownMemory,
+        fns,
+        shown,
+        scaled: latest.functions.filter((f) => shownBases.has(f.base)),
+        hidden: hiddenOf,
+        hover: hovered,
+        focus,
+        baseline,
+        agg: (f, key: Stat) =>
+          hovered !== undefined
+            ? runs[hovered]!.points.get(f.id)?.[key]
+            : mean(runs.map((r) => r.points.get(f.id)?.[key])),
+        setHover: (i) => setHoverAt(i === undefined ? undefined : runs[i]?.finishedAt),
+        setFocus,
+        toggle: toggleOf,
+      }
+    }
+
+    const sized = functions.filter((f) => f.arch === shownArch)
     const fns = sized
       .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
-    const visible = fns.filter((f) => !hidden.has(f.base))
-    const shown = visible.length ? visible : fns
-    const shownBases = new Set(shown.map((f) => f.base))
-    const view: View = {
-      runs,
-      latest,
-      memoryMb: shownMemory,
+    const webs = latest.functions.filter((f) => f.web)
+    // The functions can be compared with a Web Function too, at its one size.
+    const comparable = [...fns, ...webs]
+    const view = viewOf(
       fns,
-      shown,
-      scaled: latest.functions.filter((f) => shownBases.has(f.base)),
       hidden,
-      hover: hovered,
-      focus,
-      baseline: fns.find((f) => f.base === compare),
-      agg: (f, key: Stat) =>
-        hovered !== undefined
-          ? runs[hovered]!.points.get(f.id)?.[key]
-          : mean(runs.map((r) => r.points.get(f.id)?.[key])),
-      setHover,
-      setFocus,
       toggle,
-    }
+      comparable.find((f) => f.base === compare)
+    )
+    const { runs, hover: hovered } = view
     const pickMemory = (mb: number) => {
       track('memory_picked', { memory_mb: mb })
       setMemory(mb)
-      setHover(undefined)
+      setHoverAt(undefined)
     }
     const pickRange = (r: number) => {
       track('range_picked', { days: r })
       setRange(r)
-      setHover(undefined)
+      setHoverAt(undefined)
     }
     // The mean over each range, then every run in the shown one, newest first.
     const means = ranges.map((r) => `mean:${r}`)
@@ -382,12 +421,26 @@ export const App = () => {
     }
     const pick = (key: string) => {
       track('run_picked', { run: key.startsWith('mean:') ? 'mean' : 'run' })
-      setHover(undefined)
+      setHoverAt(undefined)
       if (!key.startsWith('mean:')) return setPinned(key)
       setPinned(undefined)
       setRange(Number(key.slice(5)))
     }
     const [cold, ...small] = METRICS
+
+    // Each Web Function and the function it's compared with, on the arm64 it's limited to.
+    const counterparts = latest.functions.filter(
+      (f) =>
+        compareWeb &&
+        f.arch === 'arm64' &&
+        f.memoryMb === shownMemory &&
+        webs.some((w) => w.web!.counterpart === f.base)
+    )
+    // Its charts show every function they have: only the result list hides rows.
+    // From the first run that measured a Web Function, however far back the counterparts go.
+    const webView = viewOf([...webs, ...counterparts], new Set(), () => {}, counterparts[0], webs)
+    // The result list ranks the Web Functions among the functions.
+    const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
 
     return (
       <>
@@ -411,7 +464,7 @@ export const App = () => {
                   onPick={(a) => {
                     track('arch_picked', { arch: a })
                     setArch(a)
-                    setHover(undefined)
+                    setHoverAt(undefined)
                   }}
                 />
                 <Segmented
@@ -436,20 +489,27 @@ export const App = () => {
               <LastRun run={latest} />
               <span>{latest.rounds} rounds</span>
               <span className="hidden sm:inline">
-                {new Set(latest.functions.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
+                {new Set(functions.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
                 {memories.length} sizes
               </span>
             </p>
           </div>
         </div>
 
-        <section className={`${WRAP} mt-6 flex flex-col gap-6`}>
+        <section className={`${WRAP} mt-10 flex flex-col gap-6`}>
+          <div className="flex flex-col gap-3">
+            <h2 className="text-2xl">Lambda Event Functions</h2>
+            <p className="max-w-prose text-pretty text-ink-2">
+              Every runtime as a regular Lambda function, which AWS now calls an Event Function, at{' '}
+              {shownMemory} MB on {shownArch} in {STACK_REGION}.
+            </p>
+          </div>
           {/* Above the charts, which alone it changes: the toolbar has no room left for it. */}
           <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 text-sm text-muted">
             <Picker
               label="Compare with"
-              options={['', ...fns.map((f) => f.base)]}
-              value={fns.some((f) => f.base === compare) ? compare : ''}
+              options={['', ...comparable.map((f) => f.base)]}
+              value={comparable.some((f) => f.base === compare) ? compare : ''}
               text={(b) => (b ? (VARIANTS[b]?.name ?? b) : 'None')}
               onPick={(b) => {
                 track('compare_picked', { variant: b || 'none' })
@@ -483,7 +543,7 @@ export const App = () => {
           </div>
 
           <div
-            onMouseLeave={() => setHover(undefined)}
+            onMouseLeave={() => setHoverAt(undefined)}
             className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3"
           >
             <Chart
@@ -506,6 +566,18 @@ export const App = () => {
             ))}
           </div>
         </section>
+
+        {webs.length > 0 && (
+          <WebFunctions
+            view={webView}
+            metrics={METRICS}
+            compared={compareWeb}
+            onCompare={(on) => {
+              track('web_compare_toggled', { on: Number(on) })
+              setCompareWeb(on)
+            }}
+          />
+        )}
 
         <section className="band mt-16 py-12 sm:py-16">
           <div className={`${WRAP} flex flex-col gap-8`}>
@@ -536,7 +608,7 @@ export const App = () => {
                 Click a row to hide it.
               </p>
             </div>
-            <Table view={view} />
+            <Table view={listView} />
           </div>
         </section>
       </>
@@ -582,7 +654,10 @@ export const App = () => {
         </p>
         <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
           <dt className="font-medium text-ink">Cold start</dt>
-          <dd className="m-0">Lambda init duration</dd>
+          <dd className="m-0">
+            Lambda init duration; for the Web Function, its environment’s initialization, from
+            starting the runtime until the server listens
+          </dd>
           <dt className="font-medium text-ink">To handler</dt>
           <dd className="m-0">
             the part of the cold start inside the process: from process start until the handler is
@@ -590,13 +665,23 @@ export const App = () => {
             runtime asking for its first event
           </dd>
           <dt className="font-medium text-ink">Warm start</dt>
-          <dd className="m-0">handler time on an instance that’s already up</dd>
+          <dd className="m-0">
+            handler time on an instance that’s already up; for the Web Function, the request’s
+            duration, as Lambda reports it
+          </dd>
           <dt className="font-medium text-ink">Duration</dt>
-          <dd className="m-0">handler time of the cold invocation</dd>
+          <dd className="m-0">handler time of the cold invocation, or the cold request</dd>
           <dt className="font-medium text-ink">Memory used</dt>
-          <dd className="m-0">peak memory, as Lambda reports it</dd>
+          <dd className="m-0">
+            peak memory, as Lambda reports it; for the Web Function, the whole environment’s once
+            it’s initialized
+          </dd>
           <dt className="font-medium text-ink">Size</dt>
           <dd className="m-0">size of the deployed code</dd>
+          <dt className="font-medium text-ink">Region</dt>
+          <dd className="m-0">
+            {STACK_REGION}, Frankfurt, for everything, the Web Function included
+          </dd>
         </dl>
         <p className="max-w-prose">
           Compiled builds also pass <code>--target=bun-linux-{'<arch>'}</code>,{' '}

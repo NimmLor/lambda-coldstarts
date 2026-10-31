@@ -37,6 +37,9 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🪶  | `LlrtStdSdk`                   | `Llrt` on LLRT's default Lambda build, with the common AWS SDK clients built in      |
 | 🪶  | `LlrtFullSdk`                  | `Llrt` on LLRT's full-sdk Lambda build, with every AWS SDK client built in           |
 | 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)           |
+| 🌐  | `Node24Web`                    | a `node:http` server on a [Lambda Web Function](#-the-web-function)                  |
+
+Everything runs in **eu-central-1**, `Node24Web` included.
 
 Bun and LLRT run on `provided.al2023`. Bun serves invocations through a small runtime loop
 ([`src/runtime.ts`](src/runtime.ts)), LLRT through its own ([`src/llrt.ts`](src/llrt.ts)), and Node
@@ -142,7 +145,29 @@ then fires concurrent cold invocations. The numbers come from Lambda's own `REPO
 - 🏁 **In-process startup**: `performance.now()` when the handler module is evaluated
 - 🔁 **Invoke / round trip**: Lambda's `Duration`, and what the client saw
 
-Results land in `bench-results/` as Markdown and JSON.
+Results land in `bench-results/` as Markdown and JSON. `bench` measures functions only; the Web
+Function is measured by the scheduled runs.
+
+### 🌐 The Web Function
+
+[Lambda Web Functions](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html) run an
+HTTP server rather than a handler, and serve many requests per environment.
+[`infra/web-function.ts`](infra/web-function.ts) deploys `Node24Web` with `aws-native`, since SST
+has no component for them yet. Their API differs, and so does how it's measured
+([`src/perf/web.ts`](src/perf/web.ts)):
+
+- 🪣 **The code** sits in a versioned bucket, which Lambda reads on behalf of the function's
+  revisions.
+- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site gives it a
+  section of its own, against `Node24` on arm64 at whichever memory size you pick.
+- 🔄 **A cold start** is a new revision that differs in `BENCH_NONCE`, which the endpoint is then
+  pointed at. For a second or two after the endpoint says it's updated, requests still reach the old
+  revision's environment, so the round keeps asking until a server answers its first request.
+- 🔏 **The endpoint takes signed requests only** (`IamAuth`), from PerfMeasure, and is capped at
+  2 environments.
+- 📜 **No REPORT line**: init, duration and memory come from the environment's `platform.initReport`
+  and `platform.requestComplete` events, read from its log stream (named by the
+  `lambda-web-logstream` response header) in the `.local` log group.
 
 ## 🕐 Scheduled runs
 
