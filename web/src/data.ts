@@ -210,7 +210,7 @@ export const niceMax = (value: number) => {
   )
 }
 
-/** A run by when it finished, to the minute: there is one an hour. */
+/** A run by when it finished, to the minute: there is one every 4 hours. */
 export const when = (date: Date) =>
   date.toLocaleString('en-US', {
     month: 'short',

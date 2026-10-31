@@ -5,7 +5,7 @@
 # ⚡ lambda-coldstarts
 
 **How fast do Bun, LLRT and Node.js cold-start on AWS Lambda?**<br>
-110 real Lambdas, benchmarked every hour.
+110 real Lambdas, benchmarked every 4 hours.
 
 [🌐 Live results](https://coldstarts.github.nimmervoll.work) ·
 [🚀 Deploy](#-deploy) ·
@@ -144,15 +144,18 @@ Results land in `bench-results/` as Markdown and JSON.
 
 ## 🕐 Scheduled runs
 
-The stack also benchmarks itself every hour, the way
-[maxday/lambda-perf](https://github.com/maxday/lambda-perf) does, and keeps every result.
+In production the stack also benchmarks itself every 4 hours, the way
+[maxday/lambda-perf](https://github.com/maxday/lambda-perf) does. DynamoDB keeps each run for 120
+days; on the 1st, the month before goes to S3 for good.
 
 ```mermaid
 flowchart LR
-  S[⏰ EventBridge Scheduler<br>every hour] --> R[PerfRun<br>Step Functions]
-  R -- every function, in parallel --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm]
-  M --> D[(PerfResults<br>DynamoDB)]
+  S[⏰ EventBridge Scheduler<br>every 4 hours] --> R[PerfRun<br>Step Functions, Standard]
+  R -- an Express child per function,<br>40 at a time --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm]
+  M --> D[(PerfResults<br>DynamoDB, 120 days)]
   R -- at the end --> Z[PerfSummarize] --> D
+  E[⏰ on the 1st] --> X[PerfExport] -- the month before --> B[(PerfArchive<br>S3)]
+  D --> X
   D --> A[PerfApi]
   A -- /api/* --> C[☁️ PerfRouter<br>CloudFront]
   W[PerfSite<br>React + Tailwind] --> C
@@ -162,16 +165,29 @@ flowchart LR
 | --------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
 | `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm invokes |
 | `PerfSummarize` | [`src/perf/summarize.ts`](src/perf/summarize.ts) | Per-function p50/p90/avg/min/max, stored with the run                   |
+| `PerfExport`    | [`src/perf/export.ts`](src/perf/export.ts)       | A month of runs and samples, as gzipped NDJSON in `PerfArchive`         |
 | `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs/history`: the latest 90 runs, the one request the site makes |
 | `PerfSite`      | [`web/`](web/)                                   | The charts at [coldstarts.github.nimmervoll.work][site]                 |
 
-Other stages live at `<stage>.coldstarts.github.nimmervoll.work` and tell search engines to stay
-away.
+- 🧒 Each function's rounds run as an **Express child workflow**, which bills by duration instead of
+  by state transition. A child gets 5 minutes; one that runs out loses its remaining rounds, like
+  one whose rounds keep failing, and the run goes on without it.
+- 🗄️ Every item of a run expires 120 days after the run started (`expiresAt`, DynamoDB's TTL). The
+  archive holds `<yyyy>/<mm>/runs.ndjson.gz`, each run with its per-function statistics, and
+  `<yyyy>/<mm>/samples.ndjson.gz`, every cold start. A run belongs to the month it started in.
+- 🧪 Other stages live at `<stage>.coldstarts.github.nimmervoll.work`, tell search engines to stay
+  away and run only when asked: their schedules are created paused, and a deploy pauses them again.
 
 ```sh
 bun run perf --stage dev [--detach]                    # start a run now (and wait for it)
 bun scripts/perf-summarize.ts --stage production [--all]   # summarize runs that have no summary yet
+bun scripts/perf-export.ts --stage production --month 2026-10   # export a month again, or --all past months
+bun scripts/perf-expire.ts --stage production              # let items from before the TTL expire too
 ```
+
+Items written before the TTL existed have no `expiresAt` and stay until `perf-expire` gives them
+one. It only does that for months the archive holds, plus the current one, which the export picks
+up on the 1st. Run `perf-export --all` first.
 
 | Variable                | Default |                                                                                                   |
 | ----------------------- | ------- | ------------------------------------------------------------------------------------------------- |
@@ -192,8 +208,8 @@ body's hash on a POST: `curl` one with
 | Action   | Does                                                                                |
 | -------- | ----------------------------------------------------------------------------------- |
 | `run`    | Starts a run                                                                        |
-| `pause`  | Stops the hourly runs; a deploy that updates the schedule turns them back on        |
-| `resume` | Starts the hourly runs again                                                        |
+| `pause`  | Stops the scheduled runs; in production, a deploy that updates the schedule resumes |
+| `resume` | Starts the scheduled runs again; outside production, until the next deploy          |
 | `purge`  | Empties PerfResults, ~15 s at a time; call it again until it answers `"done": true` |
 
 </details>

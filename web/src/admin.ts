@@ -38,8 +38,8 @@ const setSchedule = async (secret: string, action: 'pause' | 'resume') => {
   const { state, was } = await post(secret, action)
   say(
     state === was
-      ? `The hourly schedule was already ${scheduleStates[state]}`
-      : `The hourly schedule is ${scheduleStates[state]} now`
+      ? `The schedule was already ${scheduleStates[state]}`
+      : `The schedule is ${scheduleStates[state]} now`
   )
 }
 
