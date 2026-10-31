@@ -1,6 +1,7 @@
 import { track } from './analytics'
-import { Chart, type Metric } from './Chart'
-import type { View } from './data'
+import { Chart, type Metric, Versus } from './Chart'
+import { ChartIcon } from './ChartIcon'
+import { fixed, type View } from './data'
 import { REPO, WRAP } from './layout'
 
 const DOCS = 'https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html'
@@ -96,10 +97,52 @@ const Explainer = () => (
   </details>
 )
 
+/** One figure for each function in the section, each against the counterpart's. */
+const Figure = ({ metric: m, view }: { metric: Metric; view: View }) => {
+  const { fns, baseline, agg } = view
+  const against = baseline && agg(baseline, m.key)
+  return (
+    <article className="flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6">
+      <div className="flex items-baseline justify-between gap-3 text-sm text-muted">
+        <h3 className="flex items-baseline gap-2 text-lg text-ink">
+          <ChartIcon name={m.icon} className="size-[1.125rem]" />
+          {m.title}
+        </h3>
+        {m.unit}
+      </div>
+      <dl className="m-0 flex flex-col gap-2.5">
+        {fns.map((f) => {
+          const value = agg(f, m.key)
+          return (
+            <div key={f.id} className="flex items-baseline justify-between gap-3">
+              <dt className="flex min-w-0 items-center gap-2 text-sm text-ink-2">
+                <span
+                  aria-hidden="true"
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ background: f.color }}
+                />
+                <span className="truncate">
+                  {f.name}
+                  {!f.web && <span className="text-muted"> · {f.memoryMb} MB</span>}
+                </span>
+              </dt>
+              <dd className="m-0 flex items-baseline gap-2 whitespace-nowrap">
+                {f !== baseline && <Versus value={value} baseline={against} />}
+                <span className="measured text-md text-ink">{fixed(value, m.digits)}</span>
+              </dd>
+            </div>
+          )
+        })}
+      </dl>
+    </article>
+  )
+}
+
 /**
- * The Lambda Web Functions' charts, apart from the functions above, and unless turned off, against
- * their counterparts: the same runtime as an Event Function on arm64 at the picked memory size.
- * The result list below ranks them with the functions.
+ * The Lambda Web Functions, apart from the functions above: a figure for each of the cold start,
+ * warm start and memory, and the cold start over time, against their counterparts unless turned
+ * off: the same runtime as an Event Function on arm64 at the picked memory size. The result list
+ * below ranks them with the functions.
  */
 export const WebFunctions = ({
   view,
@@ -110,17 +153,14 @@ export const WebFunctions = ({
 }: {
   /** The Web Functions, and their counterparts when `compared`. */
   view: View
-  /** The cold start's chart first. */
+  /** The page's metrics; the section shows the cold start, warm start and memory. */
   metrics: Metric[]
   region: string
   compared: boolean
   onCompare: (on: boolean) => void
 }) => {
-  const [cold, ...small] = metrics
-  const caption = (m: Metric) =>
-    compared
-      ? `${m.unit}, mean per run · Event Function at ${view.memoryMb} MB`
-      : `${m.unit}, mean per run`
+  const figures = metrics.filter((m) => m.key === 'cold' || m.key === 'warm' || m.key === 'mem')
+  const cold = figures.find((m) => m.key === 'cold')!
   return (
     <section className={`${WRAP} flex flex-col gap-6 pt-16 sm:pt-20`}>
       <div className="flex flex-col gap-3">
@@ -145,16 +185,21 @@ export const WebFunctions = ({
         onMouseLeave={() => view.setHover(undefined)}
         className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3"
       >
+        {figures.map((m) => (
+          <Figure key={m.key} metric={m} view={view} />
+        ))}
         <Chart
-          metric={{ ...cold!, height: 220 }}
+          // Under the cold start's figure, which has its plain title.
+          metric={{ ...cold, title: 'Cold start over time', height: 200 }}
           wide
           view={view}
-          caption={caption(cold!)}
+          caption={
+            compared
+              ? `${cold.unit}, mean per run · Event Function at ${view.memoryMb} MB`
+              : `${cold.unit}, mean per run`
+          }
           className="col-span-full"
         />
-        {small.map((m) => (
-          <Chart key={m.key} metric={m} wide={false} view={view} caption={caption(m)} />
-        ))}
       </div>
     </section>
   )
