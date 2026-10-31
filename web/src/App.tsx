@@ -687,8 +687,8 @@ export const App = () => {
           </dd>
           <dt className="font-medium text-ink">First request</dt>
           <dd className="m-0">
-            the last part of the MicroVM’s first answer: its first request, which the endpoint holds
-            until the MicroVM is running
+            the last part of the MicroVM’s first answer: from its first request until one is
+            answered, asking again while the endpoint turns them away as the MicroVM resumes
           </dd>
           <dt className="font-medium text-ink">Memory used</dt>
           <dd className="m-0">

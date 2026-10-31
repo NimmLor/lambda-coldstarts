@@ -73,8 +73,9 @@ export type Sample = {
    */
   roundTripMs?: number
   /**
-   * A MicroVM's: how long its first request took, which the endpoint holds until the MicroVM is
-   * running; the rest of `roundTripMs` went to RunMicrovm and CreateMicrovmAuthToken.
+   * A MicroVM's: how long its first requests took, until one was answered: the endpoint turns them
+   * away while the MicroVM is still resuming. The rest of `roundTripMs` went to RunMicrovm and
+   * CreateMicrovmAuthToken.
    */
   firstRequestMs?: number
   /** A MicroVM's: which Graviton it ran on, which Lambda picks for each MicroVM. */

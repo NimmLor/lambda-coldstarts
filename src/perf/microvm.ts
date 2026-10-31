@@ -1,8 +1,8 @@
 /**
  * One round of a Lambda MicroVM, for measure.ts. A MicroVM resumes from the snapshot its image was
  * built with, so it has no init to measure, and Lambda reports no numbers for it. The round runs a
- * new MicroVM, sends it a request as soon as it has a token to send, which the endpoint holds until
- * the MicroVM is running, times that from here, and terminates it. It sends no warm requests:
+ * new MicroVM, sends it requests as soon as it has a token to send until it answers, times that
+ * from here, and terminates it. It sends no warm requests:
  * PerfMeasure's sliver of a vCPU would time its own 20 ms time slices instead (see `Sample`).
  */
 import {
@@ -40,6 +40,9 @@ const MAX_LIFETIME_S = 120
  * which another stage's MicroVMs or one still terminating can hold.
  */
 const QUOTA_WAIT_MS = 90_000
+
+/** How long a round asks a MicroVM again while it's still resuming, well past the 8 GB's 3 s. */
+const RESUME_WAIT_MS = 30_000
 
 const round2 = (value: number) => Math.round(value * 100) / 100
 
@@ -95,11 +98,23 @@ export const measureMicrovm = async (
         allowedPorts: [{ port: PORT }],
       })
     )
+    // The endpoint holds a request for about 1.3 s while the MicroVM resumes, then gives up with a
+    // 502; the larger sizes often take longer than that. A caller would ask again, and so does the
+    // round.
     const sentAt = performance.now()
-    const response = await fetch(`https://${endpoint}/perf`, { headers: authToken })
+    const deadline = Date.now() + RESUME_WAIT_MS
+    let response: Response
+    for (;;) {
+      response = await fetch(`https://${endpoint}/perf`, { headers: authToken })
+      const resuming =
+        response.status === 502 &&
+        response.headers.get('x-aws-proxy-error') === 'MICROVM_CONNECT_FAILED'
+      if (!resuming || Date.now() > deadline) break
+      await response.body?.cancel()
+    }
     const text = await response.text()
     const answeredAt = performance.now()
-    // A 502 when the MicroVM didn't start; the state machine retries the round with another.
+    // The state machine retries the round with another MicroVM.
     if (!response.ok) throw new Error(`${target.id} answered ${response.status}: ${text}`)
     const body = JSON.parse(text)
     // The snapshot was taken before the server's first request, so this should never happen.

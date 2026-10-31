@@ -80,10 +80,10 @@ const About = () => (
       A MicroVM has no init to compare: its server started once, when the image was built. So each
       round times what a caller waits for instead, from PerfMeasure in the same region. First answer
       runs from calling RunMicrovm, through getting a token to reach the MicroVM, until its first
-      response. First request is the last part alone: the endpoint holds the request until the
-      MicroVM is running. The Event Function’s first answer is its cold invocation, from calling
-      Invoke until the response. Neither is the init duration above.{' '}
-      <a href={`${REPO}#-the-microvm`}>How it’s measured</a>
+      response. First request is the last part alone: the endpoint holds a request for about a
+      second while the MicroVM resumes, then turns it away, and the round asks again. The Event
+      Function’s first answer is its cold invocation, from calling Invoke until the response.
+      Neither is the init duration above. <a href={`${REPO}#-the-microvm`}>How it’s measured</a>
     </p>
     <nav aria-label="About MicroVMs" className="flex flex-wrap gap-x-6 gap-y-2">
       <a href={DOCS}>MicroVMs in the Lambda docs</a>

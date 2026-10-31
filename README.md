@@ -182,10 +182,12 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
 - 🧊 **No init to measure.** Node started once, when the image was built, so there's nothing to
   compare with an Init Duration, and Lambda reports no durations, platform events or metrics.
 - ⏱️ **First answer instead**: each round runs a new MicroVM and times, from PerfMeasure, calling
-  RunMicrovm, getting an auth token and its first response. The endpoint holds that request until
-  the MicroVM is running. `firstRequestMs` is the last part alone. The site sets it against an Event
-  Function's cold invoke round trip (`roundTripMs`, which every round now records), from the same
-  PerfMeasure.
+  RunMicrovm, getting an auth token and its first response. The endpoint holds a request for about
+  1.3 s while the MicroVM resumes, then answers 502 with `x-aws-proxy-error: MICROVM_CONNECT_FAILED`,
+  which the 4 and 8 GB sizes often outlast; the round asks again until one is answered. A
+  turned-away first request costs about 2 s more, so those sizes' first answers come in two modes.
+  `firstRequestMs` is the last part alone. The site sets it against an Event Function's cold invoke
+  round trip (`roundTripMs`, which every round now records), from the same PerfMeasure.
 - 🐢 **No warm round trips.** At 128 MB, PerfMeasure gets CPU in 20 ms slices, and a warm request
   of ~5 ms comes back as 20, 40 or 60. The cold ones barely move: a MicroVM's first answer took
   1.34–1.36 s from a 1769 MB PerfMeasure and 1.32–1.43 s from the 128 MB one.
@@ -197,8 +199,9 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
   unless the quota is raised, all of it the largest size's. A round that finds the quota taken, by
   another stage's MicroVM say, waits up to 90 s before it starts its clock.
 - 🧹 **Every MicroVM is terminated** at the end of its round, and lives 2 minutes at most should
-  that fail. A round costs a few seconds of compute and up to ~0.6 GB of snapshot reads: about a
-  tenth of a cent at us-east-1's prices.
+  that fail. A round costs a few seconds of compute plus the snapshot it resumes from, 0.4 GB at
+  0.5 GB up to 1.1 GB at 8 GB: all five sizes come to about half a cent a round at us-east-1's
+  prices, at most ~$11 a month on the 4-hour schedule.
 - 📌 **The base image is pinned** (`al2023-1` version 2). Lambda stops running a version 90 days
   after the next one comes out; `ListManagedMicrovmImageVersions` lists them.
 
