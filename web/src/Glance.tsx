@@ -9,34 +9,49 @@ const DAY_MS = 864e5
 const ARCH = 'arm64'
 const MEMORY_MB = 256
 const DAYS = 3
-/** The ones compared, in the order every panel lists them, with names short enough for a quarter of the page. */
+/** The ones compared, in the order every panel lists them, with names short enough for a third of the page. */
 const CONTENDERS: { base: string; name: string; memoryMb?: number }[] = [
   { base: 'Llrt', name: 'LLRT' },
   { base: 'BunCompileAotTrim', name: 'Bun AOT, trimmed' },
   { base: 'Node24', name: 'Node.js 24' },
   // At the one size every Web Function has.
   { base: 'Node24Web', name: 'Node.js 24, Web Function', memoryMb: 2048 },
+  // At Lambda's default size, the same as the Web Function's.
+  { base: 'Node24MicroVm', name: 'Node.js 24, MicroVM', memoryMb: 2048 },
 ]
 /** What each leader is measured against: the newest Node.js Lambda runs without a preview. */
 const BASELINE = 'Node24'
 
-type Key = 'cold' | 'warm' | 'mem' | 'size'
+type Key = 'cold' | 'trip' | 'warm' | 'mem' | 'size'
 const METRICS: {
   key: Key
   title: string
   unit: string
   digits: number
   better: string
+  /** A MicroVM has neither an init nor warm invocations, so it's left out rather than shown missing. */
+  microvm: boolean
 }[] = [
-  { key: 'cold', title: 'Cold start', unit: 'ms', digits: 1, better: 'faster' },
-  { key: 'warm', title: 'Warm start', unit: 'ms', digits: 2, better: 'faster' },
-  { key: 'mem', title: 'Memory used', unit: 'MB', digits: 1, better: 'less' },
-  { key: 'size', title: 'Size', unit: 'MB', digits: 1, better: 'smaller' },
+  { key: 'cold', title: 'Cold start', unit: 'ms', digits: 1, better: 'faster', microvm: false },
+  { key: 'warm', title: 'Warm start', unit: 'ms', digits: 2, better: 'faster', microvm: false },
+  { key: 'mem', title: 'Memory used', unit: 'MB', digits: 1, better: 'less', microvm: true },
+  { key: 'size', title: 'Size', unit: 'MB', digits: 1, better: 'smaller', microvm: true },
+  // How long a caller waits for a fresh instance's answer, the one number every kind has.
+  { key: 'trip', title: 'First answer', unit: 'ms', digits: 0, better: 'faster', microvm: true },
 ]
 
 type Row = { fn: Fn; name: string; values: Record<Key, number | undefined> }
 
-const Panel = ({ metric: m, rows }: { metric: (typeof METRICS)[number]; rows: Row[] }) => {
+const Panel = ({
+  metric: m,
+  rows: all,
+  className = '',
+}: {
+  metric: (typeof METRICS)[number]
+  rows: Row[]
+  className?: string
+}) => {
+  const rows = m.microvm ? all : all.filter((r) => !r.fn.microvm)
   const present = rows.filter((r) => r.values[m.key] !== undefined)
   const max = Math.max(0, ...present.map((r) => r.values[m.key]!))
   const leader = present.toSorted((a, b) => a.values[m.key]! - b.values[m.key]!)[0]
@@ -44,7 +59,7 @@ const Panel = ({ metric: m, rows }: { metric: (typeof METRICS)[number]; rows: Ro
   const ratio = leader && baseline !== undefined ? baseline / leader.values[m.key]! : undefined
 
   return (
-    <article className="flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6">
+    <article className={`flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6 ${className}`}>
       <div className="flex items-baseline justify-between gap-3 text-sm text-muted">
         <h3 className="text-lg">{m.title}</h3>
         {m.unit}
@@ -107,8 +122,8 @@ const Panel = ({ metric: m, rows }: { metric: (typeof METRICS)[number]; rows: Ro
 }
 
 /**
- * LLRT, Bun's trimmed AOT executable, Node.js 24 and Node.js 24 as a Web Function side by side,
- * whatever the dashboard below shows.
+ * LLRT, Bun's trimmed AOT executable, Node.js 24, and Node.js 24 as a Web Function and in a
+ * MicroVM side by side, whatever the dashboard below shows.
  */
 export const Glance = ({ history }: { history: RunPoints[] }) => {
   const latest = history.at(-1)
@@ -126,6 +141,7 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
         name,
         values: {
           cold: avg('cold'),
+          trip: avg('trip'),
           warm: avg('warm'),
           mem: avg('mem'),
           size: avg('size'),
@@ -144,11 +160,24 @@ export const Glance = ({ history }: { history: RunPoints[] }) => {
         <p className="measured text-sm text-muted">
           {ARCH} · {MEMORY_MB} MB · {DAYS}-day mean
           {rows.some((r) => r.fn.web) && ' · Web Function at 2 GB'}
+          {rows.some((r) => r.fn.microvm) && ' · MicroVM at 2 GB'}
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule sm:grid-cols-2 lg:grid-cols-4">
-        {METRICS.map((m) => (
-          <Panel key={m.key} metric={m} rows={rows} />
+      {/* Three panels in a row, then two wider ones; two in a row on a tablet, the last across. */}
+      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule sm:grid-cols-2 lg:grid-cols-6">
+        {METRICS.map((m, i) => (
+          <Panel
+            key={m.key}
+            metric={m}
+            rows={rows}
+            className={
+              i < 3
+                ? 'lg:col-span-2'
+                : i === METRICS.length - 1
+                  ? 'sm:col-span-2 lg:col-span-3'
+                  : 'lg:col-span-3'
+            }
+          />
         ))}
       </div>
     </section>
