@@ -178,9 +178,12 @@ const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[]
         <h3 className="text-lg">arm64 vs. x86_64</h3>
         <p className="m-0 max-w-prose text-sm text-pretty text-muted">
           How every function starts on arm64 against x86_64, cold and warm, across every memory
-          size. Web Functions and MicroVMs run on arm64 only.{' '}
-          <a href={`#${ARCH_SECTION}`}>Each size and runtime</a>
+          size. Web Functions and MicroVMs run on arm64 only.
         </p>
+        {/* A line of its own, so it never breaks across two. */}
+        <a href={`#${ARCH_SECTION}`} className="mt-auto self-start text-sm">
+          Each size and runtime
+        </a>
       </div>
       {figures.map(
         ([label, ratio]) =>
