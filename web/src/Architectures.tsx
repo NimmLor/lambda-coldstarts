@@ -872,14 +872,10 @@ export const Architectures = ({
         <ArchTable view={view} functions={functions} memories={memories} onPick={onPick} />
       </div>
       <p className="max-w-prose text-sm text-pretty text-muted">
-        The same Event Functions on Graviton and on x86_64, at every memory size, in {STACK_REGION}.
-        Each ratio is x86_64’s value over arm64’s, averaged geometrically over a family’s Event
-        Functions measured on both; the headline’s are all of them, and how much memory moves cold
-        start is the largest spread across sizes of a family’s mean cold start on either
-        architecture. First answer is the cold invocation’s round trip, as PerfMeasure in the same
-        region sees it. Cost per cold start is the init plus the invocation, billed as duration on
-        every runtime since August 2025, and the request, at {STACK_REGION}’s first-tier prices:
-        arm64’s GB-second is {discount}% cheaper.
+        The same Event Functions on both architectures, at every memory size, in {STACK_REGION}.
+        Each ratio is x86_64 over arm64, the geometric mean across a family’s functions. First
+        answer is the cold invocation’s round trip from PerfMeasure. Cost per cold start bills init,
+        invocation and request at first-tier prices; arm64’s GB-second is {discount}% cheaper.
       </p>
     </section>
   )
