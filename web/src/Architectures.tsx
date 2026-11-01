@@ -717,13 +717,6 @@ export const Architectures = ({
       value: (f) => agg(f, 'warm'),
     },
     {
-      title: 'First answer',
-      unit: 'ms',
-      digits: 0,
-      icon: 'dur',
-      value: (f) => agg(f, 'trip'),
-    },
-    {
       title: 'Cold start cost',
       unit: 'USD per million cold starts',
       digits: 2,

@@ -73,6 +73,20 @@ const METRICS: Metric[] = [
   },
 ]
 
+/**
+ * How long a caller waits for a cold function's answer, from calling Invoke: Bun's executables
+ * start fast but pay at their first invocation, which the init alone hides.
+ */
+const FIRST_ANSWER: Metric = {
+  key: 'trip',
+  digits: 0,
+  title: 'First answer',
+  unit: 'ms',
+  height: 220,
+  leader: 'Fastest',
+  icon: 'trip',
+}
+
 const Segmented = <T extends string | number>({
   label,
   options,
@@ -607,6 +621,23 @@ export const App = () => {
               />
             ) : (
               <Chart metric={dur!} wide={false} view={view} />
+            )}
+            <Chart
+              metric={FIRST_ANSWER}
+              wide
+              view={view}
+              className={memories.length > 1 ? 'col-span-full lg:col-span-2' : 'col-span-full'}
+            />
+            {memories.length > 1 && (
+              <MemoryChart
+                metric={FIRST_ANSWER}
+                wide
+                view={view}
+                sized={sized}
+                memories={memories}
+                onPick={pickMemory}
+                className="col-span-full lg:col-span-1"
+              />
             )}
           </div>
         </section>
