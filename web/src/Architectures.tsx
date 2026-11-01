@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { track } from './analytics'
 import { AXES, Floating, Versus, X_LABELS, Y_LABEL, Y_LABELS } from './Chart'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import {
@@ -6,6 +7,7 @@ import {
   ARCHS,
   type Arch,
   coldStartCost,
+  DASHES,
   type Fn,
   fixed,
   niceMax,
@@ -15,6 +17,7 @@ import {
   when,
 } from './data'
 import { WRAP } from './layout'
+import { useStored } from './stored'
 
 /** The id of the section, which the glance at the top links to. */
 export const ARCH_SECTION = 'arm64-vs-x86_64'
@@ -209,6 +212,297 @@ const ArchChart = ({
             >
               {mb}
               <span className={wide ? 'max-sm:hidden' : 'max-sm:hidden md:max-lg:hidden'}> MB</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+/** The metrics the advantage chart can show, by the switcher's label. */
+const ADVANTAGE_METRICS = [
+  ['cold', 'Cold start'],
+  ['warm', 'Warm start'],
+] as const
+type AdvantageKey = (typeof ADVANTAGE_METRICS)[number][0]
+const isAdvantageKey = (value: unknown): value is AdvantageKey =>
+  ADVANTAGE_METRICS.some(([key]) => key === value)
+
+/**
+ * The fixed groups the advantage chart averages, in the page's family order, with their family's
+ * line: each picks its variants from every Event Function, whatever the Functions filter shows.
+ */
+const GROUPS: {
+  name: string
+  color: string
+  dash?: string
+  width: number
+  has: (f: Fn) => boolean
+}[] = [
+  {
+    name: 'Bun',
+    color: 'var(--color-line-BunCompileAotTrim)',
+    dash: DASHES.Bun,
+    width: 2,
+    has: (f) => f.family === 'Bun',
+  },
+  {
+    name: 'LLRT',
+    color: 'var(--color-line-Llrt)',
+    dash: DASHES.LLRT,
+    width: 2,
+    has: (f) => f.family === 'LLRT',
+  },
+  {
+    name: 'Node.js 24',
+    color: 'var(--color-line-Node24)',
+    dash: DASHES.Node,
+    width: 2,
+    has: (f) => f.base === 'Node24',
+  },
+  // Last, so it's drawn over the others.
+  { name: 'All', color: 'var(--color-ink-2)', width: 3, has: () => true },
+]
+
+/** Advantages a gridline may sit at, above 1×; below it, their reciprocals. */
+const RATIO_TICKS = [1.25, 1.5, 2, 3, 4, 5, 10, 20, 50, 100]
+/** Rounded up to, for the axis's extent. */
+const NICE_RATIOS = [1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8, 10, 15, 20, 50, 100]
+
+/** A ratio as the axis and readout read it: 1.5×, 0.67×. */
+const times = (r: number, digits: number) => `${Number(r.toFixed(digits))}×`
+
+/** A line sample in a group's colour and dash, for the legend. */
+const LineSample = ({ color, dash, width }: { color: string; dash?: string; width: number }) => (
+  <svg aria-hidden="true" width="24" height="4" className="shrink-0 overflow-visible">
+    <line
+      x1="1"
+      x2="23"
+      y1="2"
+      y2="2"
+      style={{ stroke: color }}
+      strokeWidth={width}
+      strokeLinecap="round"
+      strokeDasharray={dash}
+    />
+  </svg>
+)
+
+/**
+ * How many times as fast arm64 is as x86_64 for each group at every memory size, x86_64's value
+ * over arm64's, on a log axis around 1×: above it arm64 is faster, below it x86_64. A group's ratio
+ * at a size is the geometric mean over its variants with both values there.
+ */
+const AdvantageChart = ({
+  view,
+  functions,
+  memories,
+  onPick,
+  className = '',
+}: {
+  view: View
+  /** Every Event Function, on both architectures and at every size. */
+  functions: Fn[]
+  /** Ascending. */
+  memories: number[]
+  onPick: (memoryMb: number) => void
+  className?: string
+}) => {
+  const { runs, hover, memoryMb, agg } = view
+  const [key, setKey] = useStored<AdvantageKey>('advantageMetric', 'cold', isAdvantageKey)
+  const [pointed, setPointed] = useState<number>()
+  const x = (i: number) => ((i + 0.5) / memories.length) * 100
+
+  const events = functions.filter((f) => !f.web && !f.microvm)
+  const byId = new Map(events.map((f) => [f.id, f]))
+  /** One function per variant, for its family, which every size and architecture shares. */
+  const variants = [...new Map(events.map((f) => [f.base, f])).values()]
+  /** Each variant's x86_64 value over its arm64 one at `mb`, if it has both. */
+  const ratio = (base: string, mb: number) => {
+    const arm = byId.get(`${base}/arm64/${mb}`)
+    const x86 = byId.get(`${base}/x86_64/${mb}`)
+    const a = arm && agg(arm, key)
+    const b = x86 && agg(x86, key)
+    return a && b ? b / a : undefined
+  }
+  const series = GROUPS.map((g) => {
+    const members = variants.filter(g.has).map((f) => f.base)
+    return {
+      g,
+      values: memories.map((mb) => geomean(members.flatMap((base) => ratio(base, mb) ?? []))),
+    }
+  }).filter((s) => s.values.some((v) => v !== undefined))
+
+  // Symmetric around 1×, as far as the largest advantage either way, rounded up, with that
+  // advantage at most 85% of the way to the edge, which leaves the halves' labels clear.
+  const most = Math.max(
+    1,
+    ...series.flatMap((s) => s.values.flatMap((v) => (v === undefined ? [] : [v, 1 / v])))
+  )
+  const m = NICE_RATIOS.find((n) => n >= most ** (1 / 0.85)) ?? NICE_RATIOS.at(-1)!
+  const y = (r: number) => 50 - (Math.log(r) / Math.log(m)) * 50
+  const above = RATIO_TICKS.filter((t) => t <= m * 1.0001)
+  const grid = [...above.map((t) => 1 / t).reverse(), 1, ...above].map((r) => ({
+    r,
+    top: y(r),
+    label: times(r, 2),
+  }))
+  const height = 240
+  const selected = memories.indexOf(memoryMb)
+  const period = hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'
+  const title = ADVANTAGE_METRICS.find(([k]) => k === key)![1]
+
+  return (
+    <article className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
+      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
+        <div className="flex flex-col gap-1 text-sm text-muted">
+          <h3 className="flex items-baseline gap-2 text-xl text-ink">
+            <ChartIcon name="sizes" className="size-5" />
+            Advantage by memory
+          </h3>
+          <p>
+            {title}, x86_64 over arm64, {period}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0 text-sm text-muted">
+            {series.map(({ g }) => (
+              <li key={g.name} className="inline-flex items-center gap-2">
+                <LineSample color={g.color} dash={g.dash} width={g.width} />
+                {g.name}
+              </li>
+            ))}
+          </ul>
+          <div className="cells" role="group" aria-label="Metric">
+            {ADVANTAGE_METRICS.map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={k === key}
+                onClick={() => {
+                  track('advantage_metric_picked', { metric: k })
+                  setKey(k)
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className={AXES}>
+        <div className={`relative ${Y_LABELS}`} style={{ height }}>
+          {grid.map((g) => (
+            <span key={g.r} className={Y_LABEL} style={{ top: `${g.top}%` }}>
+              {g.label}
+            </span>
+          ))}
+        </div>
+        <div className="relative" style={{ height }}>
+          <div className="absolute inset-y-0 w-px bg-cool" style={{ left: `${x(selected)}%` }} />
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label={`How many times as fast arm64 is as x86_64 at each memory size, by ${title.toLowerCase()}, one line per group`}
+            className="absolute inset-0 size-full overflow-visible"
+          >
+            {grid.map((g) => (
+              <line
+                key={g.r}
+                x1={0}
+                x2={100}
+                y1={g.top}
+                y2={g.top}
+                className={g.r === 1 ? 'stroke-ink-2' : 'stroke-rule'}
+                strokeWidth={g.r === 1 ? 1.5 : 1}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            {series.map(({ g, values }) => (
+              <polyline
+                key={g.name}
+                fill="none"
+                style={{ stroke: g.color }}
+                strokeWidth={g.width}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                strokeDasharray={g.dash}
+                points={values
+                  .flatMap((v, i) => (v === undefined ? [] : [`${x(i)},${y(v)}`]))
+                  .join(' ')}
+              />
+            ))}
+          </svg>
+          {/* Which architecture each half favours; at the right, as a phone's tick labels take the left. */}
+          <span className="pointer-events-none absolute top-1 right-1 rounded-chip bg-paper-2/85 px-1 text-xs text-muted">
+            arm64 faster
+          </span>
+          <span className="pointer-events-none absolute right-1 bottom-1 rounded-chip bg-paper-2/85 px-1 text-xs text-muted">
+            x86_64 faster
+          </span>
+          {series
+            .filter((s) => s.values[selected] !== undefined)
+            .map((s) => (
+              <div
+                key={s.g.name}
+                className="absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
+                style={{
+                  left: `${x(selected)}%`,
+                  top: `${y(s.values[selected]!)}%`,
+                  background: s.g.color,
+                }}
+              />
+            ))}
+          {pointed !== undefined && (
+            <Floating left={x(pointed)}>
+              <span className="measured text-muted">
+                {memories[pointed]} MB,{' '}
+                {hover !== undefined ? `${when(runs[hover]!.date)} UTC` : 'mean'}
+              </span>
+              {series
+                .filter((s) => s.values[pointed] !== undefined)
+                .sort((a, b) => b.values[pointed]! - a.values[pointed]!)
+                .map(({ g, values }) => (
+                  <span key={g.name} className="flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ background: g.color }}
+                    />
+                    <span className="text-ink-2">{g.name}</span>
+                    <span className="measured ml-auto pl-4 text-ink">
+                      {values[pointed]!.toFixed(2)}×
+                    </span>
+                  </span>
+                ))}
+            </Floating>
+          )}
+          <div className="absolute inset-0 flex" onMouseLeave={() => setPointed(undefined)}>
+            {memories.map((mb, i) => (
+              <button
+                key={mb}
+                type="button"
+                aria-pressed={mb === memoryMb}
+                aria-label={`Show ${mb} MB`}
+                onClick={() => onPick(mb)}
+                onMouseEnter={() => setPointed(i)}
+                className="flex-1 cursor-pointer hover:bg-rule/30 focus-visible:-outline-offset-2"
+              />
+            ))}
+          </div>
+        </div>
+        <div className={X_LABELS}>
+          {memories.map((mb, i) => (
+            <span
+              key={mb}
+              className={`measured absolute -translate-x-1/2 text-xs whitespace-nowrap ${mb === memoryMb ? 'text-cool' : 'text-muted'}`}
+              style={{ left: `${x(i)}%` }}
+            >
+              {mb}
+              <span className="max-sm:hidden"> MB</span>
             </span>
           ))}
         </div>
@@ -462,6 +756,13 @@ export const Architectures = ({
         ))}
       </div>
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule md:grid-cols-3">
+        <AdvantageChart
+          view={view}
+          functions={functions}
+          memories={memories}
+          onPick={onPick}
+          className="col-span-full"
+        />
         <ArchChart
           measure={cold!}
           wide
