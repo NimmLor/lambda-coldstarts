@@ -252,7 +252,7 @@ const AdvantagePanel = ({
             .map((s) => (
               <div
                 key={s.group.name}
-                className="absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
+                className="mark absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
                 style={{
                   left: `${x(selected)}%`,
                   top: `${y(s.values[selected]!)}%`,
@@ -459,7 +459,7 @@ const MARKS = { arm64: 'size-3.5 rounded-full', x86_64: 'h-4 w-1.5 rounded-[2px]
  */
 const Marker = ({ arch, left }: { arch: keyof typeof ARCH_COLORS; left: string }) => (
   <span
-    className={`absolute top-1/2 -translate-1/2 ring-2 ring-paper-2 ${MARKS[arch]}`}
+    className={`mark absolute top-1/2 -translate-1/2 ring-2 ring-paper-2 ${MARKS[arch]}`}
     style={{ left, background: ARCH_COLORS[arch] }}
   />
 )
@@ -687,7 +687,7 @@ const ArchTable = ({
                         {arm !== undefined && x86 !== undefined && (
                           // Neutral, so the circles' colours stand out at its ends.
                           <span
-                            className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-rule-2"
+                            className="mark absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-rule-2"
                             style={{
                               left: at(Math.min(arm, x86)),
                               width: `${(Math.abs(x86 - arm) / max) * 100}%`,
@@ -790,47 +790,49 @@ const Headline = ({
 
   return (
     <p className="max-w-prose text-lg/normal text-pretty text-ink-2">
-      At {view.memoryMb} MB arm64{' '}
-      {cold >= 1 ? (
-        <>
-          cold-starts <Figure>{cold.toFixed(2)}×</Figure> as fast
-        </>
-      ) : (
-        <>
-          takes <Figure>{(1 / cold).toFixed(2)}×</Figure> as long to cold-start
-        </>
-      )}
-      {percent !== undefined &&
-        (percent === 0 ? (
-          ' and costs the same per cold start'
+      <span className="datum">
+        At {view.memoryMb} MB arm64{' '}
+        {cold >= 1 ? (
+          <>
+            cold-starts <Figure>{cold.toFixed(2)}×</Figure> as fast
+          </>
         ) : (
           <>
-            {' '}
-            and costs <Figure>{Math.abs(percent)}%</Figure> {percent < 0 ? 'less' : 'more'} per cold
-            start
+            takes <Figure>{(1 / cold).toFixed(2)}×</Figure> as long to cold-start
           </>
-        ))}
-      {/* Nothing to say of the warm start when no run in view measured one. */}
-      {!warm.some((r) => r !== undefined) ? (
-        '.'
-      ) : losses.length ? (
-        <>
-          ; warm, x86_64 is up to <Figure>{most.toFixed(2)}×</Figure> faster {where}.
-        </>
-      ) : warm.every((r) => r === undefined || r >= EVEN) ? (
-        '; warm, arm64 is faster too.'
-      ) : (
-        '; warm, x86_64 is nowhere more than 5% faster.'
-      )}{' '}
-      {spread <= 10 ? (
-        <>
-          Memory barely moves cold start: by <Figure>{spread}%</Figure> at most.
-        </>
-      ) : (
-        <>
-          Memory moves cold start by up to <Figure>{spread}%</Figure>.
-        </>
-      )}
+        )}
+        {percent !== undefined &&
+          (percent === 0 ? (
+            ' and costs the same per cold start'
+          ) : (
+            <>
+              {' '}
+              and costs <Figure>{Math.abs(percent)}%</Figure> {percent < 0 ? 'less' : 'more'} per
+              cold start
+            </>
+          ))}
+        {/* Nothing to say of the warm start when no run in view measured one. */}
+        {!warm.some((r) => r !== undefined) ? (
+          '.'
+        ) : losses.length ? (
+          <>
+            ; warm, x86_64 is up to <Figure>{most.toFixed(2)}×</Figure> faster {where}.
+          </>
+        ) : warm.every((r) => r === undefined || r >= EVEN) ? (
+          '; warm, arm64 is faster too.'
+        ) : (
+          '; warm, x86_64 is nowhere more than 5% faster.'
+        )}{' '}
+        {spread <= 10 ? (
+          <>
+            Memory barely moves cold start: by <Figure>{spread}%</Figure> at most.
+          </>
+        ) : (
+          <>
+            Memory moves cold start by up to <Figure>{spread}%</Figure>.
+          </>
+        )}
+      </span>
     </p>
   )
 }

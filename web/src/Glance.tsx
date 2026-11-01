@@ -82,7 +82,7 @@ const Panel = ({ metric: m, rows: all }: { metric: (typeof METRICS)[number]; row
               <div aria-hidden="true" className="h-1.5 rounded-full bg-paper-3">
                 {v !== undefined && max > 0 && (
                   <div
-                    className="h-full rounded-full"
+                    className="mark h-full rounded-full"
                     style={{
                       width: `${(v / max) * 100}%`,
                       background: r.fn.color,
@@ -95,19 +95,21 @@ const Panel = ({ metric: m, rows: all }: { metric: (typeof METRICS)[number]; row
         })}
       </dl>
       <p className="mt-auto text-sm text-muted">
-        {leader && ratio !== undefined && leader.fn.base !== BASELINE ? (
-          <>
-            <span className="text-ink">{leader.name}</span>{' '}
-            <span className="measured text-ink">{ratio.toFixed(1)}×</span> {m.better} than Node.js
-            24
-          </>
-        ) : (
-          leader && (
+        <span className="datum">
+          {leader && ratio !== undefined && leader.fn.base !== BASELINE ? (
             <>
-              <span className="text-ink">{leader.name}</span> leads
+              <span className="text-ink">{leader.name}</span>{' '}
+              <span className="measured text-ink">{ratio.toFixed(1)}×</span> {m.better} than Node.js
+              24
             </>
-          )
-        )}
+          ) : (
+            leader && (
+              <>
+                <span className="text-ink">{leader.name}</span> leads
+              </>
+            )
+          )}
+        </span>
       </p>
     </article>
   )
@@ -146,7 +148,9 @@ const ArchFigure = ({ label, ratio }: { label: string; ratio: number }) => {
         <span className="measured text-2xl text-ink">
           {(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×
         </span>
-        <span className="text-sm text-muted">{ratio >= 1 ? 'faster' : 'slower'} on arm64</span>
+        <span className="datum text-sm text-muted">
+          {ratio >= 1 ? 'faster' : 'slower'} on arm64
+        </span>
       </p>
       <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
         {bars.map(([arch, width, color]) => (
@@ -154,7 +158,7 @@ const ArchFigure = ({ label, ratio }: { label: string; ratio: number }) => {
             <dt className="measured text-xs text-muted">{arch}</dt>
             <dd className="m-0 h-1.5 rounded-full bg-paper-3">
               <div
-                className={`h-full rounded-full ${color}`}
+                className={`mark h-full rounded-full ${color}`}
                 style={{ width: `${width * 100}%` }}
               />
             </dd>

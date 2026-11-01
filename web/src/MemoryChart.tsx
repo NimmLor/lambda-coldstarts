@@ -129,7 +129,7 @@ export const MemoryChart = ({
             .map((s) => (
               <div
                 key={s.f.base}
-                className="absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
+                className="mark absolute size-2.5 -translate-1/2 rounded-full border-2 border-paper-2"
                 style={{
                   left: `${x(selected)}%`,
                   top: `${y(s.values[selected]!)}%`,

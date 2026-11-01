@@ -200,9 +200,10 @@ export const Table = ({ view }: { view: View }) => {
     ).map((k) => agg(f, k))
     const isBest = (k: keyof typeof mins, v: number | undefined) =>
       on && v !== undefined && v === mins[k]
-    // The leader in a column is a reading, so it takes the instrument's cool tint.
+    // The leader in a column is a reading, so it takes the instrument's cool tint. Each figure and
+    // its unit are a datum, one bone while the page loads.
     const best = (k: keyof typeof mins, v: number | undefined) =>
-      isBest(k, v) ? 'rounded-chip bg-cool-soft px-1 text-cool [&>span]:text-cool' : ''
+      `datum ${isBest(k, v) ? 'rounded-chip bg-cool-soft px-1 text-cool [&>span]:text-cool' : ''}`
     const point = latest.points.get(f.id)!
     return (
       <div
@@ -262,7 +263,7 @@ export const Table = ({ view }: { view: View }) => {
             {(tickRun.points.get(f.id)?.initDurations ?? []).map((v, k) => (
               <span
                 key={k}
-                className="absolute top-0 h-3 w-0.5 -translate-x-px"
+                className="mark absolute top-0 h-3 w-0.5 -translate-x-px"
                 style={{ left: `${(v / tickMax) * 100}%`, background: f.color }}
                 title={`${v.toFixed(2)} ms`}
               />
@@ -319,7 +320,7 @@ export const Table = ({ view }: { view: View }) => {
             </span>
           </Cell>
           <Cell label="Size">
-            <span>
+            <span className="datum">
               <Reading>{point.size ? point.size.toFixed(1) : '—'}</Reading>
               <Unit>MB</Unit>
             </span>

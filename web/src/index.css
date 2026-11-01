@@ -1,5 +1,5 @@
 /* Hallmark · shape: app screen · genre: modern-minimal · theme: Console (by request) · redesign: full
- * nav: kept, the header's three links, no bar · signature: the cold start board, measured means per function on the deepest band · states: loading, error, empty, full · console: graphite
+ * nav: kept, the header's three links, no bar · signature: the cold start board, measured means per function on the deepest band · states: loading (the dashboard veiled), error, empty, full · console: graphite
  * axes: dark/grotesk-sans/chromatic-amber · posture: restrained · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: S, a graphite dashboard could be any monitoring tool; the board's measured means set large in the instrument face carry it, and amber is kept for the one control */
 /* Hallmark · waive 39b · the 127px div.grid is a board row with role button, not a control · each function's row toggles its line, so the whole row is the hit target */
@@ -243,9 +243,28 @@
     border-block: var(--rule-hair) solid var(--color-rule);
   }
 
-  .skeleton {
-    background: var(--color-paper-2);
-    border-radius: var(--radius-card);
+  /* The first load: the dashboard laid out on App's placeholder run, everything that run decides
+     veiled. Its readings, .measured or in the mono, and the .datum words around them are bones the
+     size of their text; the .marks and lines it drew are hidden. Important, as the utilities that
+     colour them come in a later layer, and some colours are inline. */
+  .pending :is(.measured, .font-mono, .datum) {
+    color: transparent !important;
+    background: color-mix(in oklab, var(--color-ink) 9%, transparent) !important;
+    border-radius: var(--radius-chip);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    animation: bone 1.4s var(--ease-in-out) infinite alternate;
+  }
+
+  .pending :is(.measured, .font-mono, .datum) *,
+  .pending :is(.mark, polyline) {
+    visibility: hidden;
+  }
+
+  @keyframes bone {
+    to {
+      opacity: 0.45;
+    }
   }
 
   /* The imprint and privacy policy: one measure of body text, heads in ink. */

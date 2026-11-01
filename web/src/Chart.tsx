@@ -236,10 +236,10 @@ export const Chart = ({
             {m.leader}
             <span
               aria-hidden="true"
-              className="size-2.5 shrink-0 rounded-full"
+              className="mark size-2.5 shrink-0 rounded-full"
               style={{ background: best.color }}
             />
-            <span className="font-medium text-ink">{best.name}</span>
+            <span className="datum font-medium text-ink">{best.name}</span>
             {baseline && baseline.base !== best.base && (
               <Versus value={agg(best, m.key)} baseline={agg(baseline, m.key)} />
             )}
@@ -302,7 +302,7 @@ export const Chart = ({
                 : [
                     <div
                       key={`${s.f.id}:${i}`}
-                      className="absolute size-1.5 -translate-1/2 rounded-full"
+                      className="mark absolute size-1.5 -translate-1/2 rounded-full"
                       style={{
                         left: `${x(i)}%`,
                         top: `${y(v)}%`,
