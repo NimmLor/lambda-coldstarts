@@ -1,9 +1,9 @@
 /**
  * A scheduled cold-start benchmark in the style of maxday/lambda-perf. The PerfRun state machine
- * goes through every function, `CONCURRENCY` at a time, each in an Express child workflow that
- * forces `PERF_ROUNDS` cold starts one after another, each followed by `PERF_WARM` warm
- * invocations (src/perf/measure.ts stores their REPORTs in PerfResults), then records the run and
- * stores its summary (src/perf/summarize.ts). PerfResults keeps a run for `RETENTION_DAYS`; on the
+ * goes through every function, `CONCURRENCY` at a time, and beside them every MicroVM, one at a
+ * time, each in an Express child workflow that forces `PERF_ROUNDS` cold starts one after another,
+ * each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs in
+ * PerfResults), then records the run and stores its summary (src/perf/summarize.ts). PerfResults keeps a run for `RETENTION_DAYS`; on the
  * 1st, PerfExport (src/perf/export.ts) copies the month before to the PerfArchive bucket. PerfApi
  * serves the summaries to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs,
  * pauses and resumes the schedule, and purges the table.
@@ -268,10 +268,15 @@ export const createPerf = (
     })
   }
 
-  const run = measureEach('Functions', '', functionTargets, CONCURRENCY)
-  // One size at a time, after the functions: the account may run 8 GB of MicroVMs at once, all
-  // of it the largest size's, and the functions' rounds keep Lambda's control plane busy.
+  const runFunctions = measureEach('Functions', '', functionTargets, CONCURRENCY)
+  // One size at a time: the account may run 8 GB of MicroVMs at once, all of it the largest size's.
   const runMicrovms = measureEach('Microvms', 'Microvm', microvmTargets, 1)
+  // The MicroVMs beside the functions, so a run takes as long as the longer of the two. Their
+  // rounds call RunMicrovm and TerminateMicrovm, not UpdateFunctionConfiguration, so they don't
+  // slow the functions' rounds down.
+  const measureAll = sst.aws.StepFunctions.parallel({ name: 'MeasureAll', output: {} })
+    .branch(runFunctions)
+    .branch(runMicrovms)
 
   const recordRun = sst.aws.StepFunctions.task({
     name: 'RecordRun',
@@ -301,15 +306,18 @@ export const createPerf = (
   }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
 
   const stateMachine = new sst.aws.StepFunctions('PerfRun', {
-    definition: run.next(runMicrovms).next(recordRun).next(summarizeRun),
+    definition: measureAll.next(recordRun).next(summarizeRun),
     transform: {
       // SST's Map has no ToleratedFailurePercentage. Without it, one failed child fails the Map
-      // Run, and RecordRun and Summarize never run for the functions that finished.
+      // Run, then MeasureAll, and RecordRun and Summarize never run for the targets that finished.
       stateMachine: (args) => {
         args.definition = $output(args.definition).apply((definition) => {
           const parsed = JSON.parse(definition)
-          for (const map of [run, runMicrovms]) {
-            parsed.States[map.name].ToleratedFailurePercentage = 100
+          const branches: { States: Record<string, Record<string, unknown>> }[] =
+            parsed.States[measureAll.name].Branches
+          for (const map of [runFunctions, runMicrovms]) {
+            const branch = branches.find((b) => map.name in b.States)!
+            branch.States[map.name]!.ToleratedFailurePercentage = 100
           }
           return JSON.stringify(parsed)
         })
