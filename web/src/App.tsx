@@ -34,8 +34,6 @@ const DAY_MS = 864e5
 /** How often PerfSchedule starts a run (infra/perf.ts). */
 const RUN_EVERY_MS = 4 * 36e5
 const RANGES = [14, 30, 90]
-/** What the dashboard is laid out on until the first load. */
-const PLACEHOLDER = placeholderHistory()
 
 const METRICS: Metric[] = [
   {
@@ -279,10 +277,14 @@ const UNITS = [
   ['second', 1e3],
 ] as const
 
-/** When the latest run finished, as how long ago, kept current; the dot turns once a run is missed. */
-const LastRun = ({ run }: { run: RunPoints }) => {
-  const [now, setNow] = useState(Date.now)
+/**
+ * When the latest run finished, as how long ago, kept current; the dot turns once a run is missed.
+ * It first reads as of `from`, App's `now`, as the prerendered page does, then the visitor's clock.
+ */
+const LastRun = ({ run, from }: { run: RunPoints; from: number }) => {
+  const [now, setNow] = useState(from)
   useEffect(() => {
+    setNow(Date.now())
     const id = setInterval(() => setNow(Date.now()), 1e3)
     return () => clearInterval(id)
   }, [])
@@ -303,7 +305,11 @@ const LastRun = ({ run }: { run: RunPoints }) => {
   )
 }
 
-export const App = () => {
+/**
+ * `now` is when the placeholder's runs lead up to: the build's, for the dashboard build.ts
+ * prerenders into index.html, which hydrating it has to render again to the letter.
+ */
+export const App = ({ now }: { now: number }) => {
   /** Oldest first. */
   const [loaded, setLoaded] = useState<RunPoints[]>([])
   const [loading, setLoading] = useState(true)
@@ -324,6 +330,8 @@ export const App = () => {
   const [compareWeb, setCompareWeb] = useStored('compareWeb', true, isBoolean)
   /** The same for the MicroVMs' section. */
   const [compareMicrovm, setCompareMicrovm] = useStored('compareMicrovm', true, isBoolean)
+  /** What the dashboard is laid out on until the first load. */
+  const [placeholderRuns] = useState(() => placeholderHistory(now))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -344,7 +352,7 @@ export const App = () => {
   // Until the first load, the dashboard lays out the placeholder run as it will the real ones, its
   // readings veiled by `.pending` in index.css, so nothing moves when they arrive.
   const placeholder = !loaded.length && loading && !error
-  const history = placeholder ? PLACEHOLDER : loaded
+  const history = placeholder ? placeholderRuns : loaded
   const latest = history.at(-1)
 
   const toggle = (base: string) => {
@@ -529,7 +537,7 @@ export const App = () => {
               </div>
             </div>
             <p className="measured m-0 flex shrink-0 items-center gap-x-4 text-xs text-muted">
-              <LastRun run={latest} />
+              <LastRun run={latest} from={now} />
               <span>{latest.rounds} rounds</span>
               <span className="hidden sm:inline">
                 {new Set(functions.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
@@ -747,8 +755,9 @@ export const App = () => {
           <p role="status" className="sr-only">
             Loading runs
           </p>
-          {/* Contents, so the toolbar stays sticky across the page; inert, as nothing in it is real. */}
-          <div inert className="contents">
+          {/* Contents, so the toolbar stays sticky across the page; inert, as nothing in it is real,
+              and no snippet, so a search result never quotes the prerendered page's made-up figures. */}
+          <div inert data-nosnippet className="contents">
             {dashboard(latest!)}
           </div>
         </>
