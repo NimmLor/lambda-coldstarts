@@ -416,6 +416,17 @@ const RatioCells = ({ ratios }: { ratios: Record<Metric['key'], number | undefin
   </>
 )
 
+/** Each architecture's colour where a row shows both: tokens.css's `--color-arch-*`. */
+const ARCH_COLORS = { arm64: 'var(--color-arch-arm)', x86_64: 'var(--color-arch-x86)' } as const
+
+/** A value on the track: a slim upright pill in its architecture's colour, cut out of the bar under it. */
+const Marker = ({ arch, left }: { arch: keyof typeof ARCH_COLORS; left: string }) => (
+  <span
+    className="absolute top-1/2 h-3.5 w-1 -translate-1/2 rounded-full ring-2 ring-paper-2"
+    style={{ left, background: ARCH_COLORS[arch] }}
+  />
+)
+
 /** The dumbbell's track, on the axis every row shares, and the values beside it. */
 const TRACK = 'relative h-4 min-w-32 flex-1 max-sm:hidden'
 const VALUES = 'shrink-0 text-right whitespace-nowrap max-sm:ml-auto sm:w-[6.5rem]'
@@ -508,17 +519,14 @@ const ArchTable = ({
               <th className="pb-1 text-left font-normal">
                 <span className="flex flex-wrap items-center gap-x-4">
                   <span className="whitespace-nowrap text-ink-2">Cold start, ms</span>
-                  {/* What the track's dots are; a phone shows no track. */}
+                  {/* What the marks' colours are; a phone has no track, and the values' heading says it. */}
                   <span className="inline-flex items-center gap-1.5 max-sm:hidden">
-                    <span aria-hidden="true" className="size-2 rounded-full bg-ink-2" />
-                    arm64
+                    <span aria-hidden="true" className="h-3 w-1 rounded-full bg-arch-arm" />
+                    <span className="text-arch-arm">arm64</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5 max-sm:hidden">
-                    <span
-                      aria-hidden="true"
-                      className="size-2 rounded-full border-2 border-ink-2"
-                    />
-                    x86_64
+                    <span aria-hidden="true" className="h-3 w-1 rounded-full bg-arch-x86" />
+                    <span className="text-arch-x86">x86_64</span>
                   </span>
                 </span>
               </th>
@@ -541,7 +549,11 @@ const ArchTable = ({
                       </span>
                     ))}
                   </span>
-                  <span className={VALUES}>arm64 → x86_64</span>
+                  {/* Flex items, so the font's contextual alternates don't read "4 x8" as "4 ×8". */}
+                  <span className={`${VALUES} flex justify-end gap-x-[1ch]`}>
+                    <span className="text-arch-arm">arm64</span>
+                    <span className="text-arch-x86">x86_64</span>
+                  </span>
                 </span>
               </th>
               {metrics.map((m) => (
@@ -607,31 +619,22 @@ const ArchTable = ({
                           />
                         ))}
                         {arm !== undefined && x86 !== undefined && (
+                          // From one architecture's colour to the other's, so the gap reads as which way it goes.
                           <span
-                            className="absolute top-1/2 h-0.5 -translate-y-1/2 opacity-60"
+                            className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full opacity-60"
                             style={{
                               left: at(Math.min(arm, x86)),
                               width: `${(Math.abs(x86 - arm) / max) * 100}%`,
-                              background: f.color,
+                              background: `linear-gradient(to right, ${arm < x86 ? ARCH_COLORS.arm64 : ARCH_COLORS.x86_64}, ${arm < x86 ? ARCH_COLORS.x86_64 : ARCH_COLORS.arm64})`,
                             }}
                           />
                         )}
-                        {x86 !== undefined && (
-                          <span
-                            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full border-2 bg-paper-2"
-                            style={{ left: at(x86), borderColor: f.color }}
-                          />
-                        )}
-                        {arm !== undefined && (
-                          <span
-                            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full"
-                            style={{ left: at(arm), background: f.color }}
-                          />
-                        )}
+                        {x86 !== undefined && <Marker arch="x86_64" left={at(x86)} />}
+                        {arm !== undefined && <Marker arch="arm64" left={at(arm)} />}
                       </span>
-                      <span className={`${VALUES} measured text-ink`}>
-                        {fixed(arm, 0)} <span className="text-muted">→</span>{' '}
-                        <span className="text-ink-2">{fixed(x86, 0)}</span>
+                      <span className={`${VALUES} measured`}>
+                        <span className="text-arch-arm">{fixed(arm, 0)}</span>{' '}
+                        <span className="text-arch-x86">{fixed(x86, 0)}</span>
                       </span>
                     </span>
                   </td>
