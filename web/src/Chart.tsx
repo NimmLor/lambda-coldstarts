@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import { DASHES, type Fn, fixed, niceMax, type Stat, type View, day, when } from './data'
@@ -34,46 +34,34 @@ const READOUT_GAP = 12
 export const Versus = ({ value, baseline }: { value?: number; baseline?: number }) => {
   if (value === undefined || baseline === undefined || !(value > 0) || !(baseline > 0)) return null
   const times = baseline / value
-  const tone = times >= 1 ? 'ok' : 'bad'
-  // The root lifts small differences off the neutral grey; oklab, as oklch would pass through other hues on the way.
-  const strength = Math.sqrt(Math.min(1, Math.abs(Math.log2(times)))) * 100
   return (
-    <span
-      className="measured rounded-chip px-1 text-xs"
-      style={{
-        color: `color-mix(in oklab, var(--color-${tone}) ${strength}%, var(--color-muted))`,
-        background: `color-mix(in oklab, var(--color-${tone}-soft) ${strength}%, transparent)`,
-      }}
-    >
+    <span className="measured rounded-chip px-1 text-xs" style={tone(times)}>
       {times.toFixed(2)}×
     </span>
   )
 }
 
 /**
- * The values under the pointer, lowest first, below the chart's card under the crosshair at `left`%
- * of the plot, so it covers none of the chart. Above the card when the viewport has no room below,
- * else beside the crosshair: right of it if it fits, else left, else as near it as the plot allows.
- * In a portal, as the card grid clips its cells to round its corners.
+ * The colours of a chip for `times`: green above 1, red below, fully saturated from twice either
+ * way. The root lifts small differences off the neutral grey; oklab, as oklch would pass through
+ * other hues on the way.
  */
-export const Readout = ({
-  left,
-  title,
-  rows,
-  unit,
-  digits,
-  focus,
-  baseline,
-}: {
-  left: number
-  title: string
-  rows: { f: Fn; value: number | undefined }[]
-  unit: string
-  digits: number
-  focus?: string
-  /** The compared function's value, which each row's badge is against. */
-  baseline?: number
-}) => {
+export const tone = (times: number) => {
+  const name = times >= 1 ? 'ok' : 'bad'
+  const strength = Math.sqrt(Math.min(1, Math.abs(Math.log2(times)))) * 100
+  return {
+    color: `color-mix(in oklab, var(--color-${name}) ${strength}%, var(--color-muted))`,
+    background: `color-mix(in oklab, var(--color-${name}-soft) ${strength}%, transparent)`,
+  }
+}
+
+/**
+ * A tooltip below the chart's card under the crosshair at `left`% of the plot, so it covers none of
+ * the chart. Above the card when the viewport has no room below, else beside the crosshair: right
+ * of it if it fits, else left, else as near it as the plot allows. In a portal, as the card grid
+ * clips its cells to round its corners.
+ */
+export const Floating = ({ left, children }: { left: number; children: ReactNode }) => {
   /** Stays in the plot, which the readout is placed by from the portal. */
   const anchor = useRef<HTMLSpanElement>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -122,43 +110,65 @@ export const Readout = ({
           role="tooltip"
           className="pointer-events-none absolute z-(--z-tooltip) flex flex-col gap-1 rounded-pill border border-rule-2 bg-paper px-3 py-2 text-xs whitespace-nowrap shadow-[0_8px_24px_oklch(0%_0_0/0.45)]"
         >
-          <span className="measured text-muted">{title}</span>
-          {rows
-            .filter((r) => r.value !== undefined)
-            .sort((a, b) => a.value! - b.value!)
-            .map(({ f, value }) => (
-              <span
-                key={f.id}
-                className={`flex items-center gap-2 ${focus && focus !== f.base ? 'opacity-40' : ''}`}
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-2 shrink-0 rounded-full"
-                  style={{ background: f.color }}
-                />
-                <span className={focus === f.base ? 'font-medium text-ink' : 'text-ink-2'}>
-                  {f.name}
-                </span>
-                <span className="measured ml-auto pl-4 text-ink">
-                  {fixed(value, digits)}{' '}
-                  {/* A phone-wide plot has room for the badge or the unit, and the chart's heading already names it. */}
-                  <span className={`text-muted ${baseline !== undefined ? 'max-sm:hidden' : ''}`}>
-                    {unit}
-                  </span>
-                </span>
-                {baseline !== undefined && (
-                  <span className="w-12 text-right">
-                    <Versus value={value} baseline={baseline} />
-                  </span>
-                )}
-              </span>
-            ))}
+          {children}
         </div>,
         document.body
       )}
     </>
   )
 }
+
+/** The values under the pointer, lowest first, in a `Floating` tooltip. */
+export const Readout = ({
+  left,
+  title,
+  rows,
+  unit,
+  digits,
+  focus,
+  baseline,
+}: {
+  left: number
+  title: string
+  rows: { f: Fn; value: number | undefined }[]
+  unit: string
+  digits: number
+  focus?: string
+  /** The compared function's value, which each row's badge is against. */
+  baseline?: number
+}) => (
+  <Floating left={left}>
+    <span className="measured text-muted">{title}</span>
+    {rows
+      .filter((r) => r.value !== undefined)
+      .sort((a, b) => a.value! - b.value!)
+      .map(({ f, value }) => (
+        <span
+          key={f.id}
+          className={`flex items-center gap-2 ${focus && focus !== f.base ? 'opacity-40' : ''}`}
+        >
+          <span
+            aria-hidden="true"
+            className="size-2 shrink-0 rounded-full"
+            style={{ background: f.color }}
+          />
+          <span className={focus === f.base ? 'font-medium text-ink' : 'text-ink-2'}>{f.name}</span>
+          <span className="measured ml-auto pl-4 text-ink">
+            {fixed(value, digits)}{' '}
+            {/* A phone-wide plot has room for the badge or the unit, and the chart's heading already names it. */}
+            <span className={`text-muted ${baseline !== undefined ? 'max-sm:hidden' : ''}`}>
+              {unit}
+            </span>
+          </span>
+          {baseline !== undefined && (
+            <span className="w-12 text-right">
+              <Versus value={value} baseline={baseline} />
+            </span>
+          )}
+        </span>
+      ))}
+  </Floating>
+)
 
 /** About `segments` + 1 dates under the chart, always including the last. */
 const dateTicks = (n: number, segments: number) => {

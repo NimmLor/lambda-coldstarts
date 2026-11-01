@@ -19,8 +19,23 @@ export const DASHES: Record<Family, string | undefined> = {
   Node: '5 4',
 }
 
+/** The architectures every function runs on, arm64 first as it's the default. */
+export const ARCHS = ['arm64', 'x86_64'] as const
+export type Arch = (typeof ARCHS)[number]
+
+/**
+ * Lambda's on-demand prices in STACK_REGION, in USD, at the first tier, from the AWS Price List API
+ * (EUC1-Lambda-GB-Second, -ARM and EUC1-Request): arm64's GB-second costs a fifth less.
+ */
+export const PRICES = {
+  gbSecond: { arm64: 0.0000133334, x86_64: 0.0000166667 } satisfies Record<Arch, number>,
+  request: 0.0000002,
+}
+
 type Variant = {
   name: string
+  /** Its name under its family's heading, when the name minus the family's isn't it. */
+  short?: string
   family: Family
   /**
    * The command infra/build.ts or infra/llrt.ts builds it with, short of the entry point, `--outfile`, and for the
@@ -94,6 +109,7 @@ export const VARIANTS: Record<string, Variant> = {
   },
   Llrt: {
     name: 'LLRT',
+    short: 'no SDK',
     family: 'LLRT',
     build: LLRT_BUNDLE,
     about: 'The bundle, run by LLRT’s no-SDK Lambda build as the bootstrap',
@@ -155,6 +171,21 @@ export const VARIANTS: Record<string, Variant> = {
   },
 }
 export const ORDER = Object.keys(VARIANTS)
+
+/** Each family's name, in the page's order. */
+export const FAMILY_NAMES: Record<Family, string> = { Bun: 'Bun', LLRT: 'LLRT', Node: 'Node.js' }
+
+/**
+ * A variant's name under its family's heading: `short`, or its name without the family's, e.g.
+ * "AOT executable, trimmed" for "Bun AOT executable, trimmed" and "24" for "Node.js 24".
+ */
+export const shortName = (base: string) => {
+  const v = VARIANTS[base]
+  if (!v) return base
+  const family = FAMILY_NAMES[v.family]
+  if (v.short) return v.short
+  return v.name.startsWith(family) ? v.name.slice(family.length).replace(/^[\s,]+/, '') : v.name
+}
 
 /** A deployed function: its variant, e.g. BunCompile, on one architecture with one memory size. */
 export type Fn = Variant & {
@@ -267,16 +298,32 @@ export const mean = (values: (number | undefined)[]) => {
   return present.length ? present.reduce((a, b) => a + b, 0) / present.length : undefined
 }
 
+/**
+ * What a million cold starts of `f` cost: since August 2025 Lambda bills the init as duration on
+ * every runtime, so each is billed for its init plus the invocation, and the request.
+ */
+export const coldStartCost = (f: Fn, cold?: number, dur?: number) => {
+  const price = PRICES.gbSecond[f.arch as Arch]
+  if (cold === undefined || dur === undefined || price === undefined) return undefined
+  return (((cold + dur) / 1e3) * (f.memoryMb / 1024) * price + PRICES.request) * 1e6
+}
+
+/** The geometric mean, which averages ratios as they multiply; undefined for none. */
+export const geomean = (values: number[]) =>
+  values.length
+    ? Math.exp(values.reduce((sum, v) => sum + Math.log(v), 0) / values.length)
+    : undefined
+
 export const fixed = (value: number | undefined, digits: number) => value?.toFixed(digits) ?? '—'
 
 /** A round axis maximum just above `value`. */
 export const niceMax = (value: number) => {
   if (!(value > 0)) return 1
-  const magnitude = 10 ** Math.floor(Math.log10(value))
-  return (
-    [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * magnitude >= value * 1.05)! *
-    magnitude
-  )
+  // The magnitude of the padded value, so a value just under a power of ten, like 960, still
+  // finds a step: 1000 is short of 960 × 1.05, and 10 × 100 is the last step from 100.
+  const padded = value * 1.05
+  const magnitude = 10 ** Math.floor(Math.log10(padded))
+  return [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * magnitude >= padded)! * magnitude
 }
 
 /** A run by when it finished, to the minute: there is one every 4 hours. */

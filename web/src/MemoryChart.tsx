@@ -17,7 +17,7 @@ export const MemoryChart = ({
   className = '',
 }: {
   metric: Metric
-  /** Beside the wide cold start chart, at its height, rather than in a row of small charts. */
+  /** Beside a wide chart over time, with its larger title, rather than in a row of small charts. */
   wide: boolean
   view: View
   /** Every function on the shown architecture, at every memory size. */
@@ -44,7 +44,7 @@ export const MemoryChart = ({
     top: 100 - g * 100,
     label: (max * g).toFixed(max < 5 ? 1 : 0),
   }))
-  const height = wide ? 300 : m.height
+  const height = m.height
   // The focused line last, so it's drawn on top.
   const ordered = series.toSorted((a, b) => Number(a.f.base === focus) - Number(b.f.base === focus))
   const selected = memories.indexOf(memoryMb)
