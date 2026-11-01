@@ -308,6 +308,12 @@ export const coldStartCost = (f: Fn, cold?: number, dur?: number) => {
   return (((cold + dur) / 1e3) * (f.memoryMb / 1024) * price + PRICES.request) * 1e6
 }
 
+/** The geometric mean, which averages ratios as they multiply; undefined for none. */
+export const geomean = (values: number[]) =>
+  values.length
+    ? Math.exp(values.reduce((sum, v) => sum + Math.log(v), 0) / values.length)
+    : undefined
+
 export const fixed = (value: number | undefined, digits: number) => value?.toFixed(digits) ?? '—'
 
 /** A round axis maximum just above `value`. */

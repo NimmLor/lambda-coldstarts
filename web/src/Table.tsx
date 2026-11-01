@@ -8,8 +8,9 @@ import nodeIcon from './icons/nodejs.svg'
 const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
 
 /**
- * Eight columns from `xl`, where the name still has room beside them; below it each row is a card: the rank and logo over the name, beside
- * them the cold start, then the build, the ticks, the percentiles and the other figures under it.
+ * Eight columns from `xl`, where the name still has room beside them; below it each row is a
+ * card: the rank and logo over the name, beside them the cold start, then the build, the ticks,
+ * the percentiles and the other figures under it.
  */
 const ROW =
   'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 py-4 xl:grid-cols-[2rem_minmax(0,1fr)_13rem_6.5rem_7rem_6rem_6rem_5.5rem] xl:items-center xl:gap-4'

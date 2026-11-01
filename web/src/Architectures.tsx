@@ -3,11 +3,13 @@ import { track } from './analytics'
 import { Floating, tone, X_LABELS } from './Chart'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import {
+  ARCHS,
   coldStartCost,
   FAMILY_NAMES,
   type Family,
   type Fn,
   fixed,
+  geomean,
   niceMax,
   PRICES,
   STACK_REGION,
@@ -23,12 +25,6 @@ import { useStored } from './stored'
 
 /** The id of the section, which the glance at the top links to. */
 export const ARCH_SECTION = 'arm64-vs-x86_64'
-
-/** The geometric mean, which averages ratios as they multiply; undefined for none. */
-const geomean = (ratios: number[]) =>
-  ratios.length
-    ? Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length)
-    : undefined
 
 /**
  * What the section compares, each lower-is-better, so x86_64's value over arm64's is how many
@@ -79,16 +75,28 @@ const GROUPS: Group[] = [
 /** A group's advantage at each memory size. */
 type Series = { group: Group; values: (number | undefined)[] }
 
+/** A metric's panel: the metric, and each group's advantage in it at every memory size. */
+type Panel = { metric: Metric; series: Series[] }
+
+/**
+ * The Event Functions by id, and one per variant for its family, which every size and
+ * architecture shares. Web Functions and MicroVMs run on arm64 only, so they're left out.
+ */
+const indexEvents = (functions: Fn[]) => {
+  const events = functions.filter((f) => !f.web && !f.microvm)
+  return {
+    byId: new Map(events.map((f) => [f.id, f])),
+    variants: [...new Map(events.map((f) => [f.base, f])).values()],
+  }
+}
+
 /**
  * Each group's advantage in `metric` at each memory size: the geometric mean, over its variants
  * with a value on both architectures at that size, of x86_64's value over arm64's. Web Functions
  * and MicroVMs, which run on arm64 only, are left out; the Functions filter doesn't apply.
  */
 const advantage = (functions: Fn[], memories: number[], metric: Metric): Series[] => {
-  const events = functions.filter((f) => !f.web && !f.microvm)
-  const byId = new Map(events.map((f) => [f.id, f]))
-  /** One function per variant, for its family, which every size and architecture shares. */
-  const variants = [...new Map(events.map((f) => [f.base, f])).values()]
+  const { byId, variants } = indexEvents(functions)
   const ratio = (base: string, mb: number) => {
     const arm = byId.get(`${base}/arm64/${mb}`)
     const x86 = byId.get(`${base}/x86_64/${mb}`)
@@ -96,12 +104,13 @@ const advantage = (functions: Fn[], memories: number[], metric: Metric): Series[
     const b = x86 && metric.value(x86)
     return a && b ? b / a : undefined
   }
-  return GROUPS.map((group) => ({
-    group,
-    values: memories.map((mb) =>
-      geomean(variants.filter(group.has).flatMap((v) => ratio(v.base, mb) ?? []))
-    ),
-  })).filter((s) => s.values.some((v) => v !== undefined))
+  return GROUPS.map((group) => {
+    const members = variants.filter(group.has)
+    return {
+      group,
+      values: memories.map((mb) => geomean(members.flatMap((v) => ratio(v.base, mb) ?? []))),
+    }
+  }).filter((s) => s.values.some((v) => v !== undefined))
 }
 
 /** Advantages a gridline may sit at, above 1×; below it, their reciprocals. */
@@ -311,24 +320,19 @@ const AdvantagePanel = ({
  */
 const AdvantageChart = ({
   view,
-  functions,
+  panels,
   memories,
   onPick,
   className = '',
 }: {
   view: View
-  /** Every Event Function, on both architectures and at every size. */
-  functions: Fn[]
+  panels: Panel[]
   /** Ascending. */
   memories: number[]
   onPick: (memoryMb: number) => void
   className?: string
 }) => {
-  const { runs, hover, memoryMb, agg } = view
-  const panels = metricsOf(agg).map((metric) => ({
-    metric,
-    series: advantage(functions, memories, metric),
-  }))
+  const { runs, hover, memoryMb } = view
   // Symmetric around even, as far as the largest advantage either way in any panel, rounded up,
   // with that advantage at most 85% of the way to the edge.
   const most = Math.max(
@@ -429,17 +433,17 @@ const CostChip = ({ r }: { r?: number }) => {
   )
 }
 
-/** A chip for each metric's ratio, cost as a difference. */
+/**
+ * A chip for each metric's ratio, cost as a difference, in the order the record was built in,
+ * which is metricsOf's, as the headings are.
+ */
 const RatioCells = ({ ratios }: { ratios: Record<Metric['key'], number | undefined> }) => (
   <>
-    {(['cold', 'trip', 'warm'] as const).map((key) => (
-      <td key={key} className="px-1 py-1.5 text-right sm:px-2">
-        <RatioChip r={ratios[key]} />
+    {(Object.entries(ratios) as [Metric['key'], number | undefined][]).map(([key, r]) => (
+      <td key={key} className="px-1 py-1.5 text-right last:pr-0 sm:px-2">
+        {key === 'cost' ? <CostChip r={r} /> : <RatioChip r={r} />}
       </td>
     ))}
-    <td className="py-1.5 pl-1 text-right sm:pl-2">
-      <CostChip r={ratios.cost} />
-    </td>
   </>
 )
 
@@ -719,12 +723,10 @@ const EVEN = 1.05
  * from the lowest size's to the highest's.
  */
 const coldSpread = (functions: Fn[], memories: number[], cold: (f: Fn) => number | undefined) => {
-  const events = functions.filter((f) => !f.web && !f.microvm)
-  const byId = new Map(events.map((f) => [f.id, f]))
-  const variants = [...new Map(events.map((f) => [f.base, f])).values()]
+  const { byId, variants } = indexEvents(functions)
   let most = 0
   for (const g of GROUPS) {
-    for (const arch of ['arm64', 'x86_64']) {
+    for (const arch of ARCHS) {
       const series = variants
         .filter(g.has)
         .map((v) =>
@@ -753,20 +755,18 @@ const Figure = ({ children }: { children: ReactNode }) => (
  */
 const Headline = ({
   view,
+  panels,
   functions,
   memories,
 }: {
   view: View
+  panels: Panel[]
   functions: Fn[]
   memories: number[]
 }) => {
-  const metrics = metricsOf(view.agg)
   const all = (key: Metric['key']) =>
-    advantage(
-      functions,
-      memories,
-      metrics.find((m) => m.key === key)!
-    ).find((s) => s.group.name === 'All')?.values ?? []
+    panels.find((p) => p.metric.key === key)?.series.find((s) => s.group.name === 'All')?.values ??
+    []
   const at = memories.indexOf(view.memoryMb)
   const cold = all('cold')[at]
   const cost = all('cost')[at]
@@ -786,7 +786,7 @@ const Headline = ({
       : prefix
         ? `below ${memories[losses.length]} MB`
         : `at ${losses.map((i) => memories[i]).join(', ')} MB`
-  const spread = Math.round(coldSpread(functions, memories, metrics[0]!.value) * 100)
+  const spread = Math.round(coldSpread(functions, memories, (f) => view.agg(f, 'cold')) * 100)
 
   return (
     <p className="max-w-prose text-lg/normal text-pretty text-ink-2">
@@ -810,15 +810,17 @@ const Headline = ({
             start
           </>
         ))}
-      ;{' '}
-      {losses.length ? (
+      {/* Nothing to say of the warm start when no run in view measured one. */}
+      {!warm.some((r) => r !== undefined) ? (
+        '.'
+      ) : losses.length ? (
         <>
-          warm, x86_64 is up to <Figure>{most.toFixed(2)}×</Figure> faster {where}.
+          ; warm, x86_64 is up to <Figure>{most.toFixed(2)}×</Figure> faster {where}.
         </>
       ) : warm.every((r) => r === undefined || r >= EVEN) ? (
-        'warm, arm64 is faster too.'
+        '; warm, arm64 is faster too.'
       ) : (
-        'warm, x86_64 is nowhere more than 5% faster.'
+        '; warm, x86_64 is nowhere more than 5% faster.'
       )}{' '}
       {spread <= 10 ? (
         <>
@@ -857,6 +859,11 @@ export const Architectures = ({
   for (const f of functions) archs.set(f.base, (archs.get(f.base) ?? new Set()).add(f.arch))
   if (![...archs.values()].some((a) => a.has('arm64') && a.has('x86_64'))) return null
   const discount = Math.round((1 - PRICES.gbSecond.arm64 / PRICES.gbSecond.x86_64) * 100)
+  // Once per render, for the headline and the chart both.
+  const panels = metricsOf(view.agg).map((metric) => ({
+    metric,
+    series: advantage(functions, memories, metric),
+  }))
 
   return (
     <section
@@ -865,10 +872,10 @@ export const Architectures = ({
     >
       <div className="flex flex-col gap-3">
         <h2 className="text-2xl">arm64 vs x86_64</h2>
-        <Headline view={view} functions={functions} memories={memories} />
+        <Headline view={view} panels={panels} functions={functions} memories={memories} />
       </div>
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule">
-        <AdvantageChart view={view} functions={functions} memories={memories} onPick={onPick} />
+        <AdvantageChart view={view} panels={panels} memories={memories} onPick={onPick} />
         <ArchTable view={view} functions={functions} memories={memories} onPick={onPick} />
       </div>
       <p className="max-w-prose text-sm text-pretty text-muted">

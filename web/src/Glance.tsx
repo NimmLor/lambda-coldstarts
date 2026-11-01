@@ -1,5 +1,5 @@
 import { ARCH_SECTION } from './Architectures'
-import { type Fn, fixed, mean, type RunPoints } from './data'
+import { type Fn, fixed, geomean, mean, type RunPoints } from './data'
 import bunIcon from './icons/bun.svg'
 import llrtIcon from './icons/llrt.svg'
 import nodeIcon from './icons/nodejs.svg'
@@ -118,19 +118,19 @@ const Panel = ({ metric: m, rows: all }: { metric: (typeof METRICS)[number]; row
  * both: each one's x86_64 time over its arm64 one at the same memory size, averaged geometrically,
  * as ratios are. Undefined without such a pair.
  */
-const archRatio = (runs: RunPoints[], functions: Fn[], key: 'cold' | 'warm') => {
-  const logs = functions.flatMap((arm) => {
-    if (arm.arch !== 'arm64') return []
-    const x86 = functions.find(
-      (f) => f.arch === 'x86_64' && f.base === arm.base && f.memoryMb === arm.memoryMb
-    )
-    if (!x86) return []
-    const armTime = mean(runs.map((r) => r.points.get(arm.id)?.[key]))
-    const x86Time = mean(runs.map((r) => r.points.get(x86.id)?.[key]))
-    return armTime && x86Time ? [Math.log(x86Time / armTime)] : []
-  })
-  return logs.length ? Math.exp(logs.reduce((sum, l) => sum + l, 0) / logs.length) : undefined
-}
+const archRatio = (runs: RunPoints[], functions: Fn[], key: 'cold' | 'warm') =>
+  geomean(
+    functions.flatMap((arm) => {
+      if (arm.arch !== 'arm64') return []
+      const x86 = functions.find(
+        (f) => f.arch === 'x86_64' && f.base === arm.base && f.memoryMb === arm.memoryMb
+      )
+      if (!x86) return []
+      const armTime = mean(runs.map((r) => r.points.get(arm.id)?.[key]))
+      const x86Time = mean(runs.map((r) => r.points.get(x86.id)?.[key]))
+      return armTime && x86Time ? [x86Time / armTime] : []
+    })
+  )
 
 /** A ratio as its stat: arm64's bar against x86_64's, the slower one full width. */
 const ArchFigure = ({ label, ratio }: { label: string; ratio: number }) => {
