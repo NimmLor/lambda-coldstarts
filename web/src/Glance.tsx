@@ -114,20 +114,20 @@ const Panel = ({ metric: m, rows: all }: { metric: (typeof METRICS)[number]; row
 }
 
 /**
- * How many times faster arm64 cold-starts than x86_64, over the functions that run on both, of
- * `base` or of every variant: each one's x86_64 cold start over its arm64 one at the same memory
- * size, averaged geometrically, as ratios are. Undefined without such a pair.
+ * How many times faster arm64 starts than x86_64, cold or warm, over every function that runs on
+ * both: each one's x86_64 time over its arm64 one at the same memory size, averaged geometrically,
+ * as ratios are. Undefined without such a pair.
  */
-const archRatio = (runs: RunPoints[], functions: Fn[], base?: string) => {
+const archRatio = (runs: RunPoints[], functions: Fn[], key: 'cold' | 'warm') => {
   const logs = functions.flatMap((arm) => {
-    if (arm.arch !== 'arm64' || (base && arm.base !== base)) return []
+    if (arm.arch !== 'arm64') return []
     const x86 = functions.find(
       (f) => f.arch === 'x86_64' && f.base === arm.base && f.memoryMb === arm.memoryMb
     )
     if (!x86) return []
-    const armCold = mean(runs.map((r) => r.points.get(arm.id)?.cold))
-    const x86Cold = mean(runs.map((r) => r.points.get(x86.id)?.cold))
-    return armCold && x86Cold ? [Math.log(x86Cold / armCold)] : []
+    const armTime = mean(runs.map((r) => r.points.get(arm.id)?.[key]))
+    const x86Time = mean(runs.map((r) => r.points.get(x86.id)?.[key]))
+    return armTime && x86Time ? [Math.log(x86Time / armTime)] : []
   })
   return logs.length ? Math.exp(logs.reduce((sum, l) => sum + l, 0) / logs.length) : undefined
 }
@@ -165,11 +165,11 @@ const ArchFigure = ({ label, ratio }: { label: string; ratio: number }) => {
   )
 }
 
-/** A row under the panels: arm64's cold start against x86_64's, overall and for Node.js 24. */
+/** A row under the panels: arm64's cold and warm starts against x86_64's, over every function. */
 const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[] }) => {
   const figures = [
-    ['All functions', archRatio(runs, functions)],
-    ['Node.js 24', archRatio(runs, functions, BASELINE)],
+    ['Cold starts', archRatio(runs, functions, 'cold')],
+    ['Warm starts', archRatio(runs, functions, 'warm')],
   ] as const
   if (figures.every(([, ratio]) => ratio === undefined)) return null
   return (
@@ -177,8 +177,8 @@ const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[]
       <div className="flex flex-col gap-2 bg-paper-2 p-5 sm:col-span-2 sm:p-6">
         <h3 className="text-lg">arm64 vs. x86_64</h3>
         <p className="m-0 max-w-prose text-sm text-pretty text-muted">
-          How much faster functions cold-start on arm64 than on x86_64, at every memory size. Web
-          Functions and MicroVMs run on arm64 only.{' '}
+          How every function starts on arm64 against x86_64, cold and warm, across every memory
+          size. Web Functions and MicroVMs run on arm64 only.{' '}
           <a href={`#${ARCH_SECTION}`}>Each size and runtime</a>
         </p>
       </div>
