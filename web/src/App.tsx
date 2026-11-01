@@ -24,6 +24,7 @@ import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryChart } from './MemoryChart'
 import { isBoolean, isNumber, isString, useStored } from './stored'
 import { MicroVms } from './MicroVms'
+import { placeholderHistory } from './placeholder'
 import { Table } from './Table'
 import { WebFunctions } from './WebFunctions'
 
@@ -33,6 +34,8 @@ const DAY_MS = 864e5
 /** How often PerfSchedule starts a run (infra/perf.ts). */
 const RUN_EVERY_MS = 4 * 36e5
 const RANGES = [14, 30, 90]
+/** What the dashboard is laid out on until the first load. */
+const PLACEHOLDER = placeholderHistory()
 
 const METRICS: Metric[] = [
   {
@@ -244,9 +247,14 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
         <h1 className="text-3xl text-balance">Bun vs LLRT vs Node.js cold starts on AWS Lambda</h1>
       </div>
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
-        {latest
-          ? `${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${kinds.length ? `, plus Node.js 24 ${kinds.join(' and ')}` : ''}, each cold started ${latest.rounds} times every 4 hours. `
-          : 'Each runtime is cold started every 4 hours. '}
+        {latest ? (
+          <>
+            {`${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${kinds.length ? `, plus Node.js 24 ${kinds.join(' and ')}` : ''}, each cold started `}
+            <span className="datum">{latest.rounds}</span> times every 4 hours.{' '}
+          </>
+        ) : (
+          'Each runtime is cold started every 4 hours. '
+        )}
         Each point on the charts is one run. The table averages the range you pick.
       </p>
       <nav className="flex flex-col gap-1.5 text-sm lg:col-span-4 lg:items-end">
@@ -295,22 +303,9 @@ const LastRun = ({ run }: { run: RunPoints }) => {
   )
 }
 
-/** The first load, in the shape of the toolbar, the cold start chart and the board. */
-const Skeleton = () => (
-  <div aria-busy="true" aria-label="Loading runs" className={`${WRAP} flex flex-col gap-6`}>
-    <div className="skeleton h-12" />
-    <div className="skeleton h-96" />
-    <div className="flex flex-col gap-2">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="skeleton h-14" />
-      ))}
-    </div>
-  </div>
-)
-
 export const App = () => {
   /** Oldest first. */
-  const [history, setHistory] = useState<RunPoints[]>([])
+  const [loaded, setLoaded] = useState<RunPoints[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
   // 256 MB on arm64, like the glance at the top, until the visitor picks another, which is kept.
@@ -336,7 +331,7 @@ export const App = () => {
       const response = await fetch(`${API}/runs/history`)
       if (!response.ok) throw new Error(`/runs/history: ${response.status}`)
       const { runs } = (await response.json()) as { runs: Run[] }
-      setHistory(runs.map(toPoints).reverse())
+      setLoaded(runs.map(toPoints).reverse())
       setError(undefined)
     } catch (e) {
       setError(String(e))
@@ -346,6 +341,10 @@ export const App = () => {
   }, [])
   useEffect(() => void load(), [load])
 
+  // Until the first load, the dashboard lays out the placeholder run as it will the real ones, its
+  // readings veiled by `.pending` in index.css, so nothing moves when they arrive.
+  const placeholder = !loaded.length && loading && !error
+  const history = placeholder ? PLACEHOLDER : loaded
   const latest = history.at(-1)
 
   const toggle = (base: string) => {
@@ -698,9 +697,17 @@ export const App = () => {
               </h2>
               <p className="max-w-prose text-sm text-pretty text-muted">
                 Ticks are {hovered !== undefined ? 'that' : 'the latest'} run’s{' '}
-                {(hovered !== undefined ? runs[hovered]! : latest).rounds} cold starts.
-                {latest.warmInvocations !== undefined &&
-                  ` Warm start is the mean of the ${latest.warmInvocations} calls after each.`}{' '}
+                <span className="datum">
+                  {(hovered !== undefined ? runs[hovered]! : latest).rounds}
+                </span>{' '}
+                cold starts.
+                {latest.warmInvocations !== undefined && (
+                  <>
+                    {' '}
+                    Warm start is the mean of the{' '}
+                    <span className="datum">{latest.warmInvocations}</span> calls after each.
+                  </>
+                )}{' '}
                 Click a row to hide it.
               </p>
             </div>
@@ -711,34 +718,45 @@ export const App = () => {
     )
   }
 
-  /** What stands in for the dashboard until there is a run to show. */
-  const pending = () => {
-    if (loading && !error) return <Skeleton />
-    return (
-      <div className={WRAP}>
-        <div
-          role={error ? 'alert' : undefined}
-          className="flex flex-col items-start gap-4 rounded-card border border-rule bg-paper-2 p-6"
+  /** What stands in for the dashboard when the load failed or found no run. */
+  const noRuns = () => (
+    <div className={WRAP}>
+      <div
+        role={error ? 'alert' : undefined}
+        className="flex flex-col items-start gap-4 rounded-card border border-rule bg-paper-2 p-6"
+      >
+        <h2 className="text-lg">{error ? 'Couldn’t load the runs' : 'No runs yet'}</h2>
+        {error && <p className="measured text-sm text-bad">{error}</p>}
+        <button
+          type="button"
+          onClick={load}
+          aria-busy={loading}
+          className="btn btn--primary hit relative"
         >
-          <h2 className="text-lg">{error ? 'Couldn’t load the runs' : 'No runs yet'}</h2>
-          {error && <p className="measured text-sm text-bad">{error}</p>}
-          <button
-            type="button"
-            onClick={load}
-            aria-busy={loading}
-            className="btn btn--primary hit relative"
-          >
-            {loading ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
-    <main>
+    <main className={placeholder ? 'pending' : undefined} aria-busy={placeholder}>
       <Header latest={latest} />
-      {latest ? dashboard(latest) : pending()}
+      {placeholder ? (
+        <>
+          <p role="status" className="sr-only">
+            Loading runs
+          </p>
+          {/* Contents, so the toolbar stays sticky across the page; inert, as nothing in it is real. */}
+          <div inert className="contents">
+            {dashboard(latest!)}
+          </div>
+        </>
+      ) : latest ? (
+        dashboard(latest)
+      ) : (
+        noRuns()
+      )}
       <footer
         className={`${WRAP} flex flex-col gap-6 pt-12 pb-16 text-sm text-muted ${latest ? '' : 'mt-16'}`}
       >
