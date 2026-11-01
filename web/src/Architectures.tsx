@@ -419,10 +419,16 @@ const RatioCells = ({ ratios }: { ratios: Record<Metric['key'], number | undefin
 /** Each architecture's colour where a row shows both: tokens.css's `--color-arch-*`. */
 const ARCH_COLORS = { arm64: 'var(--color-arch-arm)', x86_64: 'var(--color-arch-x86)' } as const
 
-/** A value on the track: a solid circle in its architecture's colour, ringed off the bar under it. */
+/** Each architecture's mark on the track; the legend draws them a little smaller. */
+const MARKS = { arm64: 'size-3.5 rounded-full', x86_64: 'h-4 w-1.5 rounded-[2px]' } as const
+
+/**
+ * A value on the track, ringed off the bar under it: arm64 a green circle, x86_64 an upright red
+ * bar, so the two differ in shape as well as colour.
+ */
 const Marker = ({ arch, left }: { arch: keyof typeof ARCH_COLORS; left: string }) => (
   <span
-    className="absolute top-1/2 size-3.5 -translate-1/2 rounded-full ring-2 ring-paper-2"
+    className={`absolute top-1/2 -translate-1/2 ring-2 ring-paper-2 ${MARKS[arch]}`}
     style={{ left, background: ARCH_COLORS[arch] }}
   />
 )
@@ -525,7 +531,7 @@ const ArchTable = ({
                     <span className="text-arch-arm">arm64</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5 max-sm:hidden">
-                    <span aria-hidden="true" className="size-2.5 rounded-full bg-arch-x86" />
+                    <span aria-hidden="true" className="h-3 w-1 rounded-[1px] bg-arch-x86" />
                     <span className="text-arch-x86">x86_64</span>
                   </span>
                 </span>
