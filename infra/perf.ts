@@ -3,10 +3,10 @@
  * goes through every function, `CONCURRENCY` at a time, and beside them every MicroVM, one at a
  * time, each in an Express child workflow that forces `PERF_ROUNDS` cold starts one after another,
  * each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs in
- * PerfResults), then records the run and stores its summary (src/perf/summarize.ts). PerfResults keeps a run for `RETENTION_DAYS`; on the
- * 1st, PerfExport (src/perf/export.ts) copies the month before to the PerfArchive bucket. PerfApi
- * serves the summaries to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs,
- * pauses and resumes the schedule, and purges the table.
+ * PerfResults), then records the run and stores its summary (src/perf/summarize.ts). PerfResults
+ * keeps a run for `RETENTION_DAYS`; on the 1st, PerfExport (src/perf/export.ts) copies the month
+ * before to the PerfArchive bucket. PerfApi serves the summaries to the React site in web/ and,
+ * with PERF_ADMIN_SECRET set, starts runs, pauses and resumes the schedule, and purges the table.
  */
 import { RETENTION_DAYS, RUNS_PK } from '../src/perf/keys'
 import { BENCH_TAG } from './functions'
