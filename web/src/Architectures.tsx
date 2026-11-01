@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Floating, tone, X_LABELS } from './Chart'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import {
@@ -22,7 +22,7 @@ import { WRAP } from './layout'
 /** The id of the section, which the glance at the top links to. */
 export const ARCH_SECTION = 'arm64-vs-x86_64'
 
-/** How many times as fast arm64 is, over the pairs with both values, averaged geometrically. */
+/** The geometric mean, which averages ratios as they multiply; undefined for none. */
 const geomean = (ratios: number[]) =>
   ratios.length
     ? Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length)
@@ -642,28 +642,129 @@ const ArchTable = ({
           ))}
         </table>
       </div>
-      <Summary rows={rows} />
     </div>
   )
 }
 
-/** arm64's cold start and cost advantage over the rows. */
-const Summary = ({ rows }: { rows: { ratios: Record<Metric['key'], number | undefined> }[] }) => {
-  const speed = geomean(rows.flatMap((r) => r.ratios.cold ?? []))
-  const cost = geomean(rows.flatMap((r) => r.ratios.cost ?? []))
-  if (speed === undefined) return null
+/** Within this of each other, two values are even: the headline names no winner. */
+const EVEN = 1.05
+
+/**
+ * The largest relative spread of cold start across the memory sizes: per group and
+ * architecture, the geometric mean of the cold start of its variants measured at every size,
+ * from the lowest size's to the highest's.
+ */
+const coldSpread = (functions: Fn[], memories: number[], cold: (f: Fn) => number | undefined) => {
+  const events = functions.filter((f) => !f.web && !f.microvm)
+  const byId = new Map(events.map((f) => [f.id, f]))
+  const variants = [...new Map(events.map((f) => [f.base, f])).values()]
+  let most = 0
+  for (const g of GROUPS) {
+    for (const arch of ['arm64', 'x86_64']) {
+      const series = variants
+        .filter(g.has)
+        .map((v) =>
+          memories.map((mb) => {
+            const f = byId.get(`${v.base}/${arch}/${mb}`)
+            return f && cold(f)
+          })
+        )
+        .filter((values): values is number[] => values.every((v) => v !== undefined && v > 0))
+      if (!series.length) continue
+      const means = memories.map((_, i) => geomean(series.map((s) => s[i]!))!)
+      most = Math.max(most, Math.max(...means) / Math.min(...means) - 1)
+    }
+  }
+  return most
+}
+
+const Figure = ({ children }: { children: ReactNode }) => (
+  <span className="measured text-ink">{children}</span>
+)
+
+/**
+ * The section's answer in a sentence, from the same geometric means as the panels: all Event
+ * Functions' cold start and cost at the picked size, where their warm start favours x86_64, and how
+ * little memory moves cold start.
+ */
+const Headline = ({
+  view,
+  functions,
+  memories,
+}: {
+  view: View
+  functions: Fn[]
+  memories: number[]
+}) => {
+  const metrics = metricsOf(view.agg)
+  const all = (key: Metric['key']) =>
+    advantage(
+      functions,
+      memories,
+      metrics.find((m) => m.key === key)!
+    ).find((s) => s.group.name === 'All')?.values ?? []
+  const at = memories.indexOf(view.memoryMb)
+  const cold = all('cold')[at]
+  const cost = all('cost')[at]
+  const warm = all('warm')
+  if (cold === undefined) return null
+
+  const percent = cost === undefined ? undefined : Math.round((1 / cost - 1) * 100)
+  // The sizes where x86_64's warm start is more than even, and by how much at most.
+  const losses = memories.flatMap((_, i) =>
+    warm[i] !== undefined && warm[i]! < 1 / EVEN ? [i] : []
+  )
+  const most = Math.max(...losses.map((i) => 1 / warm[i]!))
+  const prefix = losses.every((i, k) => i === k)
+  const where =
+    losses.length === memories.length
+      ? 'at every size'
+      : prefix
+        ? `below ${memories[losses.length]} MB`
+        : `at ${losses.map((i) => memories[i]).join(', ')} MB`
+  const spread = Math.round(coldSpread(functions, memories, metrics[0]!.value) * 100)
+
   return (
-    <p className="border-t border-rule pt-4 text-sm text-pretty text-muted">
-      On arm64, the {rows.length === 1 ? 'function' : `${rows.length} functions`} cold-start{' '}
-      <span className="measured text-ink">{speed.toFixed(2)}×</span> as fast
-      {cost !== undefined && (
+    <p className="max-w-prose text-lg/normal text-pretty text-ink-2">
+      At {view.memoryMb} MB arm64{' '}
+      {cold >= 1 ? (
         <>
-          {' '}
-          and, with a GB-second a fifth cheaper, for{' '}
-          <span className="measured text-ink">{Math.round((1 - 1 / cost) * 100)}%</span> less
+          cold-starts <Figure>{cold.toFixed(2)}×</Figure> as fast
+        </>
+      ) : (
+        <>
+          takes <Figure>{(1 / cold).toFixed(2)}×</Figure> as long to cold-start
         </>
       )}
-      .
+      {percent !== undefined &&
+        (percent === 0 ? (
+          ' and costs the same per cold start'
+        ) : (
+          <>
+            {' '}
+            and costs <Figure>{Math.abs(percent)}%</Figure> {percent < 0 ? 'less' : 'more'} per cold
+            start
+          </>
+        ))}
+      ;{' '}
+      {losses.length ? (
+        <>
+          warm, x86_64 is up to <Figure>{most.toFixed(2)}×</Figure> faster {where}.
+        </>
+      ) : warm.every((r) => r === undefined || r >= EVEN) ? (
+        'warm, arm64 is faster too.'
+      ) : (
+        'warm, x86_64 is nowhere more than 5% faster.'
+      )}{' '}
+      {spread <= 10 ? (
+        <>
+          Memory barely moves cold start: by <Figure>{spread}%</Figure> at most.
+        </>
+      ) : (
+        <>
+          Memory moves cold start by up to <Figure>{spread}%</Figure>.
+        </>
+      )}
     </p>
   )
 }
@@ -700,21 +801,21 @@ export const Architectures = ({
     >
       <div className="flex flex-col gap-3">
         <h2 className="text-2xl">arm64 vs x86_64</h2>
-        <p className="max-w-prose text-pretty text-ink-2">
-          The same Event Functions on Graviton and on x86_64, at every memory size, in{' '}
-          {STACK_REGION}. Click a size to pick it for the whole page.
-        </p>
+        <Headline view={view} functions={functions} memories={memories} />
       </div>
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule">
         <AdvantageChart view={view} functions={functions} memories={memories} onPick={onPick} />
         <ArchTable view={view} functions={functions} memories={memories} onPick={onPick} />
       </div>
       <p className="max-w-prose text-sm text-pretty text-muted">
+        The same Event Functions on Graviton and on x86_64, at every memory size, in {STACK_REGION}.
         Each ratio is x86_64’s value over arm64’s, averaged geometrically over a family’s Event
-        Functions measured on both. First answer is the cold invocation’s round trip, as PerfMeasure
-        in the same region sees it. Cost per cold start is the init plus the invocation, billed as
-        duration on every runtime since August 2025, and the request, at {STACK_REGION}’s first-tier
-        prices: arm64’s GB-second is {discount}% cheaper.
+        Functions measured on both; the headline’s are all of them, and how much memory moves cold
+        start is the largest spread across sizes of a family’s mean cold start on either
+        architecture. First answer is the cold invocation’s round trip, as PerfMeasure in the same
+        region sees it. Cost per cold start is the init plus the invocation, billed as duration on
+        every runtime since August 2025, and the request, at {STACK_REGION}’s first-tier prices:
+        arm64’s GB-second is {discount}% cheaper.
       </p>
     </section>
   )
