@@ -175,13 +175,6 @@ export const ORDER = Object.keys(VARIANTS)
 /** Each family's name, in the page's order. */
 export const FAMILY_NAMES: Record<Family, string> = { Bun: 'Bun', LLRT: 'LLRT', Node: 'Node.js' }
 
-/** A variant's name on its own, with `short` when the name alone doesn't tell it apart. */
-export const fullName = (base: string) => {
-  const v = VARIANTS[base]
-  if (!v) return base
-  return v.short ? `${FAMILY_NAMES[v.family]}, ${v.short}` : v.name
-}
-
 /**
  * A variant's name under its family's heading: `short`, or its name without the family's, e.g.
  * "AOT executable, trimmed" for "Bun AOT executable, trimmed" and "24" for "Node.js 24".
