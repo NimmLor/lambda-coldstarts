@@ -1,9 +1,13 @@
 /**
  * The last step of a run of the PerfRun state machine (infra/perf.ts): summarizes the run's
  * samples once and stores the run with its per-function statistics under `summaries`, so PerfApi
- * reads a run as one item instead of every cold start. scripts/perf-summarize.ts calls it for
- * runs recorded before this step existed.
+ * reads a run as one item instead of every cold start. Then it invalidates PerfApi's
+ * /runs/history in PerfRouter, which CloudFront would otherwise keep for hours, so the site shows
+ * the run right away. scripts/perf-summarize.ts calls it for runs recorded before this step
+ * existed.
  */
+import { randomUUID } from 'node:crypto'
+import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { expiresAt, RUNS_PK, type Sample, SUMMARIES_PK, samplesPk } from './keys'
@@ -15,7 +19,11 @@ export type SummarizeEvent = { runId: string }
 const db = DynamoDBDocumentClient.from(new DynamoDBClient(), {
   marshallOptions: { removeUndefinedValues: true },
 })
+const cloudfront = new CloudFrontClient()
 const TABLE = process.env.PERF_TABLE
+const DISTRIBUTION = process.env.PERF_DISTRIBUTION
+/** PerfApi's /runs/history, under the /api route infra/perf.ts gives it in PerfRouter. */
+const HISTORY_PATH = '/api/runs/history'
 
 const listSamples = async (runId: string) => {
   const samples: Sample[] = []
@@ -55,6 +63,17 @@ export const handler = async ({ runId }: SummarizeEvent) => {
         functionCount,
         functions,
         expiresAt: expiresAt(runId),
+      },
+    })
+  )
+  await cloudfront.send(
+    new CreateInvalidationCommand({
+      DistributionId: DISTRIBUTION,
+      InvalidationBatch: {
+        // A reused reference returns the earlier invalidation instead of making a new one, and
+        // summarizing a run again, through a retry or `--all`, changes the history again.
+        CallerReference: `${runId}/${randomUUID()}`,
+        Paths: { Quantity: 1, Items: [HISTORY_PATH] },
       },
     })
   )

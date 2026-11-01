@@ -8,6 +8,7 @@
         "sst": "4.17.2",
       },
       "devDependencies": {
+        "@aws-sdk/client-cloudfront": "^3.1161.0",
         "@aws-sdk/client-cloudwatch-logs": "^3.1161.0",
         "@aws-sdk/client-dynamodb": "^3.1158.0",
         "@aws-sdk/client-lambda": "^3.1158.0",
@@ -42,6 +43,8 @@
   },
   "packages": {
     "@aws-sdk/checksums": ["@aws-sdk/checksums@3.1002.0", "", { "dependencies": { "@aws-sdk/core": "^3.979.0", "@aws-sdk/types": "^3.975.0", "@smithy/core": "^3.37.0", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-JhnrBaQczTv0niJccOmIC6uRLVi7YCP85Yl7lhdnfyEjaqZBQ0GVtT5rILziQoGparp23bZS0fgUiE/bUR7g+A=="],
+
+    "@aws-sdk/client-cloudfront": ["@aws-sdk/client-cloudfront@3.1161.0", "", { "dependencies": { "@aws-sdk/core": "^3.979.1", "@aws-sdk/credential-provider-node": "^3.972.92", "@aws-sdk/types": "^3.975.0", "@smithy/core": "^3.38.0", "@smithy/fetch-http-handler": "^5.8.0", "@smithy/node-http-handler": "^4.14.0", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-HLNbMg3Mndt3NwEA+ZxUiy8NFafmx5IE5n4r/cY098oM7ba2vUK69R1SKs2CgtZbl2MlJPWXzQoeYQ1UYPpJlQ=="],
 
     "@aws-sdk/client-cloudwatch-logs": ["@aws-sdk/client-cloudwatch-logs@3.1161.0", "", { "dependencies": { "@aws-sdk/core": "^3.979.1", "@aws-sdk/credential-provider-node": "^3.972.92", "@aws-sdk/types": "^3.975.0", "@smithy/core": "^3.38.0", "@smithy/fetch-http-handler": "^5.8.0", "@smithy/node-http-handler": "^4.14.0", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-t2maD8t8+BkzZfJ/zAvxQMTWcdJApQqp54B9Oww0OAczaZBT0K4XqilkoahIpKVWxdT7qZIQ2E4iCXNxR297PA=="],
 
