@@ -1,7 +1,8 @@
 /**
  * The read side of PerfResults for the site in web/, behind PerfRouter:
  *
- *   GET /runs/history      the summaries of the latest `HISTORY_RUNS` runs, newest first
+ *   GET /runs/history      the summaries of the latest `HISTORY_RUNS` runs, newest first, as much
+ *                          of them as the site reads (history.ts)
  *
  * That is all the site asks for, and all anyone gets: no parameters, so every request is the same
  * one CloudFront answers from its cache, which leaves query strings out of the key (infra/perf.ts).
@@ -30,6 +31,7 @@ import {
   ScanCommand,
 } from '@aws-sdk/lib-dynamodb'
 import type { LambdaFunctionURLEvent } from 'aws-lambda'
+import { toHistoryRun } from './history'
 import { SUMMARIES_PK } from './keys'
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient())
@@ -56,11 +58,9 @@ const json = (statusCode: number, body: unknown, cacheControl = 'max-age=60') =>
   body: JSON.stringify(body),
 })
 
-const toSummary = ({ pk, sk, expiresAt, ...summary }: Record<string, unknown>) => summary
-
 /** Newest first. Pages, since a Query stops at 1 MB and each summary is tens of KB. */
 const listSummaries = async (limit: number) => {
-  const summaries: Record<string, unknown>[] = []
+  const summaries: ReturnType<typeof toHistoryRun>[] = []
   let ExclusiveStartKey: Record<string, unknown> | undefined
   do {
     const page = await db.send(
@@ -73,7 +73,7 @@ const listSummaries = async (limit: number) => {
         ExclusiveStartKey,
       })
     )
-    summaries.push(...(page.Items ?? []).map(toSummary))
+    summaries.push(...(page.Items ?? []).map(toHistoryRun))
     ExclusiveStartKey = page.LastEvaluatedKey
   } while (ExclusiveStartKey && summaries.length < limit)
   return summaries
