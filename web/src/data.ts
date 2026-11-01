@@ -298,11 +298,11 @@ export const fixed = (value: number | undefined, digits: number) => value?.toFix
 /** A round axis maximum just above `value`. */
 export const niceMax = (value: number) => {
   if (!(value > 0)) return 1
-  const magnitude = 10 ** Math.floor(Math.log10(value))
-  return (
-    [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * magnitude >= value * 1.05)! *
-    magnitude
-  )
+  // The magnitude of the padded value, so a value just under a power of ten, like 960, still
+  // finds a step: 1000 is short of 960 × 1.05, and 10 × 100 is the last step from 100.
+  const padded = value * 1.05
+  const magnitude = 10 ** Math.floor(Math.log10(padded))
+  return [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * magnitude >= padded)! * magnitude
 }
 
 /** A run by when it finished, to the minute: there is one every 4 hours. */
