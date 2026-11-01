@@ -49,10 +49,10 @@
   /* Beside the amber Node.js sizes, Node.js 24's teal and the Bun AOT executable's pink. */
   --color-line-BunCompileAotTrimMicroVm: oklch(72% 0.14 255);
   --color-line-other: oklch(74% 0.12 270);
-  /* Each architecture where a row holds both, in the arm64 vs x86_64 table: arm64, the one the
-     section measures, in a clear cyan; x86_64, the baseline, in a quiet slate. */
-  --color-arch-arm: oklch(82% 0.12 205);
-  --color-arch-x86: oklch(66% 0.03 255);
+  /* Each architecture where a row holds both, in the arm64 vs x86_64 table: arm64 green and
+     x86_64 red, the hues of ok and bad, as arm64's advantage is what the section measures. */
+  --color-arch-arm: oklch(76% 0.15 150);
+  --color-arch-x86: oklch(70% 0.17 25);
 
   /* The glyph beside each chart's headline in ChartIcon.tsx: ice, flame, chip, clock, sizes, arrows, coin. */
   --color-icon-cold: oklch(80% 0.11 225);

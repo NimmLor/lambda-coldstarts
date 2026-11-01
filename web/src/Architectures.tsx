@@ -419,16 +419,16 @@ const RatioCells = ({ ratios }: { ratios: Record<Metric['key'], number | undefin
 /** Each architecture's colour where a row shows both: tokens.css's `--color-arch-*`. */
 const ARCH_COLORS = { arm64: 'var(--color-arch-arm)', x86_64: 'var(--color-arch-x86)' } as const
 
-/** A value on the track: a slim upright pill in its architecture's colour, cut out of the bar under it. */
+/** A value on the track: a solid circle in its architecture's colour, ringed off the bar under it. */
 const Marker = ({ arch, left }: { arch: keyof typeof ARCH_COLORS; left: string }) => (
   <span
-    className="absolute top-1/2 h-3.5 w-1 -translate-1/2 rounded-full ring-2 ring-paper-2"
+    className="absolute top-1/2 size-3.5 -translate-1/2 rounded-full ring-2 ring-paper-2"
     style={{ left, background: ARCH_COLORS[arch] }}
   />
 )
 
 /** The dumbbell's track, on the axis every row shares, and the values beside it. */
-const TRACK = 'relative h-4 min-w-32 flex-1 max-sm:hidden'
+const TRACK = 'relative h-5 min-w-32 flex-1 max-sm:hidden'
 const VALUES = 'shrink-0 text-right whitespace-nowrap max-sm:ml-auto sm:w-[6.5rem]'
 
 /**
@@ -521,11 +521,11 @@ const ArchTable = ({
                   <span className="whitespace-nowrap text-ink-2">Cold start, ms</span>
                   {/* What the marks' colours are; a phone has no track, and the values' heading says it. */}
                   <span className="inline-flex items-center gap-1.5 max-sm:hidden">
-                    <span aria-hidden="true" className="h-3 w-1 rounded-full bg-arch-arm" />
+                    <span aria-hidden="true" className="size-2.5 rounded-full bg-arch-arm" />
                     <span className="text-arch-arm">arm64</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5 max-sm:hidden">
-                    <span aria-hidden="true" className="h-3 w-1 rounded-full bg-arch-x86" />
+                    <span aria-hidden="true" className="size-2.5 rounded-full bg-arch-x86" />
                     <span className="text-arch-x86">x86_64</span>
                   </span>
                 </span>
@@ -619,13 +619,12 @@ const ArchTable = ({
                           />
                         ))}
                         {arm !== undefined && x86 !== undefined && (
-                          // From one architecture's colour to the other's, so the gap reads as which way it goes.
+                          // Neutral, so the circles' colours stand out at its ends.
                           <span
-                            className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full opacity-60"
+                            className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-rule-2"
                             style={{
                               left: at(Math.min(arm, x86)),
                               width: `${(Math.abs(x86 - arm) / max) * 100}%`,
-                              background: `linear-gradient(to right, ${arm < x86 ? ARCH_COLORS.arm64 : ARCH_COLORS.x86_64}, ${arm < x86 ? ARCH_COLORS.x86_64 : ARCH_COLORS.arm64})`,
                             }}
                           />
                         )}
