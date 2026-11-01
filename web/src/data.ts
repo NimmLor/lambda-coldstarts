@@ -19,6 +19,22 @@ export const DASHES: Record<Family, string | undefined> = {
   Node: '5 4',
 }
 
+/** The architectures every function runs on, arm64 first as it's the default. */
+export const ARCHS = ['arm64', 'x86_64'] as const
+export type Arch = (typeof ARCHS)[number]
+
+/** Each architecture's line where both are drawn at once: arm64 solid, x86_64 dotted. */
+export const ARCH_DASHES: Record<Arch, string | undefined> = { arm64: undefined, x86_64: '0 5' }
+
+/**
+ * Lambda's on-demand prices in STACK_REGION, in USD, at the first tier, from the AWS Price List API
+ * (EUC1-Lambda-GB-Second, -ARM and EUC1-Request): arm64's GB-second costs a fifth less.
+ */
+export const PRICES = {
+  gbSecond: { arm64: 0.0000133334, x86_64: 0.0000166667 } satisfies Record<Arch, number>,
+  request: 0.0000002,
+}
+
 type Variant = {
   name: string
   family: Family
@@ -265,6 +281,16 @@ export const toPoints = (run: Run): RunPoints => {
 export const mean = (values: (number | undefined)[]) => {
   const present = values.filter((v) => v !== undefined)
   return present.length ? present.reduce((a, b) => a + b, 0) / present.length : undefined
+}
+
+/**
+ * What a million cold starts of `f` cost: since August 2025 Lambda bills the init as duration on
+ * every runtime, so each is billed for its init plus the invocation, and the request.
+ */
+export const coldStartCost = (f: Fn, cold?: number, dur?: number) => {
+  const price = PRICES.gbSecond[f.arch as Arch]
+  if (cold === undefined || dur === undefined || price === undefined) return undefined
+  return (((cold + dur) / 1e3) * (f.memoryMb / 1024) * price + PRICES.request) * 1e6
 }
 
 export const fixed = (value: number | undefined, digits: number) => value?.toFixed(digits) ?? '—'

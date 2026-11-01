@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { track } from './analytics'
+import { Architectures } from './Architectures'
 import { Chart, type Metric } from './Chart'
 import {
   DASHES,
@@ -609,6 +610,15 @@ export const App = () => {
             )}
           </div>
         </section>
+
+        {archs.length > 1 && (
+          <Architectures
+            view={view}
+            functions={functions}
+            memories={memories}
+            onPick={pickMemory}
+          />
+        )}
 
         {webs.length > 0 && (
           <WebFunctions

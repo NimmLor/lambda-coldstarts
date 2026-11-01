@@ -1,3 +1,4 @@
+import { ARCH_SECTION } from './Architectures'
 import { type Fn, fixed, mean, type RunPoints } from './data'
 import bunIcon from './icons/bun.svg'
 import llrtIcon from './icons/llrt.svg'
@@ -177,7 +178,8 @@ const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[]
         <h3 className="text-lg">arm64 vs. x86_64</h3>
         <p className="m-0 max-w-prose text-sm text-pretty text-muted">
           How much faster functions cold-start on arm64 than on x86_64, at every memory size. Web
-          Functions and MicroVMs run on arm64 only.
+          Functions and MicroVMs run on arm64 only.{' '}
+          <a href={`#${ARCH_SECTION}`}>Each size and runtime</a>
         </p>
       </div>
       {figures.map(

@@ -50,12 +50,13 @@
   --color-line-BunCompileAotTrimMicroVm: oklch(72% 0.14 255);
   --color-line-other: oklch(74% 0.12 270);
 
-  /* The glyph beside each chart's headline in ChartIcon.tsx: ice, flame, chip, clock, sizes. */
+  /* The glyph beside each chart's headline in ChartIcon.tsx: ice, flame, chip, clock, sizes, coin. */
   --color-icon-cold: oklch(80% 0.11 225);
   --color-icon-warm: oklch(74% 0.16 45);
   --color-icon-mem: oklch(74% 0.13 295);
   --color-icon-dur: oklch(80% 0.13 165);
   --color-icon-sizes: oklch(78% 0.14 0);
+  --color-icon-cost: oklch(84% 0.13 95);
 
   --font-display: 'Host Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-display);
