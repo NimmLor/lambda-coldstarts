@@ -202,7 +202,7 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
   `al2023-minimal` container at 2 GB. It needs no [AOT shim](#-the-aot-shim): a MicroVM is a whole VM
   with 512 MB at least, so neither `mincore` nor the 256 MB map fails. It answers as fast as
   Node.js, as both resume a snapshot of a server that's already up, in less than half the memory.
-- 🧮 **One size at a time**, after the functions: an account may run 8 GB of MicroVMs at once
+- 🧮 **One size at a time**, beside the functions: an account may run 8 GB of MicroVMs at once
   unless the quota is raised, all of it the largest size's. A round that finds the quota taken, by
   another stage's MicroVM say, waits up to 90 s before it starts its clock.
 - 🧹 **Every MicroVM is terminated** at the end of its round, and lives 2 minutes at most should
