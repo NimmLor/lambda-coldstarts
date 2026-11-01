@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from 'react'
+import { track } from './analytics'
 import { Floating, tone, X_LABELS } from './Chart'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import {
@@ -7,6 +8,7 @@ import {
   type Family,
   type Fn,
   fixed,
+  fullName,
   niceMax,
   PRICES,
   STACK_REGION,
@@ -417,13 +419,128 @@ const RatioCells = ({ ratios }: { ratios: Record<Metric['key'], number | undefin
 )
 
 /** The dumbbell's track, on the axis every row shares, and the values beside it. */
-const TRACK = 'relative h-4 min-w-32 flex-1 max-sm:hidden'
+const TRACK = 'relative h-4 min-w-28 flex-1 max-sm:hidden'
 const VALUES = 'shrink-0 text-right whitespace-nowrap max-sm:ml-auto sm:w-[6.5rem]'
 
+/** A value on both architectures, as a dumbbell on an axis to `max`: arm64 filled, x86_64 hollow. */
+const Dumbbell = ({
+  values: [arm, x86],
+  max,
+  color,
+}: {
+  values: readonly [number | undefined, number | undefined]
+  max: number
+  color: string
+}) => {
+  const at = (ms: number) => `${(ms / max) * 100}%`
+  return (
+    <span className="flex items-center gap-3">
+      <span aria-hidden="true" className={TRACK}>
+        {[0.25, 0.5, 0.75].map((g) => (
+          <span
+            key={g}
+            className="absolute inset-y-0 w-px bg-rule"
+            style={{ left: `${g * 100}%` }}
+          />
+        ))}
+        {arm !== undefined && x86 !== undefined && (
+          <span
+            className="absolute top-1/2 h-0.5 -translate-y-1/2 opacity-60"
+            style={{
+              left: at(Math.min(arm, x86)),
+              width: `${(Math.abs(x86 - arm) / max) * 100}%`,
+              background: color,
+            }}
+          />
+        )}
+        {x86 !== undefined && (
+          <span
+            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full border-2 bg-paper-2"
+            style={{ left: at(x86), borderColor: color }}
+          />
+        )}
+        {arm !== undefined && (
+          <span
+            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full"
+            style={{ left: at(arm), background: color }}
+          />
+        )}
+      </span>
+      <span className={`${VALUES} measured text-ink`}>
+        {fixed(arm, 0)} <span className="text-muted">→</span>{' '}
+        <span className="text-ink-2">{fixed(x86, 0)}</span>
+      </span>
+    </span>
+  )
+}
+
+/** A dumbbell column's axis labels, over its track, and what its values are. */
+const DumbbellAxis = ({ max }: { max: number }) => (
+  <span className="flex items-center gap-3">
+    <span aria-hidden="true" className={`${TRACK} measured`}>
+      {[0, 0.5, 1].map((g) => (
+        <span
+          key={g}
+          className={`absolute ${g === 0 ? '' : g === 1 ? '-translate-x-full' : '-translate-x-1/2'}`}
+          style={{ left: `${g * 100}%` }}
+        >
+          {max * g}
+        </span>
+      ))}
+    </span>
+    <span className={VALUES}>arm64 → x86_64</span>
+  </span>
+)
+
 /**
- * Each shown Event Function at the picked size, under its family's heading: its cold start on both
- * architectures as a dumbbell on a shared axis, and arm64's advantage in every metric. Hovering a
- * row brings it forward on the charts above.
+ * What the table can be sorted by: a dumbbell's arm64 value, fastest first, or a ratio, arm64's
+ * largest advantage first.
+ */
+type SortKey = 'cold' | 'trip' | `ratio:${Metric['key']}`
+type Sort = { key: SortKey; reversed: boolean }
+
+/** A column heading that sorts the table: by it, then the other way, then back to the families. */
+const SortButton = ({
+  sortKey,
+  sort,
+  onSort,
+  children,
+}: {
+  sortKey: SortKey
+  sort?: Sort
+  onSort: (key: SortKey) => void
+  children: ReactNode
+}) => {
+  const on = sort?.key === sortKey
+  // Fastest or most in arm64's favour first, which is ascending ms and descending ratios.
+  const up = sortKey.startsWith('ratio:') ? on && sort.reversed : !(on && sort.reversed)
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className={`inline-flex cursor-pointer items-center gap-1 rounded-chip hover:text-ink ${on ? 'text-ink' : ''}`}
+    >
+      {children}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 10 6"
+        className={`w-2 shrink-0 transition-transform ${on ? '' : 'opacity-0'} ${up ? 'rotate-180' : ''}`}
+      >
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    </button>
+  )
+}
+
+/** How a column's heading tells assistive technology the table's order. */
+const ariaSort = (sortKey: SortKey, sort?: Sort, up?: boolean) =>
+  sort?.key !== sortKey ? undefined : up ? 'ascending' : 'descending'
+
+/**
+ * Each shown Event Function at the picked size, under its family's heading: its cold start and
+ * first answer on both architectures as dumbbells, each column on an axis its rows share, and
+ * arm64's advantage in every metric. Sorted by a column, it lists every function in that order,
+ * without the headings. Hovering a row brings it forward on the charts above.
  */
 const ArchTable = ({
   view,
@@ -441,6 +558,7 @@ const ArchTable = ({
   className?: string
 }) => {
   const { runs, hover, memoryMb, focus, agg, setFocus, shown } = view
+  const [sort, setSort] = useState<Sort>()
   const metrics = metricsOf(agg)
   const byId = new Map(functions.map((f) => [f.id, f]))
   const rows = shown.flatMap((f) => {
@@ -455,8 +573,16 @@ const ArchTable = ({
         return [m.key, a && b ? b / a : undefined]
       })
     ) as Record<Metric['key'], number | undefined>
-    return [{ f, cold: [agg(arm, 'cold'), agg(x86, 'cold')] as const, ratios }]
+    return [
+      {
+        f,
+        cold: [agg(arm, 'cold'), agg(x86, 'cold')] as const,
+        trip: [agg(arm, 'trip'), agg(x86, 'trip')] as const,
+        ratios,
+      },
+    ]
   })
+  type Row = (typeof rows)[number]
   const families = (Object.keys(FAMILY_NAMES) as Family[]).flatMap((family) => {
     const members = rows.filter((r) => r.f.family === family)
     if (!members.length) return []
@@ -465,9 +591,71 @@ const ArchTable = ({
     ) as Record<Metric['key'], number | undefined>
     return [{ family, members, ratios }]
   })
-  const max = niceMax(Math.max(0, ...rows.flatMap((r) => r.cold.filter((v) => v !== undefined))))
-  const at = (ms: number) => `${(ms / max) * 100}%`
+
+  /** The row's value the table sorts by: a dumbbell's arm64 value, else x86_64's, or a ratio. */
+  const sortValue = (r: Row, key: SortKey) =>
+    key === 'cold' || key === 'trip'
+      ? (r[key][0] ?? r[key][1])
+      : r.ratios[key.slice('ratio:'.length) as Metric['key']]
+  const sorted =
+    sort &&
+    rows.toSorted((a, b) => {
+      const va = sortValue(a, sort.key)
+      const vb = sortValue(b, sort.key)
+      // Functions without the value go last, whichever way.
+      if (va === undefined || vb === undefined)
+        return Number(va === undefined) - Number(vb === undefined)
+      const descending = sort.key.startsWith('ratio:') !== sort.reversed
+      return descending ? vb - va : va - vb
+    })
+  const onSort = (key: SortKey) => {
+    const next =
+      sort?.key !== key
+        ? { key, reversed: false }
+        : sort.reversed
+          ? undefined
+          : { key, reversed: true }
+    track('arch_table_sorted', {
+      column: next ? `${key}${next.reversed ? ':reversed' : ''}` : 'families',
+    })
+    setSort(next)
+  }
+  const up = (key: SortKey) => (key.startsWith('ratio:') ? !!sort?.reversed : !sort?.reversed)
+
+  const scale = (key: 'cold' | 'trip') =>
+    niceMax(Math.max(0, ...rows.flatMap((r) => r[key].filter((v) => v !== undefined))))
+  const coldMax = scale('cold')
+  const tripMax = scale('trip')
   const period = hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'
+
+  const row = ({ f, cold, trip, ratios }: Row, name: string, indent: boolean) => (
+    <tr
+      key={f.base}
+      onMouseEnter={() => setFocus(f.base)}
+      className={focus && focus !== f.base ? 'opacity-40' : ''}
+    >
+      <th
+        scope="row"
+        className={`sticky left-0 z-1 bg-paper-2 py-1.5 pr-3 pl-2 text-left font-normal whitespace-nowrap text-ink-2 sm:pr-4 ${indent ? 'sm:pl-6' : 'sm:pl-0'}`}
+      >
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ background: f.color }}
+          />
+          {name}
+        </span>
+      </th>
+      <td className="py-1.5 pr-4">
+        <Dumbbell values={cold} max={coldMax} color={f.color} />
+      </td>
+      <td className="py-1.5">
+        <Dumbbell values={trip} max={tripMax} color={f.color} />
+      </td>
+      <RatioCells ratios={ratios} />
+    </tr>
+  )
 
   return (
     <div className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
@@ -479,7 +667,7 @@ const ArchTable = ({
           </h3>
           <p>
             {period}; ratios are arm64’s advantage, above 1× when it’s faster, and cost its
-            difference
+            difference. Click a heading to sort.
           </p>
         </div>
         <div className="cells" role="group" aria-label="Memory, MB">
@@ -495,20 +683,27 @@ const ArchTable = ({
           ))}
         </div>
       </div>
-      {/* Sideways on a phone, its names held at the left; there it shows the values without the track. */}
+      {/* Sideways on a phone, its names held at the left; there it shows the values without the tracks. */}
       <div className="-mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6">
         <table
-          className="w-full border-collapse text-sm sm:min-w-[42rem]"
+          className="w-full border-collapse text-sm sm:min-w-[52rem]"
           onMouseLeave={() => setFocus(undefined)}
         >
           <thead className="text-xs text-muted">
             <tr>
-              {/* The names and ratios as narrow as they go, which leaves the rest to the track. */}
+              {/* The names and ratios as narrow as they go, which leaves the rest to the tracks. */}
               <th className="sticky left-0 z-1 w-px bg-paper-2" />
-              <th className="pb-1 text-left font-normal">
+              <th
+                aria-sort={ariaSort('cold', sort, up('cold'))}
+                className="pr-4 pb-1 text-left font-normal"
+              >
                 <span className="flex flex-wrap items-center gap-x-4">
-                  <span className="whitespace-nowrap text-ink-2">Cold start, ms</span>
-                  {/* What the track's dots are; a phone shows no track. */}
+                  <span className="whitespace-nowrap text-ink-2">
+                    <SortButton sortKey="cold" sort={sort} onSort={onSort}>
+                      Cold start, ms
+                    </SortButton>
+                  </span>
+                  {/* What the tracks' dots are; a phone shows no track. */}
                   <span className="inline-flex items-center gap-1.5 max-sm:hidden">
                     <span aria-hidden="true" className="size-2 rounded-full bg-ink-2" />
                     arm64
@@ -522,124 +717,73 @@ const ArchTable = ({
                   </span>
                 </span>
               </th>
+              <th
+                aria-sort={ariaSort('trip', sort, up('trip'))}
+                className="pb-1 text-left font-normal whitespace-nowrap text-ink-2"
+              >
+                <SortButton sortKey="trip" sort={sort} onSort={onSort}>
+                  First answer, ms
+                </SortButton>
+              </th>
               <th colSpan={4} className="pb-1 text-right font-normal text-ink-2">
                 arm64 vs x86_64
               </th>
             </tr>
             <tr className="border-b border-rule">
               <th className="sticky left-0 z-1 bg-paper-2" />
-              <th className="pb-2 font-normal">
-                <span className="flex items-center gap-3">
-                  <span aria-hidden="true" className={`${TRACK} measured`}>
-                    {[0, 0.5, 1].map((g) => (
-                      <span
-                        key={g}
-                        className={`absolute ${g === 0 ? '' : g === 1 ? '-translate-x-full' : '-translate-x-1/2'}`}
-                        style={{ left: `${g * 100}%` }}
-                      >
-                        {max * g}
-                      </span>
-                    ))}
-                  </span>
-                  <span className={VALUES}>arm64 → x86_64</span>
-                </span>
+              <th className="pr-4 pb-2 font-normal">
+                <DumbbellAxis max={coldMax} />
               </th>
-              {metrics.map((m) => (
-                <th
-                  key={m.key}
-                  className="w-px px-1 pb-2 text-right font-normal whitespace-nowrap last:pr-0 sm:px-2"
-                >
-                  {/* One word each on a phone, where the four have to fit beside the names. */}
-                  <span className="sm:hidden">{m.title.split(' ')[0]}</span>
-                  <span className="max-sm:hidden">{m.key === 'cost' ? 'Cost' : m.title}</span>
-                </th>
-              ))}
+              <th className="pb-2 font-normal">
+                <DumbbellAxis max={tripMax} />
+              </th>
+              {metrics.map((m) => {
+                const key = `ratio:${m.key}` as const
+                return (
+                  <th
+                    key={m.key}
+                    aria-sort={ariaSort(key, sort, up(key))}
+                    className="w-px px-1 pb-2 text-right font-normal whitespace-nowrap last:pr-0 sm:px-2"
+                  >
+                    <SortButton sortKey={key} sort={sort} onSort={onSort}>
+                      {/* One word each on a phone, where the four have to fit beside the names. */}
+                      <span className="sm:hidden">{m.title.split(' ')[0]}</span>
+                      <span className="max-sm:hidden">{m.key === 'cost' ? 'Cost' : m.title}</span>
+                    </SortButton>
+                  </th>
+                )
+              })}
             </tr>
           </thead>
-          {families.map(({ family, members, ratios }) => (
-            <tbody key={family} className="border-b border-rule last:border-b-0">
-              <tr>
-                <th
-                  scope="rowgroup"
-                  className="sticky left-0 z-1 bg-paper-2 pt-3 pb-1.5 text-left font-medium whitespace-nowrap text-ink"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <img
-                      src={FAMILY_ICONS[family]}
-                      alt=""
-                      width={16}
-                      height={16}
-                      className="block shrink-0"
-                    />
-                    {FAMILY_NAMES[family]}
-                  </span>
-                </th>
-                <td />
-                <RatioCells ratios={ratios} />
-              </tr>
-              {members.map(({ f, cold: [arm, x86], ratios: r }) => (
-                <tr
-                  key={f.base}
-                  onMouseEnter={() => setFocus(f.base)}
-                  className={focus && focus !== f.base ? 'opacity-40' : ''}
-                >
+          {sorted ? (
+            <tbody>{sorted.map((r) => row(r, fullName(r.f.base), false))}</tbody>
+          ) : (
+            families.map(({ family, members, ratios }) => (
+              <tbody key={family} className="border-b border-rule last:border-b-0">
+                <tr>
                   <th
-                    scope="row"
-                    className="sticky left-0 z-1 bg-paper-2 py-1.5 pr-3 pl-2 text-left font-normal whitespace-nowrap text-ink-2 sm:pr-4 sm:pl-6"
+                    scope="rowgroup"
+                    className="sticky left-0 z-1 bg-paper-2 pt-3 pb-1.5 text-left font-medium whitespace-nowrap text-ink"
                   >
-                    <span className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ background: f.color }}
+                    <span className="inline-flex items-center gap-2">
+                      <img
+                        src={FAMILY_ICONS[family]}
+                        alt=""
+                        width={16}
+                        height={16}
+                        className="block shrink-0"
                       />
-                      {shortName(f.base)}
+                      {FAMILY_NAMES[family]}
                     </span>
                   </th>
-                  <td className="py-1.5">
-                    <span className="flex items-center gap-3">
-                      <span aria-hidden="true" className={TRACK}>
-                        {[0.25, 0.5, 0.75].map((g) => (
-                          <span
-                            key={g}
-                            className="absolute inset-y-0 w-px bg-rule"
-                            style={{ left: `${g * 100}%` }}
-                          />
-                        ))}
-                        {arm !== undefined && x86 !== undefined && (
-                          <span
-                            className="absolute top-1/2 h-0.5 -translate-y-1/2 opacity-60"
-                            style={{
-                              left: at(Math.min(arm, x86)),
-                              width: `${(Math.abs(x86 - arm) / max) * 100}%`,
-                              background: f.color,
-                            }}
-                          />
-                        )}
-                        {x86 !== undefined && (
-                          <span
-                            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full border-2 bg-paper-2"
-                            style={{ left: at(x86), borderColor: f.color }}
-                          />
-                        )}
-                        {arm !== undefined && (
-                          <span
-                            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full"
-                            style={{ left: at(arm), background: f.color }}
-                          />
-                        )}
-                      </span>
-                      <span className={`${VALUES} measured text-ink`}>
-                        {fixed(arm, 0)} <span className="text-muted">→</span>{' '}
-                        <span className="text-ink-2">{fixed(x86, 0)}</span>
-                      </span>
-                    </span>
-                  </td>
-                  <RatioCells ratios={r} />
+                  <td />
+                  <td />
+                  <RatioCells ratios={ratios} />
                 </tr>
-              ))}
-            </tbody>
-          ))}
+                {members.map((r) => row(r, shortName(r.f.base), true))}
+              </tbody>
+            ))
+          )}
         </table>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { niceMax, shortName } from './data'
+import { fullName, niceMax, shortName } from './data'
 
 test('niceMax rounds up to a step just above the value', () => {
   expect(niceMax(0)).toBe(1)
@@ -21,4 +21,10 @@ test('shortName drops the family from a variant’s name', () => {
   expect(shortName('Llrt')).toBe('no SDK')
   expect(shortName('Node24')).toBe('24')
   expect(shortName('Unknown')).toBe('Unknown')
+})
+
+test('fullName tells a variant apart without its family’s heading', () => {
+  expect(fullName('Llrt')).toBe('LLRT, no SDK')
+  expect(fullName('BunRuntime')).toBe('Bun runtime')
+  expect(fullName('Unknown')).toBe('Unknown')
 })
