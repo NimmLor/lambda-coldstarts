@@ -428,6 +428,9 @@ export const createPerf = (
         $app.stage === 'production' ? (process.env.POSTHOG_PROJECT_TOKEN ?? '') : '',
     },
     router: { instance: router },
+    // Keep earlier builds' files: the deploy doesn't wait for the invalidation, so pages
+    // CloudFront still caches would otherwise ask for hashed assets the deploy just deleted.
+    assets: { purge: false },
     invalidation: { wait: false },
   })
 
