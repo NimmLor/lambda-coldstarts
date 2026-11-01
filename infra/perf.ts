@@ -154,6 +154,32 @@ export const createPerf = (
     ],
   })
 
+  // One CloudFront distribution for the site and, under /api, PerfApi, so the page fetches its
+  // own origin. Deploys don't wait for CloudFront to roll out the distribution or finish the
+  // site's invalidation; both settle a few minutes after `sst deploy` returns.
+  const router = new sst.aws.Router('PerfRouter', {
+    domain: siteDomain(),
+    ...($app.stage !== 'production' && { edge: NO_INDEX }),
+    // PerfApi's Function URL takes requests from the distribution only, so none skip its cache.
+    protection: 'oac',
+    transform: {
+      cdn: (args) => {
+        args.wait = false
+      },
+      // Neither the site nor PerfApi reads a query string, so one can't make a request miss the cache.
+      // SST's TTLs stay: 0 by default and at least, a year at most, so each response's own
+      // Cache-Control decides, such as /runs/history's s-maxage and stale-while-revalidate.
+      cachePolicy: (args) => {
+        args.parametersInCacheKeyAndForwardedToOrigin = $output(
+          args.parametersInCacheKeyAndForwardedToOrigin
+        ).apply((parameters) => ({
+          ...parameters,
+          queryStringsConfig: { queryStringBehavior: 'none' },
+        }))
+      },
+    },
+  })
+
   const summarizer = new sst.aws.Function('PerfSummarize', {
     handler: 'src/perf/summarize.handler',
     runtime: 'nodejs24.x',
@@ -162,7 +188,14 @@ export const createPerf = (
     // A run's samples are about 1,100 small items.
     memory: '128 MB',
     link: [table],
-    environment: { PERF_TABLE: table.name },
+    environment: { PERF_TABLE: table.name, PERF_DISTRIBUTION: router.distributionID },
+    // It invalidates /api/runs/history once the run's summary is stored.
+    permissions: [
+      {
+        actions: ['cloudfront:CreateInvalidation'],
+        resources: [router.nodes.cdn.nodes.distribution.arn],
+      },
+    ],
   })
 
   const exporter = new sst.aws.Function('PerfExport', {
@@ -343,30 +376,6 @@ export const createPerf = (
     flexibleTimeWindow: { mode: 'OFF' },
     state: production ? 'ENABLED' : 'DISABLED',
     target: { arn: exporter.arn, roleArn: role.arn, input: '{}' },
-  })
-
-  // One CloudFront distribution for the site and, under /api, PerfApi, so the page fetches its
-  // own origin. Deploys don't wait for CloudFront to roll out the distribution or finish the
-  // site's invalidation; both settle a few minutes after `sst deploy` returns.
-  const router = new sst.aws.Router('PerfRouter', {
-    domain: siteDomain(),
-    ...($app.stage !== 'production' && { edge: NO_INDEX }),
-    // PerfApi's Function URL takes requests from the distribution only, so none skip its cache.
-    protection: 'oac',
-    transform: {
-      cdn: (args) => {
-        args.wait = false
-      },
-      // Neither the site nor PerfApi reads a query string, so one can't make a request miss the cache.
-      cachePolicy: (args) => {
-        args.parametersInCacheKeyAndForwardedToOrigin = $output(
-          args.parametersInCacheKeyAndForwardedToOrigin
-        ).apply((parameters) => ({
-          ...parameters,
-          queryStringsConfig: { queryStringBehavior: 'none' },
-        }))
-      },
-    },
   })
 
   const api = new sst.aws.Function('PerfApi', {

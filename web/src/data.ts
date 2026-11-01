@@ -1,4 +1,4 @@
-import type { FunctionSummary } from '../../src/perf/summary'
+import type { HistoryFunction } from '../../src/perf/history'
 
 /** What PerfApi's `/runs/history` returns per run. */
 export type Run = {
@@ -7,7 +7,7 @@ export type Run = {
   rounds: number
   warmInvocations?: number
   functionCount: number
-  functions: FunctionSummary[]
+  functions: HistoryFunction[]
 }
 
 export type Family = 'Bun' | 'LLRT' | 'Node'
@@ -206,7 +206,7 @@ export type RunPoints = {
   points: Map<string, Point>
 }
 
-const describe = (f: FunctionSummary): Fn => {
+const describe = (f: HistoryFunction): Fn => {
   // With a single architecture or memory size, ids go without that suffix; see infra/functions.ts.
   const base = f.functionId.replace(/M\d+$/, '').replace(/(Arm64|X64)$/, '')
   const variant = VARIANTS[base] ?? {
