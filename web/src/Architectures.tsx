@@ -107,20 +107,24 @@ const RATIO_TICKS = [1.25, 1.5, 2, 3, 4, 5, 10, 20, 50, 100]
 /** Rounded up to, for the axis's extent. */
 const NICE_RATIOS = [1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8, 10, 15, 20, 50, 100]
 
-/** A tick: who is faster, and by how much, or even. */
-const tickLabel = (r: number) =>
-  r === 1
-    ? 'even'
-    : r > 1
-      ? `${Number(r.toFixed(2))}× arm64`
-      : `${Number((1 / r).toFixed(2))}× x86_64`
+/**
+ * A tick: by how much the winner is faster, or even. Which one wins is the half it's in, which
+ * the plot tints and the legend names once.
+ */
+const tickLabel = (r: number) => (r === 1 ? 'even' : `${Number(Math.max(r, 1 / r).toFixed(2))}×`)
+
+/** Each half of the plot's tint: arm64 faster above even, x86_64 below, as the ratio chips colour them. */
+const HALVES = [
+  { name: 'arm64 faster', tint: 'color-mix(in oklab, var(--color-ok) 9%, transparent)' },
+  { name: 'x86_64 faster', tint: 'color-mix(in oklab, var(--color-bad) 9%, transparent)' },
+] as const
 
 /** A readout's value: the winner and its advantage, to two places. */
 const verdict = (r: number) => (r >= 1 ? `${r.toFixed(2)}× arm64` : `${(1 / r).toFixed(2)}× x86_64`)
 
 const PLOT_HEIGHT = 180
-/** Wide enough for "1.25× x86_64". */
-const TICKS_WIDTH = 'w-[5.75rem]'
+/** Wide enough for "1.25×". */
+const TICKS_WIDTH = 'w-10'
 
 /** A line sample in a group's colour, for the legend. */
 const LineSample = ({ color, width }: { color: string; width: number }) => (
@@ -191,6 +195,12 @@ const AdvantagePanel = ({
         {/* Beside each panel until they're in one row, which shares the axis's labels. */}
         <TickLabels ticks={ticks} className="row-start-1 xl:hidden" />
         <div className="relative col-start-2 row-start-1" style={{ height: PLOT_HEIGHT }}>
+          {/* Even is the middle of the plot, which the axis is symmetric around. */}
+          <div className="absolute inset-x-0 top-0 h-1/2" style={{ background: HALVES[0].tint }} />
+          <div
+            className="absolute inset-x-0 bottom-0 h-1/2"
+            style={{ background: HALVES[1].tint }}
+          />
           <div className="absolute inset-y-0 w-px bg-cool" style={{ left: `${x(selected)}%` }} />
           <svg
             viewBox="0 0 100 100"
@@ -345,14 +355,29 @@ const AdvantageChart = ({
           </h3>
           <p>Geometric mean per family, {period}; memory in MB</p>
         </div>
-        <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0 text-sm text-muted">
-          {GROUPS.map((g) => (
-            <li key={g.name} className="inline-flex items-center gap-2">
-              <LineSample color={g.color} width={g.width} />
-              {g.name}
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-2 sm:items-end">
+          <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0 text-sm text-muted">
+            {GROUPS.map((g) => (
+              <li key={g.name} className="inline-flex items-center gap-2">
+                <LineSample color={g.color} width={g.width} />
+                {g.name}
+              </li>
+            ))}
+          </ul>
+          {/* Which architecture each half of the plots favours, named once for all four. */}
+          <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0 text-sm text-muted">
+            {HALVES.map((h, i) => (
+              <li key={h.name} className="inline-flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className={`h-3 w-6 rounded-chip border ${i === 0 ? 'border-ok/40' : 'border-bad/40'}`}
+                  style={{ background: h.tint }}
+                />
+                {h.name}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-[auto_repeat(4,minmax(0,1fr))]">
         {/* One set of labels for the row the panels share once there's room for one. */}
