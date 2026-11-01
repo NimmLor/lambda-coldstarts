@@ -51,12 +51,16 @@ export const MemoryChart = ({
 
   return (
     <article className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted">
+      {/* The caption on a line of its own: a hovered run's is too long to share the title's, and
+          wrapping only then would move the chart on every hover. */}
+      <div className="flex flex-col gap-1 text-sm text-muted">
         <h2 className={`flex items-baseline gap-2 text-ink ${wide ? 'text-xl' : 'text-lg'}`}>
           <ChartIcon name="sizes" className={wide ? 'size-5' : 'size-[1.125rem]'} />
           {m.title} by memory
         </h2>
-        {m.unit}, {hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'}
+        <p>
+          {m.unit}, {hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'}
+        </p>
       </div>
       {/* At the bottom, so its sizes line up with the dates under the small charts beside it. */}
       <div className={`${AXES} ${wide ? '' : 'mt-auto'}`}>
