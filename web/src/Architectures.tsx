@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from 'react'
+import { track } from './analytics'
 import { Floating, tone, X_LABELS } from './Chart'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import {
@@ -18,6 +19,7 @@ import bunIcon from './icons/bun.svg'
 import llrtIcon from './icons/llrt.svg'
 import nodeIcon from './icons/nodejs.svg'
 import { WRAP } from './layout'
+import { useStored } from './stored'
 
 /** The id of the section, which the glance at the top links to. */
 export const ARCH_SECTION = 'arm64-vs-x86_64'
@@ -462,10 +464,19 @@ const Marker = ({ arch, left }: { arch: keyof typeof ARCH_COLORS; left: string }
 const TRACK = 'relative h-5 min-w-32 flex-1 max-sm:hidden'
 const VALUES = 'shrink-0 text-right whitespace-nowrap max-sm:ml-auto sm:w-[6.5rem]'
 
+/** What the table's dumbbells can show, with the decimals its values take. */
+const SPANS = [
+  { key: 'cold', title: 'Cold start', digits: 0 },
+  { key: 'trip', title: 'First answer', digits: 0 },
+  { key: 'warm', title: 'Warm start', digits: 2 },
+] as const
+type SpanKey = (typeof SPANS)[number]['key']
+const isSpanKey = (value: unknown): value is SpanKey => SPANS.some((m) => m.key === value)
+
 /**
- * Each shown Event Function at the picked size, under its family's heading: its cold start on both
- * architectures as a dumbbell on a shared axis, and arm64's advantage in every metric. Hovering a
- * row brings it forward on the charts above.
+ * Each shown Event Function at the picked size, under its family's heading: its cold start, first
+ * answer or warm start, as picked and kept, on both architectures as a dumbbell on a shared axis,
+ * and arm64's advantage in every metric. Hovering a row brings it forward on the charts above.
  */
 const ArchTable = ({
   view,
@@ -483,6 +494,8 @@ const ArchTable = ({
   className?: string
 }) => {
   const { runs, hover, memoryMb, focus, agg, setFocus, shown } = view
+  const [spanKey, setSpanKey] = useStored<SpanKey>('archTableMetric', 'cold', isSpanKey)
+  const span = SPANS.find((m) => m.key === spanKey)!
   const metrics = metricsOf(agg)
   const byId = new Map(functions.map((f) => [f.id, f]))
   const rows = shown.flatMap((f) => {
@@ -497,7 +510,7 @@ const ArchTable = ({
         return [m.key, a && b ? b / a : undefined]
       })
     ) as Record<Metric['key'], number | undefined>
-    return [{ f, cold: [agg(arm, 'cold'), agg(x86, 'cold')] as const, ratios }]
+    return [{ f, values: [agg(arm, span.key), agg(x86, span.key)] as const, ratios }]
   })
   const families = (Object.keys(FAMILY_NAMES) as Family[]).flatMap((family) => {
     const members = rows.filter((r) => r.f.family === family)
@@ -507,7 +520,7 @@ const ArchTable = ({
     ) as Record<Metric['key'], number | undefined>
     return [{ family, members, ratios }]
   })
-  const max = niceMax(Math.max(0, ...rows.flatMap((r) => r.cold.filter((v) => v !== undefined))))
+  const max = niceMax(Math.max(0, ...rows.flatMap((r) => r.values.filter((v) => v !== undefined))))
   const at = (ms: number) => `${(ms / max) * 100}%`
   const period = hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'
 
@@ -516,7 +529,7 @@ const ArchTable = ({
       <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <div className="flex flex-col gap-1 text-sm text-muted">
           <h3 className="flex items-baseline gap-2 text-xl text-ink">
-            <ChartIcon name="cold" className="size-5" />
+            <ChartIcon name={span.key} className="size-5" />
             Per function at {memoryMb} MB
           </h3>
           <p>
@@ -524,17 +537,35 @@ const ArchTable = ({
             difference
           </p>
         </div>
-        <div className="cells" role="group" aria-label="Memory, MB">
-          {memories.map((mb) => (
-            <button
-              key={mb}
-              type="button"
-              aria-pressed={mb === memoryMb}
-              onClick={() => onPick(mb)}
-            >
-              {mb}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-3">
+          {/* Which value the dumbbells show; the ratio columns keep all of them. */}
+          <div className="cells" role="group" aria-label="Dumbbells show">
+            {SPANS.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                aria-pressed={m.key === span.key}
+                onClick={() => {
+                  track('arch_table_metric_picked', { metric: m.key })
+                  setSpanKey(m.key)
+                }}
+              >
+                {m.title}
+              </button>
+            ))}
+          </div>
+          <div className="cells" role="group" aria-label="Memory, MB">
+            {memories.map((mb) => (
+              <button
+                key={mb}
+                type="button"
+                aria-pressed={mb === memoryMb}
+                onClick={() => onPick(mb)}
+              >
+                {mb}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {/* Sideways on a phone, its names held at the left; there it shows the values without the track. */}
@@ -549,7 +580,7 @@ const ArchTable = ({
               <th className="sticky left-0 z-1 w-px bg-paper-2" />
               <th className="pb-1 text-left font-normal">
                 <span className="flex flex-wrap items-center gap-x-4">
-                  <span className="whitespace-nowrap text-ink-2">Cold start, ms</span>
+                  <span className="whitespace-nowrap text-ink-2">{span.title}, ms</span>
                   {/* What the marks' colours are; a phone has no track, and the values' heading says it. */}
                   <span className="inline-flex items-center gap-1.5 max-sm:hidden">
                     <span aria-hidden="true" className="size-2.5 rounded-full bg-arch-arm" />
@@ -576,7 +607,7 @@ const ArchTable = ({
                         className={`absolute ${g === 0 ? '' : g === 1 ? '-translate-x-full' : '-translate-x-1/2'}`}
                         style={{ left: `${g * 100}%` }}
                       >
-                        {max * g}
+                        {Number((max * g).toFixed(2))}
                       </span>
                     ))}
                   </span>
@@ -620,7 +651,7 @@ const ArchTable = ({
                 <td />
                 <RatioCells ratios={ratios} />
               </tr>
-              {members.map(({ f, cold: [arm, x86], ratios: r }) => (
+              {members.map(({ f, values: [arm, x86], ratios: r }) => (
                 <tr
                   key={f.base}
                   onMouseEnter={() => setFocus(f.base)}
@@ -663,8 +694,8 @@ const ArchTable = ({
                         {arm !== undefined && <Marker arch="arm64" left={at(arm)} />}
                       </span>
                       <span className={`${VALUES} measured`}>
-                        <span className="text-arch-arm">{fixed(arm, 0)}</span>{' '}
-                        <span className="text-arch-x86">{fixed(x86, 0)}</span>
+                        <span className="text-arch-arm">{fixed(arm, span.digits)}</span>{' '}
+                        <span className="text-arch-x86">{fixed(x86, span.digits)}</span>
                       </span>
                     </span>
                   </td>
