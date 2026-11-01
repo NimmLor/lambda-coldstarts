@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import { DASHES, type Fn, fixed, niceMax, type Stat, type View, day, when } from './data'
 
@@ -23,7 +24,7 @@ export const Y_LABEL =
   'measured absolute text-xs text-muted max-sm:left-0 max-sm:-translate-y-full max-sm:rounded-chip max-sm:bg-paper-2/85 max-sm:pr-1 sm:right-0 sm:-translate-y-1/2'
 export const X_LABELS = 'relative mt-2 h-5 sm:col-start-2'
 
-/** Between the crosshair and the readout beside it. */
+/** Between the readout and the card or crosshair it's placed by, and the viewport's edges. */
 const READOUT_GAP = 12
 
 /**
@@ -50,9 +51,10 @@ export const Versus = ({ value, baseline }: { value?: number; baseline?: number 
 }
 
 /**
- * The values under the pointer, lowest first, beside the crosshair at `left`% of the plot: right
- * of it if it fits, else left, else as near it as the plot allows, so the card never clips it.
- * Up or down only as far as the card grid needs, as a short card's readout can be taller than it.
+ * The values under the pointer, lowest first, below the chart's card under the crosshair at `left`%
+ * of the plot, so it covers none of the chart. Above the card when the viewport has no room below,
+ * else beside the crosshair: right of it if it fits, else left, else as near it as the plot allows.
+ * In a portal, as the card grid clips its cells to round its corners.
  */
 export const Readout = ({
   left,
@@ -72,73 +74,89 @@ export const Readout = ({
   /** The compared function's value, which each row's badge is against. */
   baseline?: number
 }) => {
+  /** Stays in the plot, which the readout is placed by from the portal. */
+  const anchor = useRef<HTMLSpanElement>(null)
   const ref = useRef<HTMLDivElement>(null)
-  // Its width changes with every run, so it's placed after every render, before paint.
+  // Its size changes with every run, so it's placed after every render, before paint.
   useLayoutEffect(() => {
     const el = ref.current!
-    const plot = el.parentElement!.clientWidth
-    const at = (left / 100) * plot
+    const plot = anchor.current!.parentElement!.getBoundingClientRect()
+    const card = anchor.current!.closest('article')!.getBoundingClientRect()
+    const viewport = document.documentElement
     const width = el.offsetWidth
-    const x =
-      at + READOUT_GAP + width <= plot
-        ? at + READOUT_GAP
-        : at - READOUT_GAP - width >= 0
-          ? at - READOUT_GAP - width
-          : Math.max(0, Math.min(plot - width, at - width / 2))
-    el.style.left = `${x}px`
-    // Centred on the plot, but kept inside the card grid, which clips its cells to round its corners.
-    let clip = el.parentElement!
-    while (clip.parentElement && getComputedStyle(clip).overflowY === 'visible') {
-      clip = clip.parentElement
-    }
-    const own = el.parentElement!.getBoundingClientRect()
-    const bounds = clip.getBoundingClientRect()
     const height = el.offsetHeight
-    const y = Math.max(
-      bounds.top - own.top + READOUT_GAP,
-      Math.min(bounds.bottom - own.top - READOUT_GAP - height, (own.height - height) / 2)
-    )
-    el.style.top = `${y}px`
+    const at = plot.left + (left / 100) * plot.width
+    /** `start` moved as little as keeps `size` from it inside `from`..`to`. */
+    const clamp = (start: number, size: number, from: number, to: number) =>
+      Math.max(from, Math.min(to - size, start))
+    const below = card.bottom + READOUT_GAP
+    const above = card.top - READOUT_GAP - height
+    let x = clamp(at - width / 2, width, READOUT_GAP, viewport.clientWidth - READOUT_GAP)
+    let y: number
+    if (below + height <= viewport.clientHeight - READOUT_GAP) y = below
+    else if (above >= READOUT_GAP) y = above
+    else {
+      x =
+        at + READOUT_GAP + width <= plot.right
+          ? at + READOUT_GAP
+          : at - READOUT_GAP - width >= plot.left
+            ? at - READOUT_GAP - width
+            : clamp(at - width / 2, width, plot.left, plot.right)
+      y = clamp(
+        plot.top + (plot.height - height) / 2,
+        height,
+        READOUT_GAP,
+        viewport.clientHeight - READOUT_GAP
+      )
+    }
+    el.style.left = `${x + window.scrollX}px`
+    el.style.top = `${y + window.scrollY}px`
   })
 
   return (
-    <div
-      ref={ref}
-      role="tooltip"
-      className="pointer-events-none absolute z-(--z-tooltip) flex flex-col gap-1 rounded-pill border border-rule-2 bg-paper px-3 py-2 text-xs whitespace-nowrap shadow-[0_8px_24px_oklch(0%_0_0/0.45)]"
-    >
-      <span className="measured text-muted">{title}</span>
-      {rows
-        .filter((r) => r.value !== undefined)
-        .sort((a, b) => a.value! - b.value!)
-        .map(({ f, value }) => (
-          <span
-            key={f.id}
-            className={`flex items-center gap-2 ${focus && focus !== f.base ? 'opacity-40' : ''}`}
-          >
-            <span
-              aria-hidden="true"
-              className="size-2 shrink-0 rounded-full"
-              style={{ background: f.color }}
-            />
-            <span className={focus === f.base ? 'font-medium text-ink' : 'text-ink-2'}>
-              {f.name}
-            </span>
-            <span className="measured ml-auto pl-4 text-ink">
-              {fixed(value, digits)}{' '}
-              {/* A phone-wide plot has room for the badge or the unit, and the chart's heading already names it. */}
-              <span className={`text-muted ${baseline !== undefined ? 'max-sm:hidden' : ''}`}>
-                {unit}
+    <>
+      <span ref={anchor} hidden />
+      {createPortal(
+        <div
+          ref={ref}
+          role="tooltip"
+          className="pointer-events-none absolute z-(--z-tooltip) flex flex-col gap-1 rounded-pill border border-rule-2 bg-paper px-3 py-2 text-xs whitespace-nowrap shadow-[0_8px_24px_oklch(0%_0_0/0.45)]"
+        >
+          <span className="measured text-muted">{title}</span>
+          {rows
+            .filter((r) => r.value !== undefined)
+            .sort((a, b) => a.value! - b.value!)
+            .map(({ f, value }) => (
+              <span
+                key={f.id}
+                className={`flex items-center gap-2 ${focus && focus !== f.base ? 'opacity-40' : ''}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ background: f.color }}
+                />
+                <span className={focus === f.base ? 'font-medium text-ink' : 'text-ink-2'}>
+                  {f.name}
+                </span>
+                <span className="measured ml-auto pl-4 text-ink">
+                  {fixed(value, digits)}{' '}
+                  {/* A phone-wide plot has room for the badge or the unit, and the chart's heading already names it. */}
+                  <span className={`text-muted ${baseline !== undefined ? 'max-sm:hidden' : ''}`}>
+                    {unit}
+                  </span>
+                </span>
+                {baseline !== undefined && (
+                  <span className="w-12 text-right">
+                    <Versus value={value} baseline={baseline} />
+                  </span>
+                )}
               </span>
-            </span>
-            {baseline !== undefined && (
-              <span className="w-12 text-right">
-                <Versus value={value} baseline={baseline} />
-              </span>
-            )}
-          </span>
-        ))}
-    </div>
+            ))}
+        </div>,
+        document.body
+      )}
+    </>
   )
 }
 
