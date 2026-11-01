@@ -128,6 +128,22 @@ const deployPolicy = JSON.stringify({
       ],
       Resource: '*',
     },
+    // The aws-native provider creates Web Functions and MicroVM images through Cloud Control,
+    // which checks these on top of the lambda:* the resources themselves need.
+    {
+      Effect: 'Allow',
+      Action: [
+        'cloudformation:CancelResourceRequest',
+        'cloudformation:CreateResource',
+        'cloudformation:DeleteResource',
+        'cloudformation:GetResource',
+        'cloudformation:GetResourceRequestStatus',
+        'cloudformation:ListResourceRequests',
+        'cloudformation:ListResources',
+        'cloudformation:UpdateResource',
+      ],
+      Resource: '*',
+    },
     {
       Effect: 'Allow',
       Action: 'iam:*',
