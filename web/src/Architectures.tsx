@@ -1,51 +1,32 @@
 import { useState } from 'react'
-import { Floating, Versus, X_LABELS } from './Chart'
+import { Floating, tone, X_LABELS } from './Chart'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import {
-  ARCH_DASHES,
-  ARCHS,
-  type Arch,
   coldStartCost,
+  FAMILY_NAMES,
+  type Family,
   type Fn,
   fixed,
+  niceMax,
   PRICES,
   STACK_REGION,
+  shortName,
   type View,
   when,
 } from './data'
+import bunIcon from './icons/bun.svg'
+import llrtIcon from './icons/llrt.svg'
+import nodeIcon from './icons/nodejs.svg'
 import { WRAP } from './layout'
 
 /** The id of the section, which the glance at the top links to. */
 export const ARCH_SECTION = 'arm64-vs-x86_64'
-
-/** One shown variant on both architectures: its function at each memory size, if it has one. */
-type Pair = {
-  base: string
-  name: string
-  color: string
-  fns: Record<Arch, (Fn | undefined)[]>
-}
 
 /** How many times as fast arm64 is, over the pairs with both values, averaged geometrically. */
 const geomean = (ratios: number[]) =>
   ratios.length
     ? Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length)
     : undefined
-
-/** A solid or dotted line sample, for the legend and the readout's headings. */
-const Swatch = ({ arch, className = 'stroke-ink-2' }: { arch: Arch; className?: string }) => (
-  <svg aria-hidden="true" width="24" height="4" className={`shrink-0 ${className}`}>
-    <line
-      x1="1"
-      x2="23"
-      y1="2"
-      y2="2"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeDasharray={ARCH_DASHES[arch]}
-    />
-  </svg>
-)
 
 /**
  * What the section compares, each lower-is-better, so x86_64's value over arm64's is how many
@@ -397,107 +378,293 @@ const AdvantageChart = ({
   )
 }
 
+const FAMILY_ICONS: Record<Family, string> = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
+
+/** arm64's advantage as a chip: green and above 1× when it's faster, red and below when it's not. */
+const RatioChip = ({ r }: { r?: number }) =>
+  r === undefined ? (
+    <span className="text-muted">—</span>
+  ) : (
+    <span className="measured rounded-chip px-1 text-xs" style={tone(r)}>
+      {r.toFixed(2)}×
+    </span>
+  )
+
+/** What a cold start costs on arm64 against x86_64, as a difference: −25% is a quarter less. */
+const CostChip = ({ r }: { r?: number }) => {
+  if (r === undefined) return <span className="text-muted">—</span>
+  const percent = Math.round((1 / r - 1) * 100)
+  return (
+    <span className="measured rounded-chip px-1 text-xs" style={tone(r)}>
+      {percent > 0 ? '+' : percent < 0 ? '−' : '±'}
+      {Math.abs(percent)}%
+    </span>
+  )
+}
+
+/** A chip for each metric's ratio, cost as a difference. */
+const RatioCells = ({ ratios }: { ratios: Record<Metric['key'], number | undefined> }) => (
+  <>
+    {(['cold', 'trip', 'warm'] as const).map((key) => (
+      <td key={key} className="px-1 py-1.5 text-right sm:px-2">
+        <RatioChip r={ratios[key]} />
+      </td>
+    ))}
+    <td className="py-1.5 pl-1 text-right sm:pl-2">
+      <CostChip r={ratios.cost} />
+    </td>
+  </>
+)
+
+/** The dumbbell's track, on the axis every row shares, and the values beside it. */
+const TRACK = 'relative h-4 min-w-32 flex-1 max-sm:hidden'
+const VALUES = 'shrink-0 text-right whitespace-nowrap max-sm:ml-auto sm:w-[6.5rem]'
+
 /**
- * Each pair's cold start on both architectures at the picked size, beside the wide chart, with
- * how many times as fast arm64 is; hovering a row brings its lines forward.
+ * Each shown Event Function at the picked size, under its family's heading: its cold start on both
+ * architectures as a dumbbell on a shared axis, and arm64's advantage in every metric. Hovering a
+ * row brings it forward on the charts above.
  */
 const ArchTable = ({
   view,
-  pairs,
+  functions,
   memories,
+  onPick,
   className = '',
 }: {
   view: View
-  pairs: Pair[]
+  /** Every Event Function, on both architectures and at every size. */
+  functions: Fn[]
+  /** Ascending. */
   memories: number[]
+  onPick: (memoryMb: number) => void
   className?: string
 }) => {
-  const { runs, hover, memoryMb, focus, agg, setFocus } = view
-  const i = memories.indexOf(memoryMb)
-  const rows = pairs.map((p) => {
-    const [arm, x86] = ARCHS.map((arch) => p.fns[arch][i])
-    return {
-      p,
-      arm: arm && agg(arm, 'cold'),
-      x86: x86 && agg(x86, 'cold'),
-      armCost: arm && coldStartCost(arm, agg(arm, 'cold'), agg(arm, 'dur')),
-      x86Cost: x86 && coldStartCost(x86, agg(x86, 'cold'), agg(x86, 'dur')),
-    }
+  const { runs, hover, memoryMb, focus, agg, setFocus, shown } = view
+  const metrics = metricsOf(agg)
+  const byId = new Map(functions.map((f) => [f.id, f]))
+  const rows = shown.flatMap((f) => {
+    const arm = byId.get(`${f.base}/arm64/${memoryMb}`)
+    const x86 = byId.get(`${f.base}/x86_64/${memoryMb}`)
+    // A variant on one architecture only has nothing to compare.
+    if (!arm || !x86) return []
+    const ratios = Object.fromEntries(
+      metrics.map((m) => {
+        const a = m.value(arm)
+        const b = m.value(x86)
+        return [m.key, a && b ? b / a : undefined]
+      })
+    ) as Record<Metric['key'], number | undefined>
+    return [{ f, cold: [agg(arm, 'cold'), agg(x86, 'cold')] as const, ratios }]
   })
-  const speed = geomean(rows.flatMap((r) => (r.arm && r.x86 ? [r.x86 / r.arm] : [])))
-  const cost = geomean(rows.flatMap((r) => (r.armCost && r.x86Cost ? [r.x86Cost / r.armCost] : [])))
+  const families = (Object.keys(FAMILY_NAMES) as Family[]).flatMap((family) => {
+    const members = rows.filter((r) => r.f.family === family)
+    if (!members.length) return []
+    const ratios = Object.fromEntries(
+      metrics.map((m) => [m.key, geomean(members.flatMap((r) => r.ratios[m.key] ?? []))])
+    ) as Record<Metric['key'], number | undefined>
+    return [{ family, members, ratios }]
+  })
+  const max = niceMax(Math.max(0, ...rows.flatMap((r) => r.cold.filter((v) => v !== undefined))))
+  const at = (ms: number) => `${(ms / max) * 100}%`
+  const period = hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'
+
   return (
-    <article className={`flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6 ${className}`}>
-      <div className="flex flex-col gap-1 text-sm text-muted">
-        <h3 className="flex items-baseline gap-2 text-xl text-ink">
-          <ChartIcon name="cold" className="size-5" />
-          Cold start at {memoryMb} MB
-        </h3>
-        <p>ms, {hover !== undefined ? `run of ${when(runs[hover]!.date)} UTC` : 'mean'}</p>
-      </div>
-      <div
-        role="table"
-        aria-label={`Cold start on arm64 and x86_64 at ${memoryMb} MB`}
-        className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-baseline gap-x-3 text-sm"
-        onMouseLeave={() => setFocus(undefined)}
-      >
-        <div role="row" className="contents text-xs text-muted">
-          <span role="columnheader" />
-          <span role="columnheader" className="flex items-center justify-end gap-1.5 self-center">
-            <Swatch arch="arm64" className="stroke-muted max-sm:hidden" />
-            arm64
-          </span>
-          <span role="columnheader" className="flex items-center justify-end gap-1.5 self-center">
-            <Swatch arch="x86_64" className="stroke-muted max-sm:hidden" />
-            x86_64
-          </span>
-          {/* Its text out of sight but the cell in the grid, which an sr-only cell would leave. */}
-          <span role="columnheader">
-            <span className="sr-only">arm64 against x86_64</span>
-          </span>
+    <div className={`flex min-w-0 flex-col gap-5 bg-paper-2 p-5 sm:p-6 ${className}`}>
+      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
+        <div className="flex flex-col gap-1 text-sm text-muted">
+          <h3 className="flex items-baseline gap-2 text-xl text-ink">
+            <ChartIcon name="cold" className="size-5" />
+            Per function at {memoryMb} MB
+          </h3>
+          <p>
+            {period}; ratios are arm64’s advantage, above 1× when it’s faster, and cost its
+            difference
+          </p>
         </div>
-        {rows.map(({ p, arm, x86 }) => (
-          <div
-            key={p.base}
-            role="row"
-            className={`contents ${focus && focus !== p.base ? '[&>*]:opacity-40' : ''}`}
-            onMouseEnter={() => setFocus(p.base)}
-          >
-            <span role="rowheader" className="flex min-w-0 items-center gap-2 py-1 text-ink-2">
-              <span
-                aria-hidden="true"
-                className="size-2.5 shrink-0 self-center rounded-full"
-                style={{ background: p.color }}
-              />
-              <span className="truncate">{p.name}</span>
-            </span>
-            <span role="cell" className="measured text-right text-ink">
-              {fixed(arm, 1)}
-            </span>
-            <span role="cell" className="measured text-right text-ink-2">
-              {fixed(x86, 1)}
-            </span>
-            <span role="cell" className="w-12 text-right">
-              <Versus value={arm} baseline={x86} />
-            </span>
-          </div>
-        ))}
+        <div className="cells" role="group" aria-label="Memory, MB">
+          {memories.map((mb) => (
+            <button
+              key={mb}
+              type="button"
+              aria-pressed={mb === memoryMb}
+              onClick={() => onPick(mb)}
+            >
+              {mb}
+            </button>
+          ))}
+        </div>
       </div>
-      {speed !== undefined && (
-        <p className="mt-auto border-t border-rule pt-4 text-sm text-pretty text-muted">
-          On arm64, the {rows.length === 1 ? 'function' : `${rows.length} functions`} cold-start{' '}
-          <span className="measured text-ink">{speed.toFixed(2)}×</span> as fast
-          {cost !== undefined && (
-            <>
-              {' '}
-              and, with a GB-second a fifth cheaper, for{' '}
-              <span className="measured text-ink">{Math.round((1 - 1 / cost) * 100)}%</span> less
-            </>
-          )}
-          .
-        </p>
+      {/* Sideways on a phone, its names held at the left; there it shows the values without the track. */}
+      <div className="-mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6">
+        <table
+          className="w-full border-collapse text-sm sm:min-w-[42rem]"
+          onMouseLeave={() => setFocus(undefined)}
+        >
+          <thead className="text-xs text-muted">
+            <tr>
+              {/* The names and ratios as narrow as they go, which leaves the rest to the track. */}
+              <th className="sticky left-0 z-1 w-px bg-paper-2" />
+              <th className="pb-1 text-left font-normal">
+                <span className="flex flex-wrap items-center gap-x-4">
+                  <span className="whitespace-nowrap text-ink-2">Cold start, ms</span>
+                  {/* What the track's dots are; a phone shows no track. */}
+                  <span className="inline-flex items-center gap-1.5 max-sm:hidden">
+                    <span aria-hidden="true" className="size-2 rounded-full bg-ink-2" />
+                    arm64
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 max-sm:hidden">
+                    <span
+                      aria-hidden="true"
+                      className="size-2 rounded-full border-2 border-ink-2"
+                    />
+                    x86_64
+                  </span>
+                </span>
+              </th>
+              <th colSpan={4} className="pb-1 text-right font-normal text-ink-2">
+                arm64 vs x86_64
+              </th>
+            </tr>
+            <tr className="border-b border-rule">
+              <th className="sticky left-0 z-1 bg-paper-2" />
+              <th className="pb-2 font-normal">
+                <span className="flex items-center gap-3">
+                  <span aria-hidden="true" className={`${TRACK} measured`}>
+                    {[0, 0.5, 1].map((g) => (
+                      <span
+                        key={g}
+                        className={`absolute ${g === 0 ? '' : g === 1 ? '-translate-x-full' : '-translate-x-1/2'}`}
+                        style={{ left: `${g * 100}%` }}
+                      >
+                        {max * g}
+                      </span>
+                    ))}
+                  </span>
+                  <span className={VALUES}>arm64 → x86_64</span>
+                </span>
+              </th>
+              {metrics.map((m) => (
+                <th
+                  key={m.key}
+                  className="w-px px-1 pb-2 text-right font-normal whitespace-nowrap last:pr-0 sm:px-2"
+                >
+                  {/* One word each on a phone, where the four have to fit beside the names. */}
+                  <span className="sm:hidden">{m.title.split(' ')[0]}</span>
+                  <span className="max-sm:hidden">{m.key === 'cost' ? 'Cost' : m.title}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {families.map(({ family, members, ratios }) => (
+            <tbody key={family} className="border-b border-rule last:border-b-0">
+              <tr>
+                <th
+                  scope="rowgroup"
+                  className="sticky left-0 z-1 bg-paper-2 pt-3 pb-1.5 text-left font-medium whitespace-nowrap text-ink"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <img
+                      src={FAMILY_ICONS[family]}
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="block shrink-0"
+                    />
+                    {FAMILY_NAMES[family]}
+                  </span>
+                </th>
+                <td />
+                <RatioCells ratios={ratios} />
+              </tr>
+              {members.map(({ f, cold: [arm, x86], ratios: r }) => (
+                <tr
+                  key={f.base}
+                  onMouseEnter={() => setFocus(f.base)}
+                  className={focus && focus !== f.base ? 'opacity-40' : ''}
+                >
+                  <th
+                    scope="row"
+                    className="sticky left-0 z-1 bg-paper-2 py-1.5 pr-3 pl-2 text-left font-normal whitespace-nowrap text-ink-2 sm:pr-4 sm:pl-6"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ background: f.color }}
+                      />
+                      {shortName(f.base)}
+                    </span>
+                  </th>
+                  <td className="py-1.5">
+                    <span className="flex items-center gap-3">
+                      <span aria-hidden="true" className={TRACK}>
+                        {[0.25, 0.5, 0.75].map((g) => (
+                          <span
+                            key={g}
+                            className="absolute inset-y-0 w-px bg-rule"
+                            style={{ left: `${g * 100}%` }}
+                          />
+                        ))}
+                        {arm !== undefined && x86 !== undefined && (
+                          <span
+                            className="absolute top-1/2 h-0.5 -translate-y-1/2 opacity-60"
+                            style={{
+                              left: at(Math.min(arm, x86)),
+                              width: `${(Math.abs(x86 - arm) / max) * 100}%`,
+                              background: f.color,
+                            }}
+                          />
+                        )}
+                        {x86 !== undefined && (
+                          <span
+                            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full border-2 bg-paper-2"
+                            style={{ left: at(x86), borderColor: f.color }}
+                          />
+                        )}
+                        {arm !== undefined && (
+                          <span
+                            className="absolute top-1/2 size-2.5 -translate-1/2 rounded-full"
+                            style={{ left: at(arm), background: f.color }}
+                          />
+                        )}
+                      </span>
+                      <span className={`${VALUES} measured text-ink`}>
+                        {fixed(arm, 0)} <span className="text-muted">→</span>{' '}
+                        <span className="text-ink-2">{fixed(x86, 0)}</span>
+                      </span>
+                    </span>
+                  </td>
+                  <RatioCells ratios={r} />
+                </tr>
+              ))}
+            </tbody>
+          ))}
+        </table>
+      </div>
+      <Summary rows={rows} />
+    </div>
+  )
+}
+
+/** arm64's cold start and cost advantage over the rows. */
+const Summary = ({ rows }: { rows: { ratios: Record<Metric['key'], number | undefined> }[] }) => {
+  const speed = geomean(rows.flatMap((r) => r.ratios.cold ?? []))
+  const cost = geomean(rows.flatMap((r) => r.ratios.cost ?? []))
+  if (speed === undefined) return null
+  return (
+    <p className="border-t border-rule pt-4 text-sm text-pretty text-muted">
+      On arm64, the {rows.length === 1 ? 'function' : `${rows.length} functions`} cold-start{' '}
+      <span className="measured text-ink">{speed.toFixed(2)}×</span> as fast
+      {cost !== undefined && (
+        <>
+          {' '}
+          and, with a GB-second a fifth cheaper, for{' '}
+          <span className="measured text-ink">{Math.round((1 - 1 / cost) * 100)}%</span> less
+        </>
       )}
-    </article>
+      .
+    </p>
   )
 }
 
@@ -520,16 +687,10 @@ export const Architectures = ({
   memories: number[]
   onPick: (memoryMb: number) => void
 }) => {
-  const byId = new Map(functions.map((f) => [f.id, f]))
-  const pairs: Pair[] = view.shown.flatMap((s) => {
-    const fns = Object.fromEntries(
-      ARCHS.map((arch) => [arch, memories.map((mb) => byId.get(`${s.base}/${arch}/${mb}`))])
-    ) as Pair['fns']
-    // A variant on one architecture only has nothing to compare.
-    if (!ARCHS.every((arch) => fns[arch].some(Boolean))) return []
-    return [{ base: s.base, name: s.name, color: s.color, fns }]
-  })
-  if (!pairs.length) return null
+  // Nothing to compare without a variant on both architectures.
+  const archs = new Map<string, Set<string>>()
+  for (const f of functions) archs.set(f.base, (archs.get(f.base) ?? new Set()).add(f.arch))
+  if (![...archs.values()].some((a) => a.has('arm64') && a.has('x86_64'))) return null
   const discount = Math.round((1 - PRICES.gbSecond.arm64 / PRICES.gbSecond.x86_64) * 100)
 
   return (
@@ -546,7 +707,7 @@ export const Architectures = ({
       </div>
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule">
         <AdvantageChart view={view} functions={functions} memories={memories} onPick={onPick} />
-        <ArchTable view={view} pairs={pairs} memories={memories} />
+        <ArchTable view={view} functions={functions} memories={memories} onPick={onPick} />
       </div>
       <p className="max-w-prose text-sm text-pretty text-muted">
         Each ratio is x86_64’s value over arm64’s, averaged geometrically over a family’s Event

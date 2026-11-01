@@ -23,9 +23,6 @@ export const DASHES: Record<Family, string | undefined> = {
 export const ARCHS = ['arm64', 'x86_64'] as const
 export type Arch = (typeof ARCHS)[number]
 
-/** Each architecture's line where both are drawn at once: arm64 solid, x86_64 dotted. */
-export const ARCH_DASHES: Record<Arch, string | undefined> = { arm64: undefined, x86_64: '0 5' }
-
 /**
  * Lambda's on-demand prices in STACK_REGION, in USD, at the first tier, from the AWS Price List API
  * (EUC1-Lambda-GB-Second, -ARM and EUC1-Request): arm64's GB-second costs a fifth less.
@@ -37,6 +34,8 @@ export const PRICES = {
 
 type Variant = {
   name: string
+  /** Its name under its family's heading, when the name minus the family's isn't it. */
+  short?: string
   family: Family
   /**
    * The command infra/build.ts or infra/llrt.ts builds it with, short of the entry point, `--outfile`, and for the
@@ -110,6 +109,7 @@ export const VARIANTS: Record<string, Variant> = {
   },
   Llrt: {
     name: 'LLRT',
+    short: 'no SDK',
     family: 'LLRT',
     build: LLRT_BUNDLE,
     about: 'The bundle, run by LLRT’s no-SDK Lambda build as the bootstrap',
@@ -171,6 +171,21 @@ export const VARIANTS: Record<string, Variant> = {
   },
 }
 export const ORDER = Object.keys(VARIANTS)
+
+/** Each family's name, in the page's order. */
+export const FAMILY_NAMES: Record<Family, string> = { Bun: 'Bun', LLRT: 'LLRT', Node: 'Node.js' }
+
+/**
+ * A variant's name under its family's heading: `short`, or its name without the family's, e.g.
+ * "AOT executable, trimmed" for "Bun AOT executable, trimmed" and "24" for "Node.js 24".
+ */
+export const shortName = (base: string) => {
+  const v = VARIANTS[base]
+  if (!v) return base
+  const family = FAMILY_NAMES[v.family]
+  if (v.short) return v.short
+  return v.name.startsWith(family) ? v.name.slice(family.length).replace(/^[\s,]+/, '') : v.name
+}
 
 /** A deployed function: its variant, e.g. BunCompile, on one architecture with one memory size. */
 export type Fn = Variant & {

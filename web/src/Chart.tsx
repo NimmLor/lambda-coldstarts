@@ -34,20 +34,25 @@ const READOUT_GAP = 12
 export const Versus = ({ value, baseline }: { value?: number; baseline?: number }) => {
   if (value === undefined || baseline === undefined || !(value > 0) || !(baseline > 0)) return null
   const times = baseline / value
-  const tone = times >= 1 ? 'ok' : 'bad'
-  // The root lifts small differences off the neutral grey; oklab, as oklch would pass through other hues on the way.
-  const strength = Math.sqrt(Math.min(1, Math.abs(Math.log2(times)))) * 100
   return (
-    <span
-      className="measured rounded-chip px-1 text-xs"
-      style={{
-        color: `color-mix(in oklab, var(--color-${tone}) ${strength}%, var(--color-muted))`,
-        background: `color-mix(in oklab, var(--color-${tone}-soft) ${strength}%, transparent)`,
-      }}
-    >
+    <span className="measured rounded-chip px-1 text-xs" style={tone(times)}>
       {times.toFixed(2)}×
     </span>
   )
+}
+
+/**
+ * The colours of a chip for `times`: green above 1, red below, fully saturated from twice either
+ * way. The root lifts small differences off the neutral grey; oklab, as oklch would pass through
+ * other hues on the way.
+ */
+export const tone = (times: number) => {
+  const name = times >= 1 ? 'ok' : 'bad'
+  const strength = Math.sqrt(Math.min(1, Math.abs(Math.log2(times)))) * 100
+  return {
+    color: `color-mix(in oklab, var(--color-${name}) ${strength}%, var(--color-muted))`,
+    background: `color-mix(in oklab, var(--color-${name}-soft) ${strength}%, transparent)`,
+  }
 }
 
 /**
