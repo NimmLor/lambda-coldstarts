@@ -3,10 +3,11 @@
  * goes through every function, `CONCURRENCY` at a time, and beside them every MicroVM, one at a
  * time, each in an Express child workflow that forces `PERF_ROUNDS` cold starts one after another,
  * each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs in
- * PerfResults), then records the run and stores its summary (src/perf/summarize.ts). PerfResults
- * keeps a run for `RETENTION_DAYS`; on the 1st, PerfExport (src/perf/export.ts) copies the month
- * before to the PerfArchive bucket. PerfApi serves the summaries to the React site in web/ and,
- * with PERF_ADMIN_SECRET set, starts runs, pauses and resumes the schedule, and purges the table.
+ * PerfResults), then records the run, stores its summary (src/perf/summarize.ts) and invalidates
+ * the run history in CloudFront. PerfResults keeps a run for `RETENTION_DAYS`; on the 1st,
+ * PerfExport (src/perf/export.ts) copies the month before to the PerfArchive bucket. PerfApi
+ * serves the summaries to the React site in web/ and, with PERF_ADMIN_SECRET set, starts runs,
+ * pauses and resumes the schedule, and purges the table.
  */
 import { RETENTION_DAYS, RUNS_PK } from '../src/perf/keys'
 import { BENCH_TAG } from './functions'
@@ -188,14 +189,7 @@ export const createPerf = (
     // A run's samples are about 1,100 small items.
     memory: '128 MB',
     link: [table],
-    environment: { PERF_TABLE: table.name, PERF_DISTRIBUTION: router.distributionID },
-    // It invalidates /api/runs/history once the run's summary is stored.
-    permissions: [
-      {
-        actions: ['cloudfront:CreateInvalidation'],
-        resources: [router.nodes.cdn.nodes.distribution.arn],
-      },
-    ],
+    environment: { PERF_TABLE: table.name },
   })
 
   const exporter = new sst.aws.Function('PerfExport', {
@@ -305,11 +299,36 @@ export const createPerf = (
     payload: { runId },
   }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
 
+  // CloudFront keeps /api/runs/history for hours (src/perf/api.ts), so the site shows the run right
+  // away only once it's invalidated. PerfRouter's viewer request function rewrites the path to
+  // /runs/history before CloudFront looks in its cache, and CloudFront's docs say to invalidate
+  // both the path the viewer asked for and the rewritten one.
+  const historyPaths = ['/api/runs/history', '/runs/history']
+  const invalidate = sst.aws.StepFunctions.task({
+    name: 'Invalidate',
+    resource: 'arn:aws:states:::aws-sdk:cloudfront:createInvalidation',
+    arguments: {
+      DistributionId: router.distributionID,
+      InvalidationBatch: {
+        // A reused reference returns the earlier invalidation instead of making a new one.
+        CallerReference: '{% $uuid() %}',
+        Paths: { Quantity: historyPaths.length, Items: historyPaths },
+      },
+    },
+    output: {},
+    permissions: [
+      {
+        actions: ['cloudfront:CreateInvalidation'],
+        resources: [router.nodes.cdn.nodes.distribution.arn],
+      },
+    ],
+  }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
+
   const stateMachine = new sst.aws.StepFunctions('PerfRun', {
-    definition: measureAll.next(recordRun).next(summarizeRun),
+    definition: measureAll.next(recordRun).next(summarizeRun).next(invalidate),
     transform: {
       // SST's Map has no ToleratedFailurePercentage. Without it, one failed child fails the Map
-      // Run, then MeasureAll, and RecordRun and Summarize never run for the targets that finished.
+      // Run, then MeasureAll, and the steps after it never run for the targets that finished.
       stateMachine: (args) => {
         args.definition = $output(args.definition).apply((definition) => {
           const parsed = JSON.parse(definition)
