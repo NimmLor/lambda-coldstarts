@@ -224,7 +224,7 @@ flowchart LR
   R -- an Express child per function,<br>40 at a time --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm]
   M --> D[(PerfResults<br>DynamoDB, 120 days)]
   R -- at the end --> Z[PerfSummarize] --> D
-  Z -- invalidates /api/runs/history --> C
+  R -- then invalidates /api/runs/history --> C
   E[⏰ on the 1st] --> X[PerfExport] -- the month before --> B[(PerfArchive<br>S3)]
   D --> X
   D --> A[PerfApi]
@@ -244,7 +244,9 @@ flowchart LR
   by state transition. A child gets 5 minutes; one that runs out loses its remaining rounds, like
   one whose rounds keep failing, and the run goes on without it.
 - 🗃️ CloudFront keeps `/api/runs/history` for 4 hours and, past that, serves its copy while it
-  fetches a new one. PerfSummarize invalidates it as soon as a run's summary is stored.
+  fetches a new one. PerfRun's last step, `Invalidate`, invalidates it as soon as the run's summary
+  is stored, under both `/api/runs/history` and `/runs/history`, the path PerfRouter rewrites it to
+  before its cache.
 - 🗄️ Every item of a run expires 120 days after the run started (`expiresAt`, DynamoDB's TTL). The
   archive holds `<yyyy>/<mm>/runs.ndjson.gz`, each run with its per-function statistics, and
   `<yyyy>/<mm>/samples.ndjson.gz`, every cold start. A run belongs to the month it started in.
