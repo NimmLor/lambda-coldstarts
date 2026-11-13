@@ -27,7 +27,11 @@ try {
     entrypoints: ['src/prerender.tsx'],
     outdir: prerenderDir,
     target: 'bun',
-    define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+    define: {
+      'process.env.NODE_ENV': JSON.stringify('production'),
+      // Analytics off while prerendering: posthog.init's timers would keep the build from exiting.
+      'process.env.POSTHOG_PROJECT_TOKEN': JSON.stringify(''),
+    },
   })
   const { prerender } = (await import(bundle.outputs[0]!.path)) as typeof import('./src/prerender')
   const now = Date.now()
