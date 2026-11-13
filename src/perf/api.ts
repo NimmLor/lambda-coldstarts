@@ -16,6 +16,7 @@
  *                                `done: false` means there are more, call it again
  */
 import { timingSafeEqual } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import {
   GetScheduleCommand,
@@ -56,6 +57,22 @@ const json = (statusCode: number, body: unknown, cacheControl = 'max-age=60') =>
   statusCode,
   headers: { 'content-type': 'application/json', 'cache-control': cacheControl },
   body: JSON.stringify(body),
+})
+
+/**
+ * /runs/history as gzip. A Lambda response holds 6 MB at most, which 90 runs of 130 functions
+ * pass in JSON: the function then fails and its URL answers 502. Compressed, it's a fraction of
+ * that. Every browser takes gzip, and CloudFront passes a body its origin compressed on as is.
+ */
+const gzipJson = (body: unknown, cacheControl: string) => ({
+  statusCode: 200,
+  headers: {
+    'content-type': 'application/json',
+    'content-encoding': 'gzip',
+    'cache-control': cacheControl,
+  },
+  isBase64Encoded: true,
+  body: gzipSync(JSON.stringify(body)).toString('base64'),
 })
 
 /** Newest first. Pages, since a Query stops at 1 MB and each summary is tens of KB. */
@@ -165,5 +182,5 @@ export const handler = async (event: LambdaFunctionURLEvent) => {
   if (method !== 'GET') return json(405, { error: 'GET only' })
   if (path !== '/runs/history') return json(404, { error: `No route for ${path}` })
 
-  return json(200, { runs: await listSummaries(HISTORY_RUNS) }, HISTORY_CACHE)
+  return gzipJson({ runs: await listSummaries(HISTORY_RUNS) }, HISTORY_CACHE)
 }
