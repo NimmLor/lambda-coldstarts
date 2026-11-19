@@ -5,7 +5,7 @@
 # Runs as root in the container, with LAMBDA_ARCH set to x86_64 or arm64.
 set -eu
 
-BUN_VERSION=1.4.4
+BUN_VERSION=1.4.5
 
 case "$LAMBDA_ARCH" in
   x86_64) name=bun-linux-x64 ;;
@@ -28,10 +28,20 @@ install_zip() {
     rm -rf "$name" "$name.zip"
 }
 
+# GitHub's API, authenticated when GITHUB_TOKEN is set: anonymous callers share a limit of 60
+# requests an hour per IP address, which a CI runner's address has often spent.
+github_api() {
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/$1"
+  else
+    curl -fsSL "https://api.github.com/$1"
+  fi
+}
+
 # The canary's SHASUMS256.txt isn't rewritten with each canary, so check against the digest
 # GitHub reports for the asset instead.
 install_canary() {
-  digest=$(curl -fsSL https://api.github.com/repos/oven-sh/bun/releases/tags/canary |
+  digest=$(github_api repos/oven-sh/bun/releases/tags/canary |
     jq -er --arg name "$name.zip" '.assets[] | select(.name == $name) | .digest | ltrimstr("sha256:")') &&
     curl -fsSLO "https://github.com/oven-sh/bun/releases/download/canary/$name.zip" &&
     install_zip bun-aot "$digest"
@@ -46,7 +56,7 @@ install_zip bun "$(curl -fsSL "$release/SHASUMS256.txt" | grep " $name.zip\$" | 
 for attempt in 1 2 3 4 5; do
   install_canary && break
   test "$attempt" -lt 5
-  echo "The canary is being replaced; trying again in a minute" >&2
+  echo "The canary is being replaced, or GitHub's API refused; trying again in a minute" >&2
   sleep 60
 done
 

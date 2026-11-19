@@ -5,7 +5,7 @@
 # ⚡ lambda-coldstarts
 
 **How fast do Bun, LLRT and Node.js cold-start on AWS Lambda?**<br>
-130 real Lambdas, benchmarked every 4 hours.
+180 real Lambdas, benchmarked every 4 hours.
 
 [🌐 Live results](https://coldstarts.github.nimmervoll.work) ·
 [🚀 Deploy](#-deploy) ·
@@ -22,45 +22,50 @@
 
 One SST stack. Every function runs the same handler ([`src/report.ts`](src/report.ts)) and gets a
 public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 MB**:
-13 variants × 2 architectures × 5 sizes = **130 functions**, named like `BunCompileArm64M128`.
+18 variants × 2 architectures × 5 sizes = **180 functions**, named like `BunCompileArm64M128`.
 
-|     | Variant                        | What ships                                                                           |
-| --- | ------------------------------ | ------------------------------------------------------------------------------------ |
-| 🥟  | `BunRuntime`                   | `bun` executable + bundled `index.js`, started by a shell `bootstrap`                |
-| 🥟  | `BunCompile`                   | `bun build --compile --minify --bytecode` executable as `bootstrap`                  |
-| 🥟  | `BunCompileCanary`             | the same, built by Bun canary: the baseline for `--trim` and `--aot`                 |
-| 🥟  | `BunCompileTrim`               | `BunCompileCanary` + `--trim`, which drops the parts of Bun the code doesn't use     |
-| 🥟  | `BunCompileAot`                | `--compile --aot`, behind a `bootstrap` that preloads the [AOT shim](#-the-aot-shim) |
-| 🥟  | `BunCompileAotTrim`            | `--aot --trim`                                                                       |
-| 🪶  | `Llrt`                         | [LLRT](https://github.com/awslabs/llrt)'s no-sdk Lambda build + bundled `index.mjs`  |
-| 🪶  | `LlrtBytecode`                 | the bundle as `llrt compile` bytecode, run by LLRT's CLI build                       |
-| 🪶  | `LlrtStdSdk`                   | `Llrt` on LLRT's default Lambda build, with the common AWS SDK clients built in      |
-| 🪶  | `LlrtFullSdk`                  | `Llrt` on LLRT's full-sdk Lambda build, with every AWS SDK client built in           |
-| 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)           |
-| 🌐  | `Node24Web`                    | a `node:http` server on a [Lambda Web Function](#-the-web-function)                  |
-| 📦  | `Node24MicroVm`                | the same server in a [Lambda MicroVM](#-the-microvm), resumed from a snapshot        |
-| 📦  | `BunCompileAotTrimMicroVm`     | that server as an `--aot --trim` executable in a MicroVM, without the AOT shim       |
+|     | Variant                        | What ships                                                                               |
+| --- | ------------------------------ | ---------------------------------------------------------------------------------------- |
+| 🥟  | `BunRuntime`                   | `bun` executable + bundled `index.js`, started by a shell `bootstrap`                    |
+| 🥟  | `BunCompile`                   | `bun build --compile --minify --bytecode` executable as `bootstrap`                      |
+| 🥟  | `BunCompileCanary`             | the same, built by Bun canary: the baseline for `--trim` and `--aot`                     |
+| 🥟  | `BunCompileTrim`               | `BunCompileCanary` + `--trim`, which drops the parts of Bun the code doesn't use         |
+| 🥟  | `BunCompileAot`                | `--compile --aot`, behind a `bootstrap` that preloads the [AOT shim](#-the-aot-shim)     |
+| 🥟  | `BunCompileAotTrim`            | `--aot --trim`                                                                           |
+| 🪶  | `Llrt`                         | [LLRT](https://github.com/awslabs/llrt)'s no-sdk Lambda build + bundled `index.mjs`      |
+| 🪶  | `LlrtBytecode`                 | the bundle as `llrt compile` bytecode, run by LLRT's CLI build                           |
+| 🪶  | `LlrtStdSdk`                   | `Llrt` on LLRT's default Lambda build, with the common AWS SDK clients built in          |
+| 🪶  | `LlrtFullSdk`                  | `Llrt` on LLRT's full-sdk Lambda build, with every AWS SDK client built in               |
+| 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)               |
+| 🌐  | `Node24Web`                    | a `node:http` server on a [Lambda Web Function](#-the-web-function)                      |
+| 📦  | `Node24MicroVm`                | the same server in a [Lambda MicroVM](#-the-microvm), resumed from a snapshot            |
+| 📦  | `BunCompileAotTrimMicroVm`     | that server as an `--aot --trim` executable in a MicroVM, without the AOT shim           |
+| 🧱  | `Node24Cmr`                    | `Node24` on a [customer-managed runtime](#-the-customer-managed-runtimes) of `nodejs:24` |
+| 🧱  | `BunRuntimeCmr`                | `BunRuntime`'s `index.js` alone, the `bun` executable in the runtime image               |
+| 🧱  | `LlrtCmr`                      | `Llrt`'s `index.mjs` alone, LLRT's no-sdk Lambda build in the runtime image              |
+| 🧱  | `BunRuntimeCmrPadded`          | `BunRuntimeCmr` with 1 GB in its image that nothing reads                                |
+| 🧱  | `BunRuntimeCmrAlpine`          | `BunRuntimeCmr` on Bun's Alpine image, with the musl build of Bun                        |
 
 Everything runs in **eu-central-1**, `Node24Web` and the MicroVMs included.
 
 Bun and LLRT run on `provided.al2023`. Bun serves invocations through a small runtime loop
 ([`src/runtime.ts`](src/runtime.ts)), LLRT through its own ([`src/llrt.ts`](src/llrt.ts)), and Node
-through Lambda's managed runtime.
+through Lambda's managed runtime. The `Cmr` variants run the same way, from a runtime image.
 
 ## 🚀 Deploy
 
 ```sh
 bun install
 cp .env.example .env         # add AWS_PROFILE or access keys
-bun run deploy --stage dev   # builds both architectures in Docker, deploys all 130 functions
+bun run deploy --stage dev   # builds both architectures in Docker, deploys all 180 functions
 bun run remove --stage dev   # tears it down again (production is retained)
 ```
 
 - 🔁 `bun run just-deploy` deploys the bundles already in `dist/` without building them again.
 - 🎯 `bun run build --arch arm64 BunCompileAot` builds only the variants you name, into `dist/<arch>/<Variant>`.
-- 🐳 Builds run in Amazon Linux 2023 containers, Lambda's own OS, with Bun 1.4.4 and the latest
+- 🐳 Builds run in Amazon Linux 2023 containers, Lambda's own OS, with Bun 1.4.5 and the latest
   canary ([`infra/build-image.sh`](infra/build-image.sh)). The image is cached until that script
-  changes; `docker rmi $(docker images -q lambda-coldstarts-build)` picks up a newer canary.
+  changes; `bun run build:clean` deletes it, so the next build picks up a newer canary.
 - 🦾 The architecture your host doesn't have builds under QEMU. On Docker Engine (Linux, WSL), register
   it once per boot: `docker run --privileged --rm tonistiigi/binfmt --install arm64`
 - ⚠️ A plain `bunx sst deploy` builds on the host, for its architecture only, and replaces the
@@ -212,6 +217,39 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
 - 📌 **The base image is pinned** (`al2023-1` version 2). Lambda stops running a version 90 days
   after the next one comes out; `ListManagedMicrovmImageVersions` lists them.
 
+### 🧱 The customer-managed runtimes
+
+[Customer-managed runtimes](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-customer-managed.html)
+move a function's runtime into a container image in ECR, which Lambda publishes as a runtime with
+versions and aliases. The function still deploys a .zip, now of its handler alone, and names the
+runtime's ARN and an alias instead of `nodejs24.x`. The `Cmr` variants ask what that costs a cold
+start: [`infra/cmr-build.ts`](infra/cmr-build.ts) builds each image's context and code, and
+[`infra/cmr.ts`](infra/cmr.ts) deploys them with `aws-native` (1.86.0 is the first with runtimes; the
+aws provider has none yet) and `docker-build`.
+
+- ⚖️ **The same runtime as before, moved:** `Node24Cmr` is Lambda's `nodejs:24` image as it is,
+  against `Node24`. `BunRuntimeCmr` and `LlrtCmr` put the very `bun` executable and LLRT build
+  `BunRuntime` and `Llrt` ship in their .zip on Lambda's OS-only `provided:al2023` image, the OS
+  `provided.al2023` runs, and start them the same way: Bun through the same shell, LLRT directly.
+  LLRT reads its handler from `_HANDLER`, which only Lambda's entrypoint script sets, so its image
+  names it.
+- 🏋️ **What an image's size costs:** `BunRuntimeCmrPadded` is `BunRuntimeCmr` plus 1 GB under
+  `/var/runtime/padding` that nothing reads. The bytes are AES-CTR of zeros under a fixed key,
+  made on the deploying host, so they neither compress nor repeat, yet the layer is the same on
+  every deploy.
+- 🏔️ **Another OS:** `BunRuntimeCmrAlpine` runs on `oven/bun:<version>-alpine`, the musl build of the
+  Bun the others ship, with the `/etc/hosts` and `/etc/resolv.conf` Lambda needs in the image.
+- 🧩 **A runtime per variant and architecture**, each with one version, named by its image's
+  digest and a random suffix drawn with each new image, and a `bench` alias that all five sizes run
+  on. The images only copy files, so both architectures build on any host without QEMU.
+- 🔁 **Measured like every other function**, by PerfMeasure and `bun run bench`; the site shows them
+  in a section of their own, each beside the variant it repackages. Their `runtime` is `custom`.
+- 🗓️ **Deleting a runtime, version or alias takes 30 days**, and keeps its name that long, so each
+  stage's runtimes end in a random suffix, kept in its state. Images a newer one untags stay in
+  ECR, as a version scheduled for deletion still needs its own.
+- 🐳 Deploying needs Docker with BuildKit, and the deploy role `ecr:*`: re-run
+  `bun run bootstrap:aws` once.
+
 ## 🕐 Scheduled runs
 
 In production the stack also benchmarks itself every 4 hours, the way
@@ -322,11 +360,11 @@ bun test
 - 📦 Compiled Bun executables are ~100 MB against a few KB for Node. Lambda fetches them on every cold
   start, which shows up in the round trip even when init is fast.
 - 🪶 LLRT is pinned in [`infra/llrt.ts`](infra/llrt.ts). `Llrt` and `LlrtBytecode` use the no-sdk
-  builds; `LlrtStdSdk` (6.2 MB) and `LlrtFullSdk` (7.7 MB) run the same handler, which imports no
-  SDK client, so against `Llrt` (5.2 MB) they show what the embedded SDK costs on its own. LLRT's
+  builds; `LlrtStdSdk` (5.6 MB) and `LlrtFullSdk` (7.2 MB) run the same handler, which imports no
+  SDK client, so against `Llrt` (4.6 MB) they show what the embedded SDK costs on its own. LLRT's
   TLS warm-up only connects for imported clients, so it isn't part of it.
   [`src/llrt-env.ts`](src/llrt-env.ts) fills in the `process` and `navigator` APIs it lacks.
-- 🧩 `LlrtBytecode` ships LLRT's CLI build (14 MB vs 5.5 MB), because only the CLI build reads
+- 🧩 `LlrtBytecode` ships LLRT's CLI build (12 MB vs 4.8 MB), because only the CLI build reads
   bytecode the CLI compiled. Comparing it with `Llrt` therefore compares the executables as well.
   Like `--aot`, it only builds on Linux on the Lambda architecture.
 - 📌 `nodejs26.x` needs the AWS provider pinned to 7.52.0 in [`sst.config.ts`](sst.config.ts).

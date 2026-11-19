@@ -3,7 +3,7 @@
  * `process.execPath` and `navigator.hardwareConcurrency`. src/llrt.ts imports this before
  * report.ts, which reads the vCPUs as soon as it's evaluated.
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import { ComputeMemoryUsage } from 'llrt:qjs'
 
@@ -29,7 +29,20 @@ process.memoryUsage = (() => {
 // The peak resident size, in KiB like Node's: what Lambda reports as "Max Memory Used".
 process.resourceUsage = (() => ({ maxRSS: statusKib('VmHWM') })) as typeof process.resourceUsage
 
-// The bootstrap Lambda started, which is LLRT itself. Its `process.argv[0]` doesn't say where.
-process.execPath = `${process.env.LAMBDA_TASK_ROOT}/bootstrap`
+/** Whether `file` is there to read. */
+const exists = (file: string) => {
+  try {
+    statSync(file)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// The bootstrap Lambda started, which is LLRT itself: in the function's code, or on a
+// customer-managed runtime, in the runtime's directory. Its `process.argv[0]` doesn't say where.
+process.execPath = [process.env.LAMBDA_TASK_ROOT, process.env.LAMBDA_RUNTIME_DIR]
+  .map((dir) => `${dir}/bootstrap`)
+  .find(exists)!
 
 Object.defineProperty(navigator, 'hardwareConcurrency', { value: availableParallelism() })

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { track } from './analytics'
 import { Architectures } from './Architectures'
 import { Chart, type Metric } from './Chart'
+import { CustomerManagedRuntimes } from './CustomerManagedRuntimes'
 import {
   DASHES,
   type Family,
@@ -224,11 +225,17 @@ const InlinePick = <T extends string | number>({
 
 const Header = ({ latest }: { latest?: RunPoints }) => {
   const variants = new Set(latest?.functions.map((f) => f.base))
-  // A Web Function and a MicroVM are Node.js 24 again, on other kinds of Lambda.
+  // A Web Function and a MicroVM are Node.js 24 again, on other kinds of Lambda, and the
+  // customer-managed runtimes some of the others again.
   const count = (family: Family) =>
     [...variants].filter(
-      (b) => VARIANTS[b]?.family === family && !VARIANTS[b]?.web && !VARIANTS[b]?.microvm
+      (b) =>
+        VARIANTS[b]?.family === family &&
+        !VARIANTS[b]?.web &&
+        !VARIANTS[b]?.microvm &&
+        !VARIANTS[b]?.cmr
     ).length
+  const cmrs = [...variants].filter((b) => VARIANTS[b]?.cmr).length
   const kinds = [
     [...variants].some((b) => VARIANTS[b]?.web) && 'as a Lambda Web Function',
     [...variants].some((b) => VARIANTS[b]?.microvm) && 'in Lambda MicroVMs',
@@ -247,7 +254,7 @@ const Header = ({ latest }: { latest?: RunPoints }) => {
       <p className="max-w-prose text-lg/normal text-pretty text-ink-2 lg:col-span-8">
         {latest ? (
           <>
-            {`${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${kinds.length ? `, plus Node.js 24 ${kinds.join(' and ')}` : ''}, each cold started `}
+            {`${count('Bun')} Bun builds, ${count('LLRT')} LLRT builds and ${count('Node')} Node.js versions${kinds.length ? `, plus Node.js 24 ${kinds.join(' and ')}` : ''}${cmrs ? `${kinds.length ? ', and' : ', plus'} ${cmrs} more on customer-managed runtimes` : ''}, each cold started `}
             <span className="datum">{latest.rounds}</span> times every 4 hours.{' '}
           </>
         ) : (
@@ -330,6 +337,8 @@ export const App = ({ now }: { now: number }) => {
   const [compareWeb, setCompareWeb] = useStored('compareWeb', true, isBoolean)
   /** The same for the MicroVMs' section. */
   const [compareMicrovm, setCompareMicrovm] = useStored('compareMicrovm', true, isBoolean)
+  /** The same for the customer-managed runtimes' section. */
+  const [compareCmr, setCompareCmr] = useStored('compareCmr', true, isBoolean)
   /** What the dashboard is laid out on until the first load. */
   const [placeholderRuns] = useState(() => placeholderHistory(now))
 
@@ -364,8 +373,8 @@ export const App = ({ now }: { now: number }) => {
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
     const shownArch = archs.includes(arch) ? arch : archs[0]!
-    // The Web Functions and MicroVMs have sections of their own, further down.
-    const functions = latest.functions.filter((f) => !f.web && !f.microvm)
+    // The Web Functions, MicroVMs and customer-managed runtimes have sections of their own, further down.
+    const functions = latest.functions.filter((f) => !f.web && !f.microvm && !f.cmr)
     const memories = [...new Set(functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
     const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
     // A range is offered once there are runs older than the next shorter one shows.
@@ -423,8 +432,13 @@ export const App = ({ now }: { now: number }) => {
       .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
     const webs = latest.functions.filter((f) => f.web)
-    // The functions can be compared with a Web Function too, at its one size.
-    const comparable = [...fns, ...webs]
+    // The customer-managed runtimes on the picked architecture at the picked size, like `fns`.
+    const cmrs = latest.functions
+      .filter((f) => f.cmr && f.arch === shownArch && f.memoryMb === shownMemory)
+      .sort((a, b) => ORDER.indexOf(a.base) - ORDER.indexOf(b.base))
+    // The functions can be compared with a Web Function too, at its one size, and with one on a
+    // customer-managed runtime.
+    const comparable = [...fns, ...cmrs, ...webs]
     const view = viewOf(
       fns,
       hidden,
@@ -490,8 +504,27 @@ export const App = ({ now }: { now: number }) => {
       microvmCounterparts.find((f) => f.base === 'Node24') ?? microvmCounterparts[0],
       microvms
     )
-    // The result list ranks the Web Functions among the functions. A MicroVM has no init to rank.
-    const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
+    // Each customer-managed runtime after the variant it repackages, when that's shown, so each
+    // figure reads as pairs. From the first run that measured one.
+    const cmrCounterparts = fns.filter(
+      (f) => compareCmr && cmrs.some((c) => c.cmr!.counterpart === f.base)
+    )
+    const cmrView = viewOf(
+      [
+        ...cmrCounterparts.flatMap((f) => [
+          f,
+          ...cmrs.filter((c) => c.cmr!.counterpart === f.base),
+        ]),
+        ...cmrs.filter((c) => !cmrCounterparts.some((f) => f.base === c.cmr!.counterpart)),
+      ],
+      new Set(),
+      () => {},
+      undefined,
+      cmrs
+    )
+    // The result list ranks the customer-managed runtimes and Web Functions among the functions. A
+    // MicroVM has no init to rank.
+    const listView = viewOf([...fns, ...cmrs, ...webs], hidden, toggle, view.baseline)
 
     return (
       <>
@@ -655,6 +688,19 @@ export const App = ({ now }: { now: number }) => {
             functions={functions}
             memories={memories}
             onPick={pickMemory}
+          />
+        )}
+
+        {cmrs.length > 0 && (
+          <CustomerManagedRuntimes
+            view={cmrView}
+            metrics={[cold!, FIRST_ANSWER, mem!]}
+            arch={shownArch}
+            compared={compareCmr}
+            onCompare={(on) => {
+              track('cmr_compare_toggled', { on: Number(on) })
+              setCompareCmr(on)
+            }}
           />
         )}
 

@@ -75,6 +75,9 @@ jobs:
       # In an Amazon Linux 2023 container with the latest Bun canary; see infra/build-image.sh.
       - name: 🐳 Build bundles
         run: bun run build --arch ${{ matrix.arch }}
+        env:
+          # Authenticates infra/build-image.sh's call to GitHub's API for the canary's digest.
+          GITHUB_TOKEN: ${{ github.token }}
 
       # Artifacts drop file modes, and every bootstrap must stay executable.
       - name: 📦 Pack bundles

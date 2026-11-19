@@ -10,7 +10,8 @@
  * pauses and resumes the schedule, and purges the table.
  */
 import { RETENTION_DAYS, RUNS_PK } from '../src/perf/keys'
-import { BENCH_TAG } from './functions'
+import { runtimeAliasArns } from './cmr'
+import { BENCH_TAG, type DeployedFunction } from './functions'
 import type { Microvm } from './microvm'
 import type { WebFunction } from './web-function'
 
@@ -56,7 +57,7 @@ const NO_INDEX = {
 }
 
 export const createPerf = (
-  functions: Record<string, sst.aws.Function>,
+  functions: Record<string, DeployedFunction>,
   webFunctions: WebFunction[],
   microvms: Microvm[]
 ) => {
@@ -108,6 +109,11 @@ export const createPerf = (
           },
         ],
       },
+      // Lambda may check that whoever updates a function on a customer-managed runtime may use its
+      // alias, as it does on CreateFunction; see infra/cmr.ts.
+      ...(runtimeAliasArns().length
+        ? [{ actions: ['lambda:AssociateRuntimeAlias'], resources: runtimeAliasArns() }]
+        : []),
       // A Web Function's rounds each make a revision, point the endpoint at it, sign requests to
       // it and read the environment's platform events from its logs; see src/perf/web.ts.
       ...webFunctions.flatMap((w) => [
