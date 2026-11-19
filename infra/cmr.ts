@@ -214,13 +214,21 @@ export const createCmrFunctions = ({
     ),
     description: `The runtime of ${v.id} on ${architecture}, benchmarked by PerfMeasure`,
   })
-  // A version can't change its image, so a new image makes a new version, named by its digest,
-  // which the alias moves to before the old one is deleted.
+  // A version can't change its image, so a new image makes a new version, which the alias moves
+  // to before the old one is deleted. It's named by its digest and a suffix drawn anew with each
+  // one: a name stays taken for 30 days after its version is deleted, and Lambda can keep a
+  // version that a failed deploy created without telling it, so a digest seen before would clash.
+  const versionSuffix = new random.RandomString(`${name}RuntimeVersionSuffix`, {
+    length: 6,
+    special: false,
+    upper: false,
+    keepers: { digest: image.digest },
+  })
   const runtimeVersion = new awsnative.lambda.RuntimeVersion(
     `${name}RuntimeVersion`,
     {
       runtimeName: runtime.name,
-      name: image.digest.apply((digest) => `sha256-${digest.replace(/^sha256:/, '').slice(0, 16)}`),
+      name: $interpolate`sha256-${image.digest.apply((d) => d.replace(/^sha256:/, '').slice(0, 16))}-${versionSuffix.result}`,
       // By digest alone: Lambda rejects the `<repo>:<tag>@<digest>` that `image.ref` is, as SST's
       // own container functions work around too.
       imageUri: $interpolate`${repository.repositoryUrl}@${image.digest}`,

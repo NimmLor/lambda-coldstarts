@@ -240,8 +240,8 @@ aws provider has none yet) and `docker-build`.
 - 🏔️ **Another OS:** `BunRuntimeCmrAlpine` runs on `oven/bun:<version>-alpine`, the musl build of the
   Bun the others ship, with the `/etc/hosts` and `/etc/resolv.conf` Lambda needs in the image.
 - 🧩 **A runtime per variant and architecture**, each with one version, named by its image's
-  digest, and a `bench` alias that all five sizes run on. The images only copy files, so both
-  architectures build on any host without QEMU.
+  digest and a random suffix drawn with each new image, and a `bench` alias that all five sizes run
+  on. The images only copy files, so both architectures build on any host without QEMU.
 - 🔁 **Measured like every other function**, by PerfMeasure and `bun run bench`; the site shows them
   in a section of their own, each beside the variant it repackages. Their `runtime` is `custom`.
 - 🗓️ **Deleting a runtime, version or alias takes 30 days**, and keeps its name that long, so each
