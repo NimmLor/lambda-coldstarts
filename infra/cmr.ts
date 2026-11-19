@@ -221,7 +221,9 @@ export const createCmrFunctions = ({
     {
       runtimeName: runtime.name,
       name: image.digest.apply((digest) => `sha256-${digest.replace(/^sha256:/, '').slice(0, 16)}`),
-      imageUri: image.ref,
+      // By digest alone: Lambda rejects the `<repo>:<tag>@<digest>` that `image.ref` is, as SST's
+      // own container functions work around too.
+      imageUri: $interpolate`${repository.repositoryUrl}@${image.digest}`,
       releaseNotes: version,
     },
     { dependsOn: [repositoryPolicy] }
