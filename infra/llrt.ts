@@ -62,14 +62,14 @@ const run = (file: string, args: string[]) => execFileSync(file, args, { stdio: 
  * The release asset of `build` for `arch` with `sdk`, without its `.zip`: `llrt-lambda-arm64-no-sdk`,
  * or `llrt-lambda-arm64` for the standard SDK.
  */
-const llrtAsset = (build: 'lambda' | 'linux', arch: LambdaArch, sdk: LlrtSdk = 'no-sdk') =>
+export const llrtAsset = (build: 'lambda' | 'linux', arch: LambdaArch, sdk: LlrtSdk = 'no-sdk') =>
   `llrt-${build}-${arch === 'arm64' ? 'arm64' : 'x64'}${sdk === 'std-sdk' ? '' : `-${sdk}`}`
 
 /**
  * The file `name` from the release's `<build>-<arch>[-<sdk>].zip`, downloaded once into `cacheDir`
  * and checked against its pinned hash.
  */
-const llrtFile = (
+export const llrtFile = (
   build: 'lambda' | 'linux',
   arch: LambdaArch,
   name: string,

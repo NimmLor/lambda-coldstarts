@@ -1,7 +1,9 @@
 /**
  * Builds every Bun and LLRT variant into ./dist/<arch>/<Variant> and, on Linux, runs each `bootstrap` against a
- * fake Lambda Runtime API: a quick check that a bundle starts and answers before deploying it. On
- * arm64, it builds the MicroVMs' Bun servers too, and asks each for a report over HTTP.
+ * fake Lambda Runtime API: a quick check that a bundle starts and answers before deploying it. The
+ * customer-managed runtime variants build their runtime image's context and their code, and the
+ * ones whose runtime runs here get the same check. On arm64, it builds the MicroVMs' Bun servers
+ * too, and asks each for a report over HTTP.
  *
  *   bun scripts/build-local.ts [BunCompile ...]
  */
@@ -9,6 +11,7 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { serve } from 'bun'
 import { buildMicrovmServer, lambdaArch, toLambdaArch, unavailableReason } from '../infra/build'
+import { runsLocally } from '../infra/cmr-build'
 import { buildBundle, handlerOf, unavailable, VARIANTS } from '../infra/functions'
 
 const arch = lambdaArch()
@@ -23,9 +26,24 @@ const dirSize = async (dir: string) => {
   return total
 }
 
-/** Starts the bundle's `bootstrap`, hands it two events and measures until it asks for the first one. */
-const smokeTest = async (bundle: string, handler: string) => {
-  const bootstrap = path.join(bundle, 'bootstrap')
+/**
+ * Starts `bootstrap` with the code in `taskRoot`, hands it two events and measures until it asks
+ * for the first one. A customer-managed runtime's bootstrap lives in `runtimeDir` and gets the
+ * handler as its argument, as Lambda passes it to the image's ENTRYPOINT.
+ */
+const smokeTest = async ({
+  bootstrap,
+  taskRoot,
+  runtimeDir,
+  handler,
+  variant,
+}: {
+  bootstrap: string
+  taskRoot: string
+  runtimeDir?: string
+  handler: string
+  variant: string
+}) => {
   const events = [{ rawPath: '/cold' }, { rawPath: '/warm' }]
   const responses: unknown[] = []
   let firstNextMs = 0
@@ -57,15 +75,16 @@ const smokeTest = async (bundle: string, handler: string) => {
     },
   })
 
-  const child = Bun.spawn([bootstrap], {
+  const child = Bun.spawn(runtimeDir ? [bootstrap, handler] : [bootstrap], {
     env: {
       PATH: process.env.PATH,
       AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${server.port}`,
       AWS_LAMBDA_FUNCTION_MEMORY_SIZE: '1769',
       // As Lambda sets them. LLRT serves invocations only with `_HANDLER`, and imports it from here.
       _HANDLER: handler,
-      LAMBDA_TASK_ROOT: bundle,
-      VARIANT: path.basename(bundle),
+      LAMBDA_TASK_ROOT: taskRoot,
+      ...(runtimeDir && { LAMBDA_RUNTIME_DIR: runtimeDir }),
+      VARIANT: variant,
     },
     stdout: 'inherit',
     stderr: 'inherit',
@@ -88,8 +107,12 @@ const smokeTest = async (bundle: string, handler: string) => {
 
 const rows: Record<string, unknown>[] = []
 for (const v of VARIANTS) {
-  // Only Bun and LLRT have a bundle this repo builds.
-  if ((v.kind !== 'bun' && v.kind !== 'llrt') || (wanted.length && !wanted.includes(v.id))) continue
+  // Only Bun, LLRT and the customer-managed runtimes have a bundle this repo builds.
+  if (
+    (v.kind !== 'bun' && v.kind !== 'llrt' && v.kind !== 'cmr') ||
+    (wanted.length && !wanted.includes(v.id))
+  )
+    continue
   const reason = unavailable(v, arch)
   if (reason) {
     console.warn(`Skipping ${v.id}: ${reason}`)
@@ -100,11 +123,46 @@ for (const v of VARIANTS) {
     arch,
     cacheDir: path.resolve('dist', '.cache'),
   })
+  if (v.kind === 'cmr') {
+    const [code, runtime] = ['code', 'runtime'].map((dir) => path.join(bundle, dir)) as [
+      string,
+      string,
+    ]
+    // The bundle is the function's .zip; the runtime image adds what its Dockerfile copies.
+    const row: Record<string, unknown> = {
+      variant: v.id,
+      bundleMb: Math.round(((await dirSize(code)) / 1024 / 1024) * 10) / 10,
+    }
+    if (canRun && runsLocally(v.runtime)) {
+      Object.assign(
+        row,
+        await smokeTest({
+          bootstrap: path.join(runtime, 'bootstrap'),
+          taskRoot: code,
+          runtimeDir: runtime,
+          handler: handlerOf(v),
+          variant: v.id,
+        })
+      )
+    }
+    rows.push(row)
+    continue
+  }
   const row: Record<string, unknown> = {
     variant: v.id,
     bundleMb: Math.round(((await dirSize(bundle)) / 1024 / 1024) * 10) / 10,
   }
-  if (canRun) Object.assign(row, await smokeTest(bundle, handlerOf(v)))
+  if (canRun) {
+    Object.assign(
+      row,
+      await smokeTest({
+        bootstrap: path.join(bundle, 'bootstrap'),
+        taskRoot: bundle,
+        handler: handlerOf(v),
+        variant: v.id,
+      })
+    )
+  }
   rows.push(row)
 }
 

@@ -48,6 +48,13 @@
   --color-line-Node24MicroVm-8192: oklch(64% 0.16 46);
   /* Beside the amber Node.js sizes, Node.js 24's teal and the Bun AOT executable's pink. */
   --color-line-BunCompileAotTrimMicroVm: oklch(72% 0.14 255);
+  /* Each customer-managed runtime, which its section shows beside the variant it repackages: a
+     paler shade of that one's hue, the padded image a darker one, and Alpine its own blue. */
+  --color-line-Node24Cmr: oklch(90% 0.07 185);
+  --color-line-BunRuntimeCmr: oklch(90% 0.09 95);
+  --color-line-BunRuntimeCmrPadded: oklch(66% 0.14 65);
+  --color-line-BunRuntimeCmrAlpine: oklch(70% 0.13 250);
+  --color-line-LlrtCmr: oklch(91% 0.09 120);
   --color-line-other: oklch(74% 0.12 270);
   /* Each architecture where a row holds both, in the arm64 vs x86_64 table: arm64 green and
      x86_64 red, the hues of ok and bad, as arm64's advantage is what the section measures. */

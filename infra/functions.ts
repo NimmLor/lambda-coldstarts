@@ -8,14 +8,21 @@ import {
   unavailableReason,
   versionFile,
 } from './build'
+import { createCmrFunctions } from './cmr'
+import { buildCmrBundle, type CmrSpec, cmrHandler } from './cmr-build'
 import { buildLlrtBundle, LLRT_HANDLER, type LlrtVariant, llrtUnavailableReason } from './llrt'
 
 type NodeRuntime = 'nodejs22.x' | 'nodejs24.x' | 'nodejs26.x'
 
-/** A variant whose bundle this repo builds, and which runs on `provided.al2023`. */
-type BuiltVariant =
+/**
+ * A variant whose bundle this repo builds: one that runs on `provided.al2023`, or, with `cmr`, on a
+ * customer-managed runtime, its runtime image and code built by infra/cmr-build.ts and deployed by
+ * infra/cmr.ts.
+ */
+export type BuiltVariant =
   | { id: string; kind: 'bun'; variant: BunVariant }
   | { id: string; kind: 'llrt'; variant: LlrtVariant }
+  | ({ id: string; kind: 'cmr' } & CmrSpec)
 
 export type Variant =
   | BuiltVariant
@@ -52,6 +59,15 @@ export const VARIANTS: Variant[] = [
   { id: 'Node24MicroVm', kind: 'microvm' },
   // The same server as a trimmed --aot executable, without the AOT shim, at Lambda's default size.
   { id: 'BunCompileAotTrimMicroVm', kind: 'microvm', bun: 'aot-trim', sizes: [2048] },
+  // Customer-managed runtimes; see infra/cmr.ts. Node24, BunRuntime and Llrt with the runtime in an
+  // image rather than Lambda's or the function's .zip: the same Node.js image, the same bun
+  // executable or LLRT build, on the same OS.
+  { id: 'Node24Cmr', kind: 'cmr', runtime: 'node24' },
+  { id: 'BunRuntimeCmr', kind: 'cmr', runtime: 'bun' },
+  { id: 'LlrtCmr', kind: 'cmr', runtime: 'llrt' },
+  // BunRuntimeCmr with a gigabyte in its image that nothing reads, and on Bun's Alpine image instead.
+  { id: 'BunRuntimeCmrPadded', kind: 'cmr', runtime: 'bun', padMb: 1024 },
+  { id: 'BunRuntimeCmrAlpine', kind: 'cmr', runtime: 'bun-alpine' },
 ]
 
 /** Tags every benchmarked function, which is how PerfMeasure's permissions pick them; see infra/perf.ts. */
@@ -98,12 +114,21 @@ export const selected = () => {
  */
 const ARCH_SUFFIX: Record<LambdaArch, string> = { x86_64: 'X64', arm64: 'Arm64' }
 
-/** What Lambda's `_HANDLER` is: Bun's executables poll the Runtime API themselves, LLRT imports a module. */
-export const handlerOf = (v: BuiltVariant) => (v.kind === 'llrt' ? LLRT_HANDLER : 'bootstrap')
+/**
+ * What Lambda's `_HANDLER` is: Bun's executables poll the Runtime API themselves, LLRT imports a
+ * module. A customer-managed runtime gets it as its last argument, and decides what it means.
+ */
+export const handlerOf = (v: BuiltVariant) =>
+  v.kind === 'cmr' ? cmrHandler(v.runtime) : v.kind === 'llrt' ? LLRT_HANDLER : 'bootstrap'
 
 /** Why `v` can't be built on this host for `arch`, or `undefined` when it can. */
 export const unavailable = (v: BuiltVariant, arch: LambdaArch) =>
-  v.kind === 'bun' ? unavailableReason(v.variant, arch) : llrtUnavailableReason(v.variant, arch)
+  v.kind === 'bun'
+    ? unavailableReason(v.variant, arch)
+    : v.kind === 'llrt'
+      ? llrtUnavailableReason(v.variant, arch)
+      : // Nothing in a runtime image is compiled for the host, so any host builds either architecture.
+        undefined
 
 /** Builds `v` for `arch` into `bundle` and returns it; `cacheDir` keeps downloads between builds. */
 export const buildBundle = (
@@ -112,7 +137,13 @@ export const buildBundle = (
 ) =>
   v.kind === 'bun'
     ? buildBunBundle({ variant: v.variant, ...options })
-    : buildLlrtBundle({ variant: v.variant, ...options })
+    : v.kind === 'llrt'
+      ? buildLlrtBundle({ variant: v.variant, ...options })
+      : buildCmrBundle({ spec: v, ...options })
+
+/** The file every built bundle of `v` has: its `bootstrap`, or its runtime image's Dockerfile. */
+export const bundleMarker = (v: BuiltVariant) =>
+  v.kind === 'cmr' ? path.join('runtime', 'Dockerfile') : 'bootstrap'
 
 /**
  * The bundle of a Bun or LLRT variant: built on this host, or, with `BUN_BUNDLES`, the one
@@ -122,8 +153,9 @@ const bundleOf = (v: BuiltVariant, arch: LambdaArch) => {
   const prebuilt = process.env.BUN_BUNDLES
   if (prebuilt) {
     const bundle = path.resolve(prebuilt, arch, v.id)
-    if (existsSync(path.join(bundle, 'bootstrap'))) return { bundle }
-    return { reason: `no ${path.join(bundle, 'bootstrap')}; bun run build builds it` }
+    const marker = path.join(bundle, bundleMarker(v))
+    if (existsSync(marker)) return { bundle }
+    return { reason: `no ${marker}; bun run build builds it` }
   }
   const reason = unavailable(v, arch)
   if (reason) return { reason }
@@ -136,10 +168,13 @@ const bundleOf = (v: BuiltVariant, arch: LambdaArch) => {
   }
 }
 
+/** A deployed function: what PerfMeasure invokes it by, and its public URL. */
+export type DeployedFunction = { name: $util.Output<string>; url: $util.Output<string> }
+
 export const createFunctions = () => {
   const architectures = lambdaArchs()
   const memories = memorySizes()
-  const functions: Record<string, sst.aws.Function> = {}
+  const functions: Record<string, DeployedFunction> = {}
 
   for (const architecture of architectures) {
     for (const v of selected()) {
@@ -152,10 +187,34 @@ export const createFunctions = () => {
           ? readFileSync(versionFile(bundle), 'utf8')
           : undefined
 
+      const idOf = (memoryMb: number) =>
+        (architectures.length > 1 ? `${v.id}${ARCH_SUFFIX[architecture]}` : v.id) +
+        (memories.length > 1 ? `M${memoryMb}` : '')
+
+      if (v.kind === 'cmr') {
+        if (!bundle) {
+          console.warn(`Skipping ${v.id} on ${architecture}: ${reason}`)
+          continue
+        }
+        // One runtime for every memory size, as a runtime publisher would share it.
+        Object.assign(
+          functions,
+          createCmrFunctions({
+            v,
+            architecture,
+            bundle,
+            version,
+            functions: memories.map((memoryMb) => {
+              const { environment, tags } = shared(idOf(memoryMb), architecture, memoryMb)
+              return { id: idOf(memoryMb), memoryMb, handler: handlerOf(v), environment, tags }
+            }),
+          })
+        )
+        continue
+      }
+
       for (const memoryMb of memories) {
-        const id =
-          (architectures.length > 1 ? `${v.id}${ARCH_SUFFIX[architecture]}` : v.id) +
-          (memories.length > 1 ? `M${memoryMb}` : '')
+        const id = idOf(memoryMb)
 
         if (v.kind === 'node') {
           functions[id] = new sst.aws.Function(id, {

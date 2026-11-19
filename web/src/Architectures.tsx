@@ -80,10 +80,11 @@ type Panel = { metric: Metric; series: Series[] }
 
 /**
  * The Event Functions by id, and one per variant for its family, which every size and
- * architecture shares. Web Functions and MicroVMs run on arm64 only, so they're left out.
+ * architecture shares. Web Functions and MicroVMs run on arm64 only, so they're left out, and the
+ * customer-managed runtimes, which have a section of their own, too.
  */
 const indexEvents = (functions: Fn[]) => {
-  const events = functions.filter((f) => !f.web && !f.microvm)
+  const events = functions.filter((f) => !f.web && !f.microvm && !f.cmr)
   return {
     byId: new Map(events.map((f) => [f.id, f])),
     variants: [...new Map(events.map((f) => [f.base, f])).values()],

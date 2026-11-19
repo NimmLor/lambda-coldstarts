@@ -12,14 +12,19 @@ export default $config({
         // defaults to 7.20.0, which rejects it.
         // AWS_PROFILE comes from .env locally; CI leaves it unset and passes credentials instead.
         aws: { version: '7.52.0', profile: process.env.AWS_PROFILE || undefined },
-        // For Lambda Web Functions, which the aws provider has no resources for yet; see
-        // infra/web-function.ts. In the same region as the aws provider, from .env or CI.
+        // For Lambda Web Functions and customer-managed runtimes, which the aws provider has no
+        // resources for yet; see infra/web-function.ts and infra/cmr.ts. 1.86.0 is the first with
+        // the runtimes. In the same region as the aws provider, from .env or CI.
         'aws-native': {
-          version: '1.84.1',
+          version: '1.86.0',
           // Typed as the regions it knew of when released.
           region: process.env.AWS_REGION as awsnative.types.enums.Region,
           profile: process.env.AWS_PROFILE || undefined,
         },
+        // Builds and pushes the runtime images of infra/cmr.ts, and names their runtimes. The
+        // versions SST's own platform uses.
+        'docker-build': '0.0.14',
+        random: '4.16.6',
       },
     }
   },

@@ -18,6 +18,7 @@ const LLRT_BUILDS: Record<string, (arch: string) => string> = {
   LlrtBytecode: (arch) => `linux-${arch}-no-sdk`,
   LlrtStdSdk: (arch) => `lambda-${arch}`,
   LlrtFullSdk: (arch) => `lambda-${arch}-full-sdk`,
+  LlrtCmr: (arch) => `lambda-${arch}-no-sdk`,
 }
 
 /** What it ran on, in production's form, which the board wraps as it will that: canary Bun's is longer. */
@@ -56,6 +57,12 @@ const TYPICAL: Record<string, number[]> = {
   'Node24MicroVm/4096': [60, 1960, 1650],
   'Node24MicroVm/8192': [59, 3060, 2790],
   'BunCompileAotTrimMicroVm/2048': [25, 1590, 1280],
+  // Not measured yet: the variant each repackages, with only its handler in the .zip.
+  Node24Cmr: [110, 2.2, 75, 254, 12, 0, 86],
+  BunRuntimeCmr: [162, 2.2, 41, 646, 109, 0, 79],
+  LlrtCmr: [50, 1.3, 31, 207, 1.6, 0, 2.2],
+  BunRuntimeCmrPadded: [162, 2.2, 41, 646, 109, 0, 79],
+  BunRuntimeCmrAlpine: [162, 2.2, 41, 646, 109, 0, 79],
 }
 
 /**
@@ -70,7 +77,11 @@ const stats = (avg: number) => ({ p50: avg, p90: avg * 1.2, avg })
 const summary = (base: string, arch: string, memoryMb: number): HistoryFunction => {
   const v = VARIANTS[base]!
   const x86 = arch === 'x86_64'
-  const runtime = v.family === 'Node' ? `nodejs${base.match(/\d+/)![0]}.x` : 'provided.al2023'
+  const runtime = v.cmr
+    ? 'custom'
+    : v.family === 'Node'
+      ? `nodejs${base.match(/\d+/)![0]}.x`
+      : 'provided.al2023'
   const common = { runtime, version: version(base, arch), arch, memoryMb }
   if (v.microvm) {
     const [mem, trip, first] = TYPICAL[`${base}/${memoryMb}`]!

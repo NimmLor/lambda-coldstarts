@@ -55,6 +55,12 @@ type Variant = {
    * it's measured by its round trips instead, and shows nowhere else.
    */
   microvm?: { counterpart: string }
+  /**
+   * An Event Function on a customer-managed runtime, which has a section of its own too, where
+   * it's compared with `counterpart`: the same runtime on Lambda's or in its .zip. It has both
+   * architectures and every size, and ranks in the result list with the others.
+   */
+  cmr?: { counterpart: string }
   /** How it's deployed, for the row's tooltip. */
   about: string
 }
@@ -168,6 +174,47 @@ export const VARIANTS: Record<string, Variant> = {
     microvm: { counterpart: 'BunCompileAotTrim' },
     about:
       'The same server as a trimmed AOT executable on a Lambda MicroVM, without the AOT shim, resumed from a snapshot',
+  },
+  Node24Cmr: {
+    name: 'Node.js 24, CMR',
+    family: 'Node',
+    build: 'bun build --target=node --format=esm --minify',
+    cmr: { counterpart: 'Node24' },
+    about:
+      'The handler on a customer-managed runtime built from Lambda’s own Node.js 24 image, unchanged',
+  },
+  BunRuntimeCmr: {
+    name: 'Bun runtime, CMR',
+    family: 'Bun',
+    build: 'bun build --target=bun --format=esm --minify',
+    cmr: { counterpart: 'BunRuntime' },
+    about:
+      'The bundle alone, on a customer-managed runtime: the bun binary and its bootstrap on Lambda’s OS-only image',
+  },
+  LlrtCmr: {
+    name: 'LLRT, CMR',
+    short: 'no SDK, CMR',
+    family: 'LLRT',
+    build: LLRT_BUNDLE,
+    cmr: { counterpart: 'Llrt' },
+    about:
+      'The bundle alone, on a customer-managed runtime: LLRT’s no-SDK Lambda build on Lambda’s OS-only image',
+  },
+  BunRuntimeCmrPadded: {
+    name: 'Bun runtime, CMR +1 GB',
+    family: 'Bun',
+    build: 'bun build --target=bun --format=esm --minify',
+    cmr: { counterpart: 'BunRuntime' },
+    about:
+      'The Bun runtime’s image with a gigabyte of random bytes that nothing reads: what an image’s size costs',
+  },
+  BunRuntimeCmrAlpine: {
+    name: 'Bun runtime, CMR on Alpine',
+    family: 'Bun',
+    build: 'bun build --target=bun --format=esm --minify',
+    cmr: { counterpart: 'BunRuntime' },
+    about:
+      'The bundle on a customer-managed runtime built from Bun’s Alpine image: Bun built against musl, on another OS than Lambda’s',
   },
 }
 export const ORDER = Object.keys(VARIANTS)
