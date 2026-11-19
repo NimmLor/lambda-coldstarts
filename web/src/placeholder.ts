@@ -24,9 +24,9 @@ const LLRT_BUILDS: Record<string, (arch: string) => string> = {
 /** What it ran on, in production's form, which the board wraps as it will that: canary Bun's is longer. */
 const version = (base: string, arch: string) => {
   const v = VARIANTS[base]!
-  if (v.family === 'Bun') return v.canary ? 'bun 1.4.4-canary.1+3f3a9ff87' : 'bun 1.4.4+38afee6c8'
+  if (v.family === 'Bun') return v.canary ? 'bun 1.4.4-canary.1+3f3a9ff87' : 'bun 1.4.5+a7733435c'
   if (v.family === 'Node') return `node ${base.match(/\d+/)![0]}.22.2`
-  return `llrt-${LLRT_BUILDS[base]!(arch === 'x86_64' ? 'x64' : 'arm64')}@v0.9.0-beta`
+  return `llrt-${LLRT_BUILDS[base]!(arch === 'x86_64' ? 'x64' : 'arm64')}@v0.10.0-beta`
 }
 
 /**

@@ -63,9 +63,9 @@ bun run remove --stage dev   # tears it down again (production is retained)
 
 - 🔁 `bun run just-deploy` deploys the bundles already in `dist/` without building them again.
 - 🎯 `bun run build --arch arm64 BunCompileAot` builds only the variants you name, into `dist/<arch>/<Variant>`.
-- 🐳 Builds run in Amazon Linux 2023 containers, Lambda's own OS, with Bun 1.4.4 and the latest
+- 🐳 Builds run in Amazon Linux 2023 containers, Lambda's own OS, with Bun 1.4.5 and the latest
   canary ([`infra/build-image.sh`](infra/build-image.sh)). The image is cached until that script
-  changes; `docker rmi $(docker images -q lambda-coldstarts-build)` picks up a newer canary.
+  changes; `bun run build:clean` deletes it, so the next build picks up a newer canary.
 - 🦾 The architecture your host doesn't have builds under QEMU. On Docker Engine (Linux, WSL), register
   it once per boot: `docker run --privileged --rm tonistiigi/binfmt --install arm64`
 - ⚠️ A plain `bunx sst deploy` builds on the host, for its architecture only, and replaces the
@@ -360,11 +360,11 @@ bun test
 - 📦 Compiled Bun executables are ~100 MB against a few KB for Node. Lambda fetches them on every cold
   start, which shows up in the round trip even when init is fast.
 - 🪶 LLRT is pinned in [`infra/llrt.ts`](infra/llrt.ts). `Llrt` and `LlrtBytecode` use the no-sdk
-  builds; `LlrtStdSdk` (6.2 MB) and `LlrtFullSdk` (7.7 MB) run the same handler, which imports no
-  SDK client, so against `Llrt` (5.2 MB) they show what the embedded SDK costs on its own. LLRT's
+  builds; `LlrtStdSdk` (5.6 MB) and `LlrtFullSdk` (7.2 MB) run the same handler, which imports no
+  SDK client, so against `Llrt` (4.6 MB) they show what the embedded SDK costs on its own. LLRT's
   TLS warm-up only connects for imported clients, so it isn't part of it.
   [`src/llrt-env.ts`](src/llrt-env.ts) fills in the `process` and `navigator` APIs it lacks.
-- 🧩 `LlrtBytecode` ships LLRT's CLI build (14 MB vs 5.5 MB), because only the CLI build reads
+- 🧩 `LlrtBytecode` ships LLRT's CLI build (12 MB vs 4.8 MB), because only the CLI build reads
   bytecode the CLI compiled. Comparing it with `Llrt` therefore compares the executables as well.
   Like `--aot`, it only builds on Linux on the Lambda architecture.
 - 📌 `nodejs26.x` needs the AWS provider pinned to 7.52.0 in [`sst.config.ts`](sst.config.ts).

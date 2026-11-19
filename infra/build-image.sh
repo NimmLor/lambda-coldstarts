@@ -5,7 +5,7 @@
 # Runs as root in the container, with LAMBDA_ARCH set to x86_64 or arm64.
 set -eu
 
-BUN_VERSION=1.4.4
+BUN_VERSION=1.4.5
 
 case "$LAMBDA_ARCH" in
   x86_64) name=bun-linux-x64 ;;
