@@ -58,9 +58,13 @@ type Variant = {
   /**
    * An Event Function on a customer-managed runtime, which has a section of its own too, where
    * it's compared with `counterpart`: the same runtime on Lambda's or in its .zip. It has both
-   * architectures and every size, and ranks in the result list with the others.
+   * architectures and every size, and charts and ranks with the others too.
    */
   cmr?: { counterpart: string }
+  /** Its kind within its family, e.g. "AOT executable", which the Functions picker shows or hides together. */
+  group?: string
+  /** Its name in the Functions picker, under its group's, when its own would repeat that. */
+  option?: string
   /** How it's deployed, for the row's tooltip. */
   about: string
 }
@@ -76,18 +80,22 @@ export const VARIANTS: Record<string, Variant> = {
   BunRuntime: {
     name: 'Bun runtime',
     family: 'Bun',
+    group: 'Runtime',
+    option: 'Amazon Linux bootstrap',
     build: 'bun build --target=bun --format=esm --minify',
     about: 'The bundle plus a bun binary, started by a shell bootstrap',
   },
   BunCompile: {
     name: 'Bun executable',
     family: 'Bun',
+    group: 'Executable',
     build: 'bun build --compile --format=esm --minify --bytecode',
     about: 'A single-file executable that is the bootstrap',
   },
   BunCompileCanary: {
     name: 'Bun executable, canary',
     family: 'Bun',
+    group: 'Executable',
     build: 'bun build --compile --format=esm --minify --bytecode',
     canary: true,
     about: 'The same executable built with canary Bun, to compare the trimmed and AOT ones against',
@@ -95,6 +103,7 @@ export const VARIANTS: Record<string, Variant> = {
   BunCompileTrim: {
     name: 'Bun executable, trimmed',
     family: 'Bun',
+    group: 'Executable',
     build: 'bun build --compile --trim --format=esm --minify --bytecode',
     canary: true,
     about: 'The executable minus the parts of Bun the code doesn’t use',
@@ -102,6 +111,7 @@ export const VARIANTS: Record<string, Variant> = {
   BunCompileAot: {
     name: 'Bun AOT executable',
     family: 'Bun',
+    group: 'AOT executable',
     build: 'bun build --compile --aot',
     canary: true,
     about: 'Compiled ahead of time, started by a bootstrap that preloads the AOT shim',
@@ -109,6 +119,7 @@ export const VARIANTS: Record<string, Variant> = {
   BunCompileAotTrim: {
     name: 'Bun AOT executable, trimmed',
     family: 'Bun',
+    group: 'AOT executable',
     build: 'bun build --compile --aot --trim',
     canary: true,
     about: 'The AOT executable minus the parts of Bun the code doesn’t use',
@@ -176,41 +187,46 @@ export const VARIANTS: Record<string, Variant> = {
       'The same server as a trimmed AOT executable on a Lambda MicroVM, without the AOT shim, resumed from a snapshot',
   },
   Node24Cmr: {
-    name: 'Node.js 24, CMR',
+    name: 'Node.js 24, Custom Runtime',
     family: 'Node',
     build: 'bun build --target=node --format=esm --minify',
     cmr: { counterpart: 'Node24' },
     about:
       'The handler on a customer-managed runtime built from Lambda’s own Node.js 24 image, unchanged',
   },
+  Node27Cmr: {
+    name: 'Node.js 27 alpha, Custom Runtime',
+    family: 'Node',
+    build: 'bun build --target=node --format=esm --minify',
+    preview: true,
+    cmr: { counterpart: 'Node24' },
+    about:
+      'The handler on a customer-managed runtime built from Lambda’s Node.js 24 image, its Node.js swapped for nodejs.org’s 27 alpha',
+  },
   BunRuntimeCmr: {
-    name: 'Bun runtime, CMR',
+    name: 'Bun runtime, Custom Runtime',
     family: 'Bun',
+    group: 'Runtime',
+    option: 'Custom Runtime, Amazon Linux',
     build: 'bun build --target=bun --format=esm --minify',
     cmr: { counterpart: 'BunRuntime' },
     about:
       'The bundle alone, on a customer-managed runtime: the bun binary and its bootstrap on Lambda’s OS-only image',
   },
   LlrtCmr: {
-    name: 'LLRT, CMR',
-    short: 'no SDK, CMR',
+    name: 'LLRT, Custom Runtime',
+    short: 'no SDK, Custom Runtime',
     family: 'LLRT',
     build: LLRT_BUNDLE,
     cmr: { counterpart: 'Llrt' },
     about:
       'The bundle alone, on a customer-managed runtime: LLRT’s no-SDK Lambda build on Lambda’s OS-only image',
   },
-  BunRuntimeCmrPadded: {
-    name: 'Bun runtime, CMR +1 GB',
-    family: 'Bun',
-    build: 'bun build --target=bun --format=esm --minify',
-    cmr: { counterpart: 'BunRuntime' },
-    about:
-      'The Bun runtime’s image with a gigabyte of random bytes that nothing reads: what an image’s size costs',
-  },
   BunRuntimeCmrAlpine: {
-    name: 'Bun runtime, CMR on Alpine',
+    name: 'Bun runtime, Custom Runtime on Alpine',
     family: 'Bun',
+    group: 'Runtime',
+    option: 'Custom Runtime, Alpine',
     build: 'bun build --target=bun --format=esm --minify',
     cmr: { counterpart: 'BunRuntime' },
     about:

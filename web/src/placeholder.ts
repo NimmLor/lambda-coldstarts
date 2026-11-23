@@ -25,6 +25,7 @@ const LLRT_BUILDS: Record<string, (arch: string) => string> = {
 const version = (base: string, arch: string) => {
   const v = VARIANTS[base]!
   if (v.family === 'Bun') return v.canary ? 'bun 1.4.4-canary.1+3f3a9ff87' : 'bun 1.4.5+a7733435c'
+  if (base === 'Node27Cmr') return 'node 27.0.0-alpha.0.1.1'
   if (v.family === 'Node') return `node ${base.match(/\d+/)![0]}.22.2`
   return `llrt-${LLRT_BUILDS[base]!(arch === 'x86_64' ? 'x64' : 'arm64')}@v0.10.0-beta`
 }
@@ -59,9 +60,9 @@ const TYPICAL: Record<string, number[]> = {
   'BunCompileAotTrimMicroVm/2048': [25, 1590, 1280],
   // Not measured yet: the variant each repackages, with only its handler in the .zip.
   Node24Cmr: [110, 2.2, 75, 254, 12, 0, 86],
+  Node27Cmr: [166, 2.3, 78, 282, 9.3, 0, 128],
   BunRuntimeCmr: [162, 2.2, 41, 646, 109, 0, 79],
   LlrtCmr: [50, 1.3, 31, 207, 1.6, 0, 2.2],
-  BunRuntimeCmrPadded: [162, 2.2, 41, 646, 109, 0, 79],
   BunRuntimeCmrAlpine: [162, 2.2, 41, 646, 109, 0, 79],
 }
 

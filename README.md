@@ -41,9 +41,9 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 📦  | `Node24MicroVm`                | the same server in a [Lambda MicroVM](#-the-microvm), resumed from a snapshot            |
 | 📦  | `BunCompileAotTrimMicroVm`     | that server as an `--aot --trim` executable in a MicroVM, without the AOT shim           |
 | 🧱  | `Node24Cmr`                    | `Node24` on a [customer-managed runtime](#-the-customer-managed-runtimes) of `nodejs:24` |
+| 🧱  | `Node27Cmr`                    | `Node24Cmr`'s image with the Node.js 27 alpha in place of Node.js 24                     |
 | 🧱  | `BunRuntimeCmr`                | `BunRuntime`'s `index.js` alone, the `bun` executable in the runtime image               |
 | 🧱  | `LlrtCmr`                      | `Llrt`'s `index.mjs` alone, LLRT's no-sdk Lambda build in the runtime image              |
-| 🧱  | `BunRuntimeCmrPadded`          | `BunRuntimeCmr` with 1 GB in its image that nothing reads                                |
 | 🧱  | `BunRuntimeCmrAlpine`          | `BunRuntimeCmr` on Bun's Alpine image, with the musl build of Bun                        |
 
 Everything runs in **eu-central-1**, `Node24Web` and the MicroVMs included.
@@ -233,15 +233,17 @@ aws provider has none yet) and `docker-build`.
   `provided.al2023` runs, and start them the same way: Bun through the same shell, LLRT directly.
   LLRT reads its handler from `_HANDLER`, which only Lambda's entrypoint script sets, so its image
   names it.
-- 🏋️ **What an image's size costs:** `BunRuntimeCmrPadded` is `BunRuntimeCmr` plus 1 GB under
-  `/var/runtime/padding` that nothing reads. The bytes are AES-CTR of zeros under a fixed key,
-  made on the deploying host, so they neither compress nor repeat, yet the layer is the same on
-  every deploy.
+- 🔭 **A Node.js no Lambda runtime has:** `Node27Cmr` is `Node24Cmr`'s image with nodejs.org's
+  Node.js 27 alpha, pinned in `cmr-build.ts`, as `/var/lang/bin/node`. Lambda's entrypoint script
+  and Runtime API client stay: the client's native part is Node-API, so it loads on any Node.js.
+  nodejs.org's builds link `libatomic`, which Lambda's images lack, so the image adds Amazon Linux
+  2023's, pinned by sha256 and unpacked by `rpm` on the build host.
 - 🏔️ **Another OS:** `BunRuntimeCmrAlpine` runs on `oven/bun:<version>-alpine`, the musl build of the
   Bun the others ship, with the `/etc/hosts` and `/etc/resolv.conf` Lambda needs in the image.
 - 🧩 **A runtime per variant and architecture**, each with one version, named by its image's
   digest and a random suffix drawn with each new image, and a `bench` alias that all five sizes run
-  on. The images only copy files, so both architectures build on any host without QEMU.
+  on. The images run nothing on their own architecture, only copying files or unpacking a package
+  on the build host's, so both architectures build on any host without QEMU.
 - 🔁 **Measured like every other function**, by PerfMeasure and `bun run bench`; the site shows them
   in a section of their own, each beside the variant it repackages. Their `runtime` is `custom`.
 - 🗓️ **Deleting a runtime, version or alias takes 30 days**, and keeps its name that long, so each

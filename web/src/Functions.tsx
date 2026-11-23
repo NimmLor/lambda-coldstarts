@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { DASHES, type View } from './data'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { DASHES, type Fn, type View } from './data'
 import bunIcon from './icons/bun.svg'
 import llrtIcon from './icons/llrt.svg'
 import nodeIcon from './icons/nodejs.svg'
@@ -33,7 +33,20 @@ const Box = ({ checked }: { checked: boolean | 'mixed' }) => (
   </span>
 )
 
-/** Which functions the charts and the board show, by family or one at a time. */
+/**
+ * The functions by `group`, each where its first member is, and those with none on their own. A
+ * group's members needn't be next to each other: Bun's runtime on a customer-managed runtime is
+ * listed with those, after the executables.
+ */
+const groupsOf = (members: Fn[]) =>
+  members.reduce<[string | undefined, Fn[]][]>((groups, f) => {
+    const group = f.group && groups.find(([g]) => g === f.group)
+    if (group) group[1].push(f)
+    else groups.push([f.group, [f]])
+    return groups
+  }, [])
+
+/** Which functions the charts and the board show, by family, by kind within one, or one at a time. */
 export const Functions = ({
   view,
   setHidden,
@@ -49,6 +62,86 @@ export const Functions = ({
   const on = (base: string) => shown.some((f) => f.base === base)
   const show = (bases: string[]) =>
     setHidden(new Set(fns.map((f) => f.base).filter((base) => !bases.includes(base))))
+
+  /** A row for a set of functions, `label` naming it: ticked when all of it shows, a dash when some does. */
+  const setRow = (label: string, members: Fn[], className: string, content: ReactNode) => {
+    const count = members.filter((f) => on(f.base)).length
+    const checked = count === members.length ? true : count ? 'mixed' : false
+    return (
+      <div className={ROW}>
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={checked}
+          aria-label={`All ${label}`}
+          // Hiding the only set shown would leave nothing to chart.
+          disabled={checked === true && count === shown.length}
+          onClick={() =>
+            show(
+              (checked === true
+                ? shown.filter((f) => !members.some((m) => m.base === f.base))
+                : [...shown, ...members]
+              ).map((f) => f.base)
+            )
+          }
+          className={className}
+        >
+          <Box checked={checked} />
+          {content}
+        </button>
+        <button
+          type="button"
+          aria-label={`Only ${label}`}
+          onClick={() => show(members.map((f) => f.base))}
+          className={ONLY}
+        >
+          only
+        </button>
+      </div>
+    )
+  }
+
+  /** A function's row, by its `option` under its group's heading. */
+  const fnRow = (f: Fn, grouped = false) => {
+    const isOn = on(f.base)
+    const label = (grouped && f.option) || f.name
+    return (
+      <div
+        key={f.id}
+        className={ROW}
+        onMouseEnter={() => isOn && setFocus(f.base)}
+        onMouseLeave={() => setFocus(undefined)}
+      >
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={isOn}
+          aria-label={label === f.name ? undefined : f.name}
+          disabled={isOn && shown.length === 1}
+          onClick={() => toggle(f.base)}
+          className={`${CHECK} text-sm ${isOn ? 'text-ink-2' : 'text-muted'}`}
+        >
+          <span
+            aria-hidden="true"
+            className="size-3.5 shrink-0 rounded-full border-2"
+            style={{
+              borderColor: f.color,
+              background: isOn ? f.color : 'transparent',
+            }}
+          />
+          <span className="truncate">{label}</span>
+        </button>
+        <button
+          type="button"
+          aria-label={`Only ${f.name}`}
+          onClick={() => show([f.base])}
+          className={ONLY}
+        >
+          only
+        </button>
+      </div>
+    )
+  }
 
   useEffect(() => {
     if (!open) return
@@ -104,39 +197,23 @@ export const Functions = ({
           id={id}
           role="group"
           aria-label="Functions"
-          className="absolute top-full left-0 mt-3 flex max-h-[calc(100dvh-7rem)] w-72 flex-col overflow-hidden rounded-card border border-rule-2 bg-paper-2 shadow-[0_16px_40px_oklch(0%_0_0/0.5)]"
+          className="absolute top-full left-0 mt-3 flex max-h-[calc(100dvh-7rem)] w-80 flex-col overflow-hidden rounded-card border border-rule-2 bg-paper-2 shadow-[0_16px_40px_oklch(0%_0_0/0.5)]"
         >
           {/* The list scrolls on a short screen; Show all stays in view under it. */}
           <div className="min-h-0 overflow-y-auto p-1.5">
             {FAMILIES.map(([family, name, icon]) => {
               const members = fns.filter((f) => f.family === family)
               if (!members.length) return null
-              const count = members.filter((f) => on(f.base)).length
-              const checked = count === members.length ? true : count ? 'mixed' : false
               return (
                 <div
                   key={family}
                   className="flex flex-col border-t border-rule py-1 first:border-t-0"
                 >
-                  <div className={ROW}>
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={checked}
-                      aria-label={`All ${name}`}
-                      // Hiding the only family shown would leave nothing to chart.
-                      disabled={checked === true && count === shown.length}
-                      onClick={() =>
-                        show(
-                          (checked === true
-                            ? shown.filter((f) => f.family !== family)
-                            : [...shown, ...members]
-                          ).map((f) => f.base)
-                        )
-                      }
-                      className={`${CHECK} text-sm font-medium text-ink`}
-                    >
-                      <Box checked={checked} />
+                  {setRow(
+                    name,
+                    members,
+                    `${CHECK} text-sm font-medium text-ink`,
+                    <>
                       <img src={icon} alt="" width={16} height={16} className="block shrink-0" />
                       {name}
                       <svg
@@ -155,54 +232,24 @@ export const Functions = ({
                           strokeDasharray={DASHES[family]}
                         />
                       </svg>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Only ${name}`}
-                      onClick={() => show(members.map((f) => f.base))}
-                      className={ONLY}
-                    >
-                      only
-                    </button>
-                  </div>
-                  {members.map((f) => {
-                    const isOn = on(f.base)
-                    return (
-                      <div
-                        key={f.id}
-                        className={ROW}
-                        onMouseEnter={() => isOn && setFocus(f.base)}
-                        onMouseLeave={() => setFocus(undefined)}
-                      >
-                        <button
-                          type="button"
-                          role="checkbox"
-                          aria-checked={isOn}
-                          disabled={isOn && shown.length === 1}
-                          onClick={() => toggle(f.base)}
-                          className={`${CHECK} text-sm ${isOn ? 'text-ink-2' : 'text-muted'}`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="size-3.5 shrink-0 rounded-full border-2"
-                            style={{
-                              borderColor: f.color,
-                              background: isOn ? f.color : 'transparent',
-                            }}
-                          />
-                          <span className="truncate">{f.name}</span>
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Only ${f.name}`}
-                          onClick={() => show([f.base])}
-                          className={ONLY}
-                        >
-                          only
-                        </button>
+                    </>
+                  )}
+                  {groupsOf(members).map(([group, fs]) =>
+                    // A group of one is just its function.
+                    group && fs.length > 1 ? (
+                      <div key={group} className="flex flex-col">
+                        {setRow(
+                          group,
+                          fs,
+                          `${CHECK} text-sm text-ink-2`,
+                          <span className="truncate">{group}</span>
+                        )}
+                        <div className="flex flex-col pl-5">{fs.map((f) => fnRow(f, true))}</div>
                       </div>
+                    ) : (
+                      fs.map((f) => fnRow(f))
                     )
-                  })}
+                  )}
                 </div>
               )
             })}

@@ -21,7 +21,8 @@ Benchmarks Lambda cold starts across Bun, LLRT and Node. Layout, commands and en
   samples have no `initMs`: the site shows it only in its own section, by `roundTripMs`.
 - A customer-managed runtime variant (`kind: 'cmr'`) is built by `infra/cmr-build.ts` and deployed
   by `infra/cmr.ts`; give it `cmr` with the variant it repackages in `web/src/data.ts`. Its
-  Dockerfile only copies files, so either architecture builds anywhere without QEMU.
+  Dockerfile runs nothing on the target architecture: it copies files, and `RUN`s only in a
+  `--platform=$BUILDPLATFORM` stage. So either architecture builds anywhere without QEMU.
 - A Bun flag a variant needs goes in `NEEDED_FLAGS` in `infra/build.ts`: released Bun accepts
   unknown flags silently and would build a plain executable under the variant's name.
 - Compare `--trim` and `--aot` variants against `BunCompileCanary`, not `BunCompile`; the canary
