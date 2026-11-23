@@ -118,6 +118,8 @@ const deployPolicy = JSON.stringify({
         'cloudfront:*',
         'cloudfront-keyvaluestore:*',
         'dynamodb:*',
+        // The customer-managed runtimes' images; see infra/cmr.ts.
+        'ecr:*',
         'lambda:*',
         'logs:*',
         'route53:*',
@@ -128,8 +130,9 @@ const deployPolicy = JSON.stringify({
       ],
       Resource: '*',
     },
-    // The aws-native provider creates Web Functions and MicroVM images through Cloud Control,
-    // which checks these on top of the lambda:* the resources themselves need.
+    // The aws-native provider creates Web Functions, MicroVM images, customer-managed runtimes and
+    // the functions on them through Cloud Control, which checks these on top of the lambda:* the
+    // resources themselves need.
     {
       Effect: 'Allow',
       Action: [

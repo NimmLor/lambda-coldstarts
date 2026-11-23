@@ -665,11 +665,19 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Bucket"
     }
+    "PerfCdn": {
+      "distributionId": string
+      "type": "sst.sst.Linkable"
+    }
     "PerfExport": {
       "name": string
       "type": "sst.aws.Function"
     }
     "PerfMeasure": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "PerfRender": {
       "name": string
       "type": "sst.aws.Function"
     }

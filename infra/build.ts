@@ -130,7 +130,7 @@ const writeBootstrap = (bundle: string, script: string) =>
  * The Linux Bun executable the `bun` variant ships next to its bundle: the build host's own when it
  * is Linux on the same architecture, otherwise the same version from npm.
  */
-const linuxBunExecutable = (arch: LambdaArch, cacheDir: string) => {
+export const linuxBunExecutable = (arch: LambdaArch, cacheDir: string) => {
   const bin = bunBin()
   if (process.platform === 'linux' && toLambdaArch(process.arch) === arch) {
     return read(bin, ['-e', 'process.stdout.write(process.execPath)'])

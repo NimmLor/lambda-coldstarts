@@ -41,19 +41,19 @@ const SDK_OF: Record<Exclude<LlrtVariant, 'llrt-bytecode'>, LlrtSdk> = {
  * `lambda` is the Lambda build; `linux` is the CLI, which also has `llrt compile` and serves
  * invocations as well.
  */
-export const LLRT_VERSION = 'v0.9.0-beta'
+export const LLRT_VERSION = 'v0.10.0-beta'
 const LLRT_SHA256: Record<string, string> = {
-  'llrt-lambda-x64-no-sdk.zip': 'd29be1a75a0dc20480fe4381b759f7d0fec2998c4fc043ee3545ee75d0ae3d05',
+  'llrt-lambda-x64-no-sdk.zip': '9c5845a1d729c662d42e22d15aeacaf4aa69a9529b0d47df5f711d551d6620fb',
   'llrt-lambda-arm64-no-sdk.zip':
-    '2546ed0360c1ebfdafb19ba2c86277759c7c74ec6e5c08e50e9bd69319d0ac41',
-  'llrt-lambda-x64.zip': 'bdc7f41e9469e73f6c21636707f5a300bbd640fdb3b6228412bdc4026e29617f',
-  'llrt-lambda-arm64.zip': '2abf1f9898fa7ca114b92322b6600a4012f399a185e05ef860f784e4f2bf3979',
+    '7b65b6df0b7d647283492216e8bb08acc12a36cc18e13572cc5ed98d6f04c4ba',
+  'llrt-lambda-x64.zip': '22c8618a5a7a1f75abe391ea6d9039c71f7abb3f7ae39b55b14789f964f958c4',
+  'llrt-lambda-arm64.zip': 'e99c05ffbcfd6ac5f715f1559e86981571245f3ab6b3f3ef183affb101d5cc12',
   'llrt-lambda-x64-full-sdk.zip':
-    '7ff615509503d9aa5e9337c12a5cfb9250894cbdcaa14345477df86921d86984',
+    'e240f206c893c302e0ab21a0c91b937215f17ece85330ba79c71f7dc9f89eb9e',
   'llrt-lambda-arm64-full-sdk.zip':
-    'f205341ca5e93789249ad77ffb6dee492c89b8bdffcba8c1b458bd103d4fbd41',
-  'llrt-linux-x64-no-sdk.zip': '08f247140363119f5dd54a9ed3d51b35d83ffe6fc4c487ed90f6f7645c5dd840',
-  'llrt-linux-arm64-no-sdk.zip': 'ab582e0d60e570781c72f4615ba12271b14344278646edbaa2ed7c0214933a04',
+    '05ed83df9ec2cda3a1dbe56e0ae9fe46f0b3491495717dad99de1f7f4a5dce14',
+  'llrt-linux-x64-no-sdk.zip': '1d7588a0727cf914b8eb0d0987572d3db0081e96e2dd2f8bd77cd11213d2100d',
+  'llrt-linux-arm64-no-sdk.zip': '115999b93f1e03df25a67c9d8c16a186632eb60d48a4a82d26c00c2fad991dee',
 }
 
 const run = (file: string, args: string[]) => execFileSync(file, args, { stdio: 'inherit' })
@@ -62,14 +62,14 @@ const run = (file: string, args: string[]) => execFileSync(file, args, { stdio: 
  * The release asset of `build` for `arch` with `sdk`, without its `.zip`: `llrt-lambda-arm64-no-sdk`,
  * or `llrt-lambda-arm64` for the standard SDK.
  */
-const llrtAsset = (build: 'lambda' | 'linux', arch: LambdaArch, sdk: LlrtSdk = 'no-sdk') =>
+export const llrtAsset = (build: 'lambda' | 'linux', arch: LambdaArch, sdk: LlrtSdk = 'no-sdk') =>
   `llrt-${build}-${arch === 'arm64' ? 'arm64' : 'x64'}${sdk === 'std-sdk' ? '' : `-${sdk}`}`
 
 /**
  * The file `name` from the release's `<build>-<arch>[-<sdk>].zip`, downloaded once into `cacheDir`
  * and checked against its pinned hash.
  */
-const llrtFile = (
+export const llrtFile = (
   build: 'lambda' | 'linux',
   arch: LambdaArch,
   name: string,

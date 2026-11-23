@@ -13,6 +13,7 @@
     "perf": "bun scripts/perf-run.ts",
     "build:local": "bun scripts/build-local.ts",
     "build": "bun scripts/build-docker.ts",
+    "build:clean": "docker images lambda-coldstarts-build --format '{{.Repository}}:{{.Tag}}' | xargs -r docker rmi",
     "explain": "bun scripts/explain.ts",
     "bootstrap:aws": "bun scripts/bootstrap-aws.ts",
     "test": "bun test",

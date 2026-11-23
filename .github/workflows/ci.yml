@@ -35,3 +35,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun run build --arch ${{ matrix.arch }}
+        env:
+          # Authenticates infra/build-image.sh's call to GitHub's API for the canary's digest.
+          GITHUB_TOKEN: ${{ github.token }}

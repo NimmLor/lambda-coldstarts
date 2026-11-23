@@ -41,6 +41,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       # In an Amazon Linux 2023 container with the pinned AOT build of Bun; see infra/build-image.sh.
       - run: bun run build --arch ${{ matrix.arch }}
+        env:
+          # Authenticates infra/build-image.sh's call to GitHub's API for the canary's digest.
+          GITHUB_TOKEN: ${{ github.token }}
       # Artifacts drop file modes, and every bootstrap must stay executable.
       - run: tar -cf bundles-${{ matrix.arch }}.tar -C dist ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4

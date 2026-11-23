@@ -42,6 +42,9 @@ const buildImage = (arch: LambdaArch) => {
   }
   const container = `lambda-coldstarts-setup-${arch}-${process.pid}`
   try {
+    // GITHUB_TOKEN goes in ahead of the script, not as `-e`, which `docker commit` would keep in
+    // the image's config.
+    const token = process.env.GITHUB_TOKEN
     docker(
       [
         'run',
@@ -56,7 +59,7 @@ const buildImage = (arch: LambdaArch) => {
         'sh',
         '-s',
       ],
-      setup
+      `${token ? `GITHUB_TOKEN=${JSON.stringify(token)}\n` : ''}${setup}`
     )
     docker(['commit', container, image])
   } finally {
