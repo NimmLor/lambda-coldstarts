@@ -63,10 +63,11 @@ export const VARIANTS: Variant[] = [
   // image rather than Lambda's or the function's .zip: the same Node.js image, the same bun
   // executable or LLRT build, on the same OS.
   { id: 'Node24Cmr', kind: 'cmr', runtime: 'node24' },
+  // Node24Cmr's image with the Node.js 27 alpha in place of Node.js 24, which no Lambda runtime has.
+  { id: 'Node27Cmr', kind: 'cmr', runtime: 'node27' },
   { id: 'BunRuntimeCmr', kind: 'cmr', runtime: 'bun' },
   { id: 'LlrtCmr', kind: 'cmr', runtime: 'llrt' },
-  // BunRuntimeCmr with a gigabyte in its image that nothing reads, and on Bun's Alpine image instead.
-  { id: 'BunRuntimeCmrPadded', kind: 'cmr', runtime: 'bun', padMb: 1024 },
+  // BunRuntimeCmr on Bun's Alpine image instead.
   { id: 'BunRuntimeCmrAlpine', kind: 'cmr', runtime: 'bun-alpine' },
 ]
 

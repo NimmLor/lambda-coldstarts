@@ -93,9 +93,10 @@ export const CustomerManagedRuntimes = ({
       onCompare={onCompare}
       compareLabel="Compare with the same runtime above"
     >
-      Node.js 24, the Bun runtime and LLRT again, each on a customer-managed runtime (CMR): Lambda’s
-      Node.js 24 image as it is, and the same bun executable and LLRT build on Lambda’s OS-only
-      image. Then that Bun image with a gigabyte nothing reads, and Bun on Alpine instead.
+      Node.js 24, the Bun runtime and LLRT again, each on a customer-managed runtime, labelled
+      Custom Runtime: Lambda’s Node.js 24 image as it is, and the same bun executable and LLRT build
+      on Lambda’s OS-only image. Then that Node.js image with the Node.js 27 alpha, which no Lambda
+      runtime has yet, and Bun on Alpine instead.
     </SectionHead>
     <About />
     <Board

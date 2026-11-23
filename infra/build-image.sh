@@ -16,7 +16,8 @@ case "$LAMBDA_ARCH" in
     ;;
 esac
 
-dnf install -y gcc jq unzip
+# tar and xz unpack nodejs.org's Node.js for the node27 customer-managed runtime.
+dnf install -y gcc jq tar unzip xz
 dnf clean all
 
 # Installs $name.zip as /usr/local/bin/$1 if its SHA-256 is $2.

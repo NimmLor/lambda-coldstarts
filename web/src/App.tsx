@@ -373,8 +373,11 @@ export const App = ({ now }: { now: number }) => {
   const dashboard = (latest: RunPoints) => {
     const archs = [...new Set(latest.functions.map((f) => f.arch))].sort()
     const shownArch = archs.includes(arch) ? arch : archs[0]!
-    // The Web Functions, MicroVMs and customer-managed runtimes have sections of their own, further down.
-    const functions = latest.functions.filter((f) => !f.web && !f.microvm && !f.cmr)
+    // The Web Functions and MicroVMs have sections of their own, further down. So do the
+    // customer-managed runtimes, which are Event Functions all the same and chart with the others.
+    const events = latest.functions.filter((f) => !f.web && !f.microvm)
+    // What the architectures compare: the functions on Lambda's runtimes or their own .zip.
+    const functions = events.filter((f) => !f.cmr)
     const memories = [...new Set(functions.map((f) => f.memoryMb))].sort((a, b) => a - b)
     const shownMemory = memories.includes(memory) ? memory : memories.at(-1)!
     // A range is offered once there are runs older than the next shorter one shows.
@@ -427,18 +430,15 @@ export const App = ({ now }: { now: number }) => {
       }
     }
 
-    const sized = functions.filter((f) => f.arch === shownArch)
+    const sized = events.filter((f) => f.arch === shownArch)
     const fns = sized
       .filter((f) => f.memoryMb === shownMemory)
       .sort((a, b) => (ORDER.indexOf(a.base) >>> 0) - (ORDER.indexOf(b.base) >>> 0))
     const webs = latest.functions.filter((f) => f.web)
-    // The customer-managed runtimes on the picked architecture at the picked size, like `fns`.
-    const cmrs = latest.functions
-      .filter((f) => f.cmr && f.arch === shownArch && f.memoryMb === shownMemory)
-      .sort((a, b) => ORDER.indexOf(a.base) - ORDER.indexOf(b.base))
-    // The functions can be compared with a Web Function too, at its one size, and with one on a
-    // customer-managed runtime.
-    const comparable = [...fns, ...cmrs, ...webs]
+    // The customer-managed runtimes among them.
+    const cmrs = fns.filter((f) => f.cmr)
+    // The functions can be compared with a Web Function too, at its one size.
+    const comparable = [...fns, ...webs]
     const view = viewOf(
       fns,
       hidden,
@@ -522,9 +522,8 @@ export const App = ({ now }: { now: number }) => {
       undefined,
       cmrs
     )
-    // The result list ranks the customer-managed runtimes and Web Functions among the functions. A
-    // MicroVM has no init to rank.
-    const listView = viewOf([...fns, ...cmrs, ...webs], hidden, toggle, view.baseline)
+    // The result list ranks the Web Functions among the functions. A MicroVM has no init to rank.
+    const listView = viewOf([...fns, ...webs], hidden, toggle, view.baseline)
 
     return (
       <>
@@ -573,7 +572,7 @@ export const App = ({ now }: { now: number }) => {
               <LastRun run={latest} from={now} />
               <span>{latest.rounds} rounds</span>
               <span className="hidden sm:inline">
-                {new Set(functions.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
+                {new Set(events.map((f) => f.base)).size} fns × {archs.length} archs ×{' '}
                 {memories.length} sizes
               </span>
             </p>

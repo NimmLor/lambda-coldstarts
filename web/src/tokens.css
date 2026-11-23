@@ -49,10 +49,11 @@
   /* Beside the amber Node.js sizes, Node.js 24's teal and the Bun AOT executable's pink. */
   --color-line-BunCompileAotTrimMicroVm: oklch(72% 0.14 255);
   /* Each customer-managed runtime, which its section shows beside the variant it repackages: a
-     paler shade of that one's hue, the padded image a darker one, and Alpine its own blue. */
+     paler shade of that one's hue, and Alpine its own blue. */
   --color-line-Node24Cmr: oklch(90% 0.07 185);
+  /* Node.js 26's blue, paler, for the next Node.js after it. */
+  --color-line-Node27Cmr: oklch(88% 0.08 225);
   --color-line-BunRuntimeCmr: oklch(90% 0.09 95);
-  --color-line-BunRuntimeCmrPadded: oklch(66% 0.14 65);
   --color-line-BunRuntimeCmrAlpine: oklch(70% 0.13 250);
   --color-line-LlrtCmr: oklch(91% 0.09 120);
   --color-line-other: oklch(74% 0.12 270);
