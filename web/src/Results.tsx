@@ -94,7 +94,7 @@ export const Results = ({ view, figures, functions, arch }: TabProps) => {
     const x = figures.get(f.id)
     return x ? [{ f, x }] : []
   })
-  /** A row's value in a column; a size of 0 is a few KB, which sorts first. */
+  /** A row's value in a column; a size of 0 is under 0.1 MB, a few KB, which sorts first. */
   const value = (x: Figures, key: SortKey) => x[key]
   const sorted = rows.toSorted((a, b) => {
     const va = value(a.x, sort.key)
@@ -184,7 +184,7 @@ export const Results = ({ view, figures, functions, arch }: TabProps) => {
                   <td key={c.key} className="px-2.5 py-3 text-right">
                     {c.key === 'size' ? (
                       <span className="measured whitespace-nowrap text-ink-2">
-                        {x.size ? `${x.size.toFixed(1)} MB` : 'KB'}
+                        {x.size ? `${x.size.toFixed(1)} MB` : '< 0.1 MB'}
                       </span>
                     ) : c.key === 'cost' ? (
                       <span className="measured whitespace-nowrap text-ink-2">
