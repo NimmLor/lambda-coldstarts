@@ -44,7 +44,10 @@ type Variant = {
   build: string
   /** Built by the Bun build that `--trim` and `--aot` need rather than a release. */
   canary?: boolean
+  /** On a Lambda runtime in preview: in the runs before `ga`, or in every run without one. */
   preview?: boolean
+  /** The day its runtime reached general availability, e.g. `2026-11-20`. */
+  ga?: string
   /**
    * A Lambda Web Function, which has a tab of its own rather than a place among the others, where
    * it's compared with `counterpart`: the same runtime as a function.
@@ -159,7 +162,9 @@ export const VARIANTS: Record<string, Variant> = {
     family: 'Node',
     build: SST_BUNDLE,
     preview: true,
-    about: 'SST’s default bundle, on a runtime still in preview',
+    // https://aws.amazon.com/about-aws/whats-new/2026/11/aws-lambda-nodejs-26/
+    ga: '2026-11-20',
+    about: 'SST’s default bundle',
   },
   Node24Web: {
     name: 'Node.js 24, Web Function',
@@ -300,7 +305,8 @@ export type RunPoints = {
   points: Map<string, Point>
 }
 
-const describe = (f: HistoryFunction): Fn => {
+/** `f` as of the run that finished at `date`. */
+const describe = (f: HistoryFunction, date: Date): Fn => {
   // With a single architecture or memory size, ids go without that suffix; see infra/functions.ts.
   const base = f.functionId.replace(/M\d+$/, '').replace(/(Arm64|X64)$/, '')
   const variant = VARIANTS[base] ?? {
@@ -311,6 +317,7 @@ const describe = (f: HistoryFunction): Fn => {
   }
   return {
     ...variant,
+    preview: variant.preview && !(variant.ga && date >= new Date(variant.ga)),
     // The MicroVMs' section shows every size at once, each its own line, so each says which it is.
     ...(variant.microvm && { name: `${variant.name} · ${f.memoryMb / 1024} GB` }),
     id: `${base}/${f.arch}/${f.memoryMb}`,
@@ -324,9 +331,10 @@ const describe = (f: HistoryFunction): Fn => {
 }
 
 export const toPoints = (run: Run): RunPoints => {
-  const functions = run.functions.map(describe)
+  const date = new Date(run.finishedAt)
+  const functions = run.functions.map((f) => describe(f, date))
   return {
-    date: new Date(run.finishedAt),
+    date,
     finishedAt: run.finishedAt,
     rounds: run.rounds,
     warmInvocations: run.warmInvocations,
