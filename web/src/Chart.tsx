@@ -219,6 +219,20 @@ export const Chart = ({
   const best = shown
     .filter((f) => agg(f, m.key) !== undefined)
     .sort((a, b) => agg(a, m.key)! - agg(b, m.key)!)[0]
+  // Each marker's label grows into the wider gap beside it, back towards the start when that's the
+  // one before it; two that grow into the same gap halve it, so no label runs into another.
+  const marked = markers
+    .map((mk) => ({ ...mk, at: x(mk.index) }))
+    .sort((a, b) => a.at - b.at)
+    .map((mk, i, all) => {
+      const before = mk.at - (all[i - 1]?.at ?? 0)
+      const after = (all[i + 1]?.at ?? 100) - mk.at
+      return { ...mk, before, after, back: before > after }
+    })
+  const labels = marked.map((mk, i) => {
+    const shared = mk.back ? marked[i - 1]?.back === false : marked[i + 1]?.back === true
+    return { ...mk, room: (mk.back ? mk.before : mk.after) / (shared ? 2 : 1) }
+  })
   // Three dates fit under a narrow chart without touching; a date shows once, however many runs fall on it.
   const ticks = dateTicks(n, wide ? 4 : 2).filter(
     (i, k, all) => k === 0 || day(runs[i]!.date) !== day(runs[all[k - 1]!]!.date)
@@ -249,25 +263,23 @@ export const Chart = ({
           </span>
         )}
       </div>
-      {markers.length > 0 && (
-        <div className="relative -mb-3 h-12" aria-hidden="true">
-          {markers.map((mk) => {
-            const at = x(mk.index)
-            // Each label grows away from the nearer edge, so one near the right keeps its width.
-            return (
-              <span
-                key={mk.index}
-                className={`absolute bottom-0 line-clamp-3 text-xs text-ink-2 ${at > 50 ? 'text-right' : ''}`}
-                style={
-                  at > 50
-                    ? { right: `${100 - at}%`, maxWidth: `${at}%` }
-                    : { left: `${at}%`, maxWidth: `${100 - at}%` }
-                }
-              >
-                {mk.label}
-              </span>
-            )
-          })}
+      {labels.length > 0 && (
+        <div className="@container relative -mb-3 h-12" aria-hidden="true">
+          {labels.map((l) => (
+            <span
+              key={l.index}
+              title={l.label}
+              className={`absolute bottom-0 line-clamp-3 text-xs text-ink-2 ${l.back ? 'text-right' : ''}`}
+              style={{
+                [l.back ? 'right' : 'left']: `${l.back ? 100 - l.at : l.at}%`,
+                maxWidth: `calc(${l.room}cqw - 8px)`,
+                // No room for a word, as between two markers on a phone: the label goes, its line stays.
+                maxHeight: `clamp(0px, calc((${l.room}cqw - 4.5rem) * 999), 3rem)`,
+              }}
+            >
+              {l.label}
+            </span>
+          ))}
         </div>
       )}
       <div className={AXES}>
