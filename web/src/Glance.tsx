@@ -1,248 +1,220 @@
-import { ARCH_SECTION } from './Architectures'
-import { type Fn, fixed, geomean, mean, type RunPoints } from './data'
-import bunIcon from './icons/bun.svg'
-import llrtIcon from './icons/llrt.svg'
-import nodeIcon from './icons/nodejs.svg'
+import { useEffect, useState } from 'react'
+import {
+  FAMILY_NAMES,
+  type Family,
+  type Figures,
+  type Fn,
+  fixed,
+  isEvent,
+  type RunPoints,
+  shortName,
+} from './data'
+import { type Finding, GLANCE } from './findings'
+import { TABS, type TabId } from './tabs'
+import { FamilyIcon } from './ui'
 
-const ICONS = { Bun: bunIcon, LLRT: llrtIcon, Node: nodeIcon }
-const DAY_MS = 864e5
-
-const ARCH = 'arm64'
-const MEMORY_MB = 256
-const DAYS = 3
-/** The ones compared, in the order every panel lists them, with names short enough for a quarter of the page. */
-const CONTENDERS: { base: string; name: string; memoryMb?: number }[] = [
-  { base: 'Llrt', name: 'LLRT' },
-  { base: 'BunCompileAotTrim', name: 'Bun AOT, trimmed' },
-  { base: 'Node24', name: 'Node.js 24' },
-  // At the one size every Web Function has.
-  { base: 'Node24Web', name: 'Node.js 24, Web Function', memoryMb: 2048 },
-  // At Lambda's default size, the same as the Web Function's.
-  { base: 'Node24MicroVm', name: 'Node.js 24, MicroVM', memoryMb: 2048 },
-]
-/** What each leader is measured against: the newest Node.js Lambda runs without a preview. */
+/** What every panel measures each family's leader against: the newest Node.js out of preview. */
 const BASELINE = 'Node24'
 
-type Key = 'cold' | 'trip' | 'warm' | 'mem'
-const METRICS: {
-  key: Key
-  title: string
-  unit: string
-  digits: number
-  better: string
-  /** A MicroVM has neither an init nor warm invocations, so it's left out rather than shown missing. */
-  microvm: boolean
-}[] = [
-  { key: 'cold', title: 'Cold start', unit: 'ms', digits: 1, better: 'faster', microvm: false },
-  // How long a caller waits for a fresh instance's answer, the one number every kind has.
-  { key: 'trip', title: 'First answer', unit: 'ms', digits: 0, better: 'faster', microvm: true },
-  { key: 'warm', title: 'Warm start', unit: 'ms', digits: 2, better: 'faster', microvm: false },
-  { key: 'mem', title: 'Memory used', unit: 'MB', digits: 1, better: 'less', microvm: true },
+type Key = 'cold' | 'trip' | 'mem' | 'p99'
+const PANELS: { key: Key; title: string; unit: string; digits: number; better: string }[] = [
+  { key: 'cold', title: 'Cold start', unit: 'ms', digits: 1, better: 'faster' },
+  // How long a caller waits for a fresh instance's answer, loading its code included.
+  { key: 'trip', title: 'First answer', unit: 'ms', digits: 0, better: 'faster' },
+  { key: 'mem', title: 'Memory used', unit: 'MB', digits: 1, better: 'less' },
+  // Over every cold start of the current builds, not a mean of each run's.
+  { key: 'p99', title: 'Slowest 1%', unit: 'ms, p99', digits: 1, better: 'faster' },
 ]
 
-type Row = { fn: Fn; name: string; values: Record<Key, number | undefined> }
+/** LLRT and Bun by their best build at each metric; Node.js always by Node.js 24, the baseline. */
+const FAMILIES: Family[] = ['LLRT', 'Bun', 'Node']
 
-const Panel = ({ metric: m, rows: all }: { metric: (typeof METRICS)[number]; rows: Row[] }) => {
-  const rows = m.microvm ? all : all.filter((r) => !r.fn.microvm)
-  const present = rows.filter((r) => r.values[m.key] !== undefined)
-  const max = Math.max(0, ...present.map((r) => r.values[m.key]!))
-  const leader = present.toSorted((a, b) => a.values[m.key]! - b.values[m.key]!)[0]
-  const baseline = rows.find((r) => r.fn.base === BASELINE)?.values[m.key]
-  const ratio = leader && baseline !== undefined ? baseline / leader.values[m.key]! : undefined
+type Row = { family: Family; f: Fn; value: number }
 
+const rowsOf = (key: Key, fns: Fn[], figures: Map<string, Figures>): Row[] =>
+  FAMILIES.flatMap((family) => {
+    const candidates = fns.filter((f) =>
+      family === 'Node' ? f.base === BASELINE : f.family === family
+    )
+    const best = candidates
+      .flatMap((f) => {
+        const value = figures.get(f.id)?.[key]
+        return value === undefined ? [] : [{ family, f, value }]
+      })
+      .sort((a, b) => a.value - b.value)[0]
+    return best ? [best] : []
+  }).sort((a, b) => a.value - b.value)
+
+const Panel = ({
+  panel: p,
+  fns,
+  figures,
+}: {
+  panel: (typeof PANELS)[number]
+  fns: Fn[]
+  figures: Map<string, Figures>
+}) => {
+  const rows = rowsOf(p.key, fns, figures)
+  const max = Math.max(0, ...rows.map((r) => r.value))
+  const leader = rows[0]
+  const baseline = rows.find((r) => r.f.base === BASELINE)
   return (
     <article className="flex min-w-0 flex-col gap-4 bg-paper-2 p-5 sm:p-6">
       <div className="flex items-baseline justify-between gap-3 text-sm text-muted">
-        <h3 className="text-lg">{m.title}</h3>
-        {m.unit}
+        <h3 className="text-lg">{p.title}</h3>
+        {p.unit}
       </div>
-      <dl className="m-0 flex flex-col gap-3">
-        {rows.map((r) => {
-          const v = r.values[m.key]
-          const isLeader = r === leader
-          return (
-            <div key={r.fn.base} className="flex flex-col gap-1.5">
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink">
-                  <img
-                    src={ICONS[r.fn.family]}
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="block shrink-0 self-center"
-                  />
-                  {r.name}
-                </dt>
-                <dd
-                  className={`measured m-0 text-md whitespace-nowrap ${isLeader ? 'rounded-chip bg-cool-soft px-1 text-cool' : 'text-ink-2'}`}
-                >
-                  {fixed(v, m.digits)}
-                </dd>
-              </div>
-              <div aria-hidden="true" className="h-1.5 rounded-full bg-paper-3">
-                {v !== undefined && max > 0 && (
-                  <div
-                    className="mark h-full rounded-full"
-                    style={{
-                      width: `${(v / max) * 100}%`,
-                      background: r.fn.color,
-                    }}
-                  />
-                )}
-              </div>
+      <dl className="m-0 flex flex-col gap-3.5">
+        {rows.map((r) => (
+          <div key={r.family} className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="flex min-w-0 items-center gap-2">
+                <FamilyIcon family={r.family} />
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="text-sm font-medium text-ink">{FAMILY_NAMES[r.family]}</span>
+                  <span className="truncate text-xs text-muted" title={r.f.about}>
+                    {shortName(r.f.base)}
+                    {r.f.canary && !shortName(r.f.base).includes('canary') && ' · canary'}
+                  </span>
+                </span>
+              </dt>
+              <dd
+                className={`measured m-0 text-md whitespace-nowrap ${r === leader ? 'rounded-chip bg-cool-soft px-1 text-cool' : 'text-ink-2'}`}
+              >
+                {fixed(r.value, p.digits)}
+              </dd>
             </div>
-          )
-        })}
-      </dl>
-      <p className="mt-auto text-sm text-muted">
-        <span className="datum">
-          {leader && ratio !== undefined && leader.fn.base !== BASELINE ? (
-            <>
-              <span className="text-ink">{leader.name}</span>{' '}
-              <span className="measured text-ink">{ratio.toFixed(1)}×</span> {m.better} than Node.js
-              24
-            </>
-          ) : (
-            leader && (
-              <>
-                <span className="text-ink">{leader.name}</span> leads
-              </>
-            )
-          )}
-        </span>
-      </p>
-    </article>
-  )
-}
-
-/**
- * How many times faster arm64 starts than x86_64, cold or warm, over every function that runs on
- * both: each one's x86_64 time over its arm64 one at the same memory size, averaged geometrically,
- * as ratios are. Undefined without such a pair.
- */
-const archRatio = (runs: RunPoints[], functions: Fn[], key: 'cold' | 'warm') =>
-  geomean(
-    functions.flatMap((arm) => {
-      if (arm.arch !== 'arm64') return []
-      const x86 = functions.find(
-        (f) => f.arch === 'x86_64' && f.base === arm.base && f.memoryMb === arm.memoryMb
-      )
-      if (!x86) return []
-      const armTime = mean(runs.map((r) => r.points.get(arm.id)?.[key]))
-      const x86Time = mean(runs.map((r) => r.points.get(x86.id)?.[key]))
-      return armTime && x86Time ? [x86Time / armTime] : []
-    })
-  )
-
-/** A ratio as its stat: arm64's bar against x86_64's, the slower one full width. */
-const ArchFigure = ({ label, ratio }: { label: string; ratio: number }) => {
-  const slower = Math.max(1, 1 / ratio)
-  const bars = [
-    ['arm64', 1 / ratio / slower, 'bg-cool'],
-    ['x86_64', 1 / slower, 'bg-muted'],
-  ] as const
-  return (
-    <article className="flex min-w-0 flex-col gap-3 bg-paper-2 p-5 sm:p-6">
-      <h4 className="text-sm text-ink-2">{label}</h4>
-      <p className="m-0 flex items-baseline gap-2">
-        <span className="measured text-2xl text-ink">
-          {(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×
-        </span>
-        <span className="datum text-sm text-muted">
-          {ratio >= 1 ? 'faster' : 'slower'} on arm64
-        </span>
-      </p>
-      <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
-        {bars.map(([arch, width, color]) => (
-          <div key={arch} className="contents">
-            <dt className="measured text-xs text-muted">{arch}</dt>
-            <dd className="m-0 h-1.5 rounded-full bg-paper-3">
+            <div aria-hidden="true" className="h-1.5 rounded-full bg-paper-3">
               <div
-                className={`mark h-full rounded-full ${color}`}
-                style={{ width: `${width * 100}%` }}
+                className="mark h-full rounded-full"
+                style={{ width: `${(r.value / max) * 100}%`, background: r.f.color }}
               />
-            </dd>
+            </div>
           </div>
         ))}
       </dl>
+      <p className="datum mt-auto text-sm text-muted">
+        {leader && baseline && leader !== baseline ? (
+          <>
+            <span className="text-ink">{FAMILY_NAMES[leader.family]}</span>{' '}
+            <span className="measured text-ink">{(baseline.value / leader.value).toFixed(1)}×</span>{' '}
+            {p.better} than Node.js 24
+          </>
+        ) : (
+          leader && (
+            <>
+              <span className="text-ink">{FAMILY_NAMES[leader.family]}</span> leads
+            </>
+          )
+        )}
+      </p>
     </article>
   )
 }
 
-/** A row under the panels: arm64's cold and warm starts against x86_64's, over every function. */
-const Architectures = ({ runs, functions }: { runs: RunPoints[]; functions: Fn[] }) => {
-  const figures = [
-    ['Cold starts', archRatio(runs, functions, 'cold')],
-    ['Warm starts', archRatio(runs, functions, 'warm')],
-  ] as const
-  if (figures.every(([, ratio]) => ratio === undefined)) return null
+const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+const UNITS = [
+  ['day', 864e5],
+  ['hour', 36e5],
+  ['minute', 6e4],
+  ['second', 1e3],
+] as const
+/** How often PerfSchedule starts a run (infra/perf.ts). */
+const RUN_EVERY_MS = 4 * 36e5
+
+/**
+ * When the latest run finished, as how long ago, kept current; the dot turns once a run is missed.
+ * It first reads as of `from`, App's `now`, as the prerendered page does, then the visitor's clock.
+ */
+const LastRun = ({ run, from }: { run: RunPoints; from: number }) => {
+  const [now, setNow] = useState(from)
+  useEffect(() => {
+    setNow(Date.now())
+    const id = setInterval(() => setNow(Date.now()), 1e3)
+    return () => clearInterval(id)
+  }, [])
+  const ms = run.date.getTime() - now
+  const [unit, size] = UNITS.find(([, size]) => Math.abs(ms) >= size) ?? UNITS.at(-1)!
   return (
-    <div className="col-span-full grid grid-cols-1 gap-px bg-rule sm:grid-cols-2 lg:grid-cols-4">
-      <div className="flex flex-col gap-2 bg-paper-2 p-5 sm:col-span-2 sm:p-6">
-        <h3 className="text-lg">arm64 vs. x86_64</h3>
-        <p className="m-0 max-w-prose text-sm text-pretty text-muted">
-          How every function starts on arm64 against x86_64, cold and warm, across every memory
-          size. Web Functions and MicroVMs run on arm64 only.
-        </p>
-        {/* A line of its own, so it never breaks across two. */}
-        <a href={`#${ARCH_SECTION}`} className="mt-auto self-start text-sm">
-          Each size and runtime
-        </a>
-      </div>
-      {figures.map(
-        ([label, ratio]) =>
-          ratio !== undefined && <ArchFigure key={label} label={label} ratio={ratio} />
-      )}
-    </div>
+    <span
+      className="inline-flex items-center gap-2 text-ink-2"
+      title={run.finishedAt.replace(/\.\d+Z$/, 'Z')}
+    >
+      <span
+        aria-hidden="true"
+        className={`size-1.5 shrink-0 rounded-full ${-ms > 2 * RUN_EVERY_MS ? 'bg-bad' : 'bg-ok'}`}
+      />
+      <span>
+        Last run{' '}
+        <time dateTime={run.finishedAt}>{RELATIVE.format(Math.trunc(ms / size), unit)}</time>
+      </span>
+    </span>
   )
 }
 
 /**
- * LLRT, Bun's trimmed AOT executable, Node.js 24, and Node.js 24 as a Web Function and in a
- * MicroVM side by side, whatever the dashboard below shows, and under them arm64 against x86_64.
+ * The page's answer before any tab: LLRT, Bun and Node.js side by side on arm64 at 256 MB, over
+ * their current builds whatever the toolbar picks, and under them a finding from each tab that
+ * opens it.
  */
-export const Glance = ({ history }: { history: RunPoints[] }) => {
-  const latest = history.at(-1)
+export const Glance = ({
+  runs,
+  figures,
+  findings,
+  now,
+  onOpen,
+}: {
+  runs: RunPoints[]
+  /** Over each function's current build. */
+  figures: Map<string, Figures>
+  findings: Finding[]
+  now: number
+  onOpen: (tab: TabId) => void
+}) => {
+  const latest = runs.at(-1)
   if (!latest) return null
-  const since = latest.date.getTime() - DAYS * DAY_MS
-  const runs = history.filter((r) => r.date.getTime() > since)
-  const rows: Row[] = CONTENDERS.flatMap(({ base, name, memoryMb = MEMORY_MB }) => {
-    const fn = latest.functions.find((f) => f.id === `${base}/${ARCH}/${memoryMb}`)
-    if (!fn) return []
-    const avg = (key: Key) => mean(runs.map((r) => r.points.get(fn.id)?.[key]))
-    return [
-      {
-        fn,
-        name,
-        values: {
-          cold: avg('cold'),
-          trip: avg('trip'),
-          warm: avg('warm'),
-          mem: avg('mem'),
-        },
-      },
-    ]
-  })
-  if (rows.length < 2) return null
-
+  const fns = latest.functions.filter(
+    (f) => isEvent(f) && f.arch === GLANCE.arch && f.memoryMb === GLANCE.memoryMb
+  )
+  if (!fns.length) return null
   return (
     <section aria-labelledby="glance" className="flex flex-col gap-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <h2 id="glance" className="text-xl">
           At a glance
         </h2>
-        <p className="measured text-sm text-muted">
-          {ARCH} · {MEMORY_MB} MB · {DAYS}-day mean
-          {rows.some((r) => r.fn.web) && ' · Web Function at 2 GB'}
-          {rows.some((r) => r.fn.microvm) && ' · MicroVM at 2 GB'}
+        <p className="measured m-0 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+          <span>
+            {GLANCE.arch} · {GLANCE.memoryMb} MB · current builds
+          </span>
+          <LastRun run={latest} from={now} />
         </p>
       </div>
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule sm:grid-cols-2 lg:grid-cols-4">
-        {METRICS.map((m) => (
-          <Panel key={m.key} metric={m} rows={rows} />
+        {PANELS.map((p) => (
+          <Panel key={p.key} panel={p} fns={fns} figures={figures} />
         ))}
-        <Architectures runs={runs} functions={latest.functions} />
       </div>
+      {findings.length > 0 && (
+        <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
+          {findings.map((f) => (
+            <li key={f.tab} className="flex">
+              <button
+                type="button"
+                onClick={() => onOpen(f.tab)}
+                className="flex w-full cursor-pointer flex-col items-start gap-2 rounded-card border border-rule-2 bg-paper p-5 text-left transition-colors duration-(--dur-short) hover:bg-paper-2"
+              >
+                <span className="text-xs font-medium text-cool">
+                  {TABS.find((t) => t.id === f.tab)!.label} →
+                </span>
+                <span className="datum font-medium text-pretty text-ink">{f.title}</span>
+                <span className="measured text-xl text-ink">{f.figure}</span>
+                <span className="datum text-sm text-pretty text-muted">{f.sub}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

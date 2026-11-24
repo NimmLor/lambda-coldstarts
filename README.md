@@ -165,8 +165,8 @@ has no component for them yet. Their API differs, and so does how it's measured
 
 - 🪣 **The code** sits in a versioned bucket, which Lambda reads on behalf of the function's
   revisions.
-- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site gives it a
-  section of its own, against `Node24` on arm64 at whichever memory size you pick.
+- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site's Deployment tab
+  sets it against `Node24` on arm64 at the nearest size, 1769 MB.
 - 🔄 **A cold start** is a new revision that differs in `BENCH_NONCE`, which the endpoint is then
   pointed at. For a second or two after the endpoint says it's updated, requests still reach the old
   revision's environment, so the round keeps asking until a server answers its first request.
@@ -264,7 +264,7 @@ flowchart LR
   R -- an Express child per function,<br>40 at a time --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm]
   M --> D[(PerfResults<br>DynamoDB, 120 days)]
   R -- at the end --> Z[PerfSummarize] --> D
-  R -- then invalidates /api/runs/history --> C
+  R -- then invalidates /api/runs/* --> C
   E[⏰ on the 1st] --> X[PerfExport] -- the month before --> B[(PerfArchive<br>S3)]
   D --> X
   D --> A[PerfApi]
@@ -272,21 +272,21 @@ flowchart LR
   W[PerfSite<br>React + Tailwind] --> C
 ```
 
-| Piece           | Source                                           | Job                                                                     |
-| --------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
-| `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm invokes |
-| `PerfSummarize` | [`src/perf/summarize.ts`](src/perf/summarize.ts) | Per-function p50/p90/avg/min/max, stored with the run                   |
-| `PerfExport`    | [`src/perf/export.ts`](src/perf/export.ts)       | A month of runs and samples, as gzipped NDJSON in `PerfArchive`         |
-| `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs/history`: the latest 90 runs, the one request the site makes |
-| `PerfSite`      | [`web/`](web/)                                   | The charts at [coldstarts.github.nimmervoll.work][site]                 |
+| Piece           | Source                                           | Job                                                                                               |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm invokes                           |
+| `PerfSummarize` | [`src/perf/summarize.ts`](src/perf/summarize.ts) | Per-function p50/p90/avg/min/max, stored with the run                                             |
+| `PerfExport`    | [`src/perf/export.ts`](src/perf/export.ts)       | A month of runs and samples, as gzipped NDJSON in `PerfArchive`                                   |
+| `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs/latest`, the newest run the site paints first, then `GET /runs/history`, the latest 90 |
+| `PerfSite`      | [`web/`](web/)                                   | The charts at [coldstarts.github.nimmervoll.work][site]                                           |
 
 - 🧒 Each function's rounds run as an **Express child workflow**, which bills by duration instead of
   by state transition. A child gets 5 minutes; one that runs out loses its remaining rounds, like
   one whose rounds keep failing, and the run goes on without it.
-- 🗃️ CloudFront keeps `/api/runs/history` for 4 hours and, past that, serves its copy while it
-  fetches a new one. PerfRun's last step, `Invalidate`, invalidates it as soon as the run's summary
-  is stored, under both `/api/runs/history` and `/runs/history`, the path PerfRouter rewrites it to
-  before its cache.
+- 🗃️ CloudFront keeps `/api/runs/latest` and `/api/runs/history` for 4 hours and, past that, serves
+  its copy while it fetches a new one. PerfRun's last step, `Invalidate`, invalidates both as soon
+  as the run's summary is stored, each under `/api/runs/…` and `/runs/…`, the path PerfRouter
+  rewrites it to before its cache.
 - 🗄️ Every item of a run expires 120 days after the run started (`expiresAt`, DynamoDB's TTL). The
   archive holds `<yyyy>/<mm>/runs.ndjson.gz`, each run with its per-function statistics, and
   `<yyyy>/<mm>/samples.ndjson.gz`, every cold start. A run belongs to the month it started in.

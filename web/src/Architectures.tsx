@@ -20,7 +20,6 @@ import {
 import bunIcon from './icons/bun.svg'
 import llrtIcon from './icons/llrt.svg'
 import nodeIcon from './icons/nodejs.svg'
-import { WRAP } from './layout'
 import { useStored } from './stored'
 
 /** The id of the section, which the glance at the top links to. */
@@ -869,10 +868,7 @@ export const Architectures = ({
   }))
 
   return (
-    <section
-      id={ARCH_SECTION}
-      className={`${WRAP} flex scroll-mt-20 flex-col gap-6 pt-16 sm:pt-20`}
-    >
+    <section id={ARCH_SECTION} className="flex scroll-mt-28 flex-col gap-6">
       <div className="flex flex-col gap-3">
         <h2 className="text-2xl">arm64 vs x86_64</h2>
         <Headline view={view} panels={panels} functions={functions} memories={memories} />
