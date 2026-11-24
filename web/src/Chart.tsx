@@ -15,14 +15,14 @@ export type Metric = {
 }
 
 /**
- * The value labels in a column left of the plot; on a phone they sit inside it, over their
- * gridlines, so the plot takes the card's width and lines up under its heading.
+ * The value labels sit inside the plot, over their gridlines, so the plot takes the card's width
+ * and its padding is the same on both sides.
  */
-export const AXES = 'relative grid grid-cols-1 sm:grid-cols-[2.75rem_minmax(0,1fr)] sm:gap-x-2'
-export const Y_LABELS = 'max-sm:pointer-events-none max-sm:absolute max-sm:inset-x-0 max-sm:z-1'
+export const AXES = 'relative grid grid-cols-1'
+export const Y_LABELS = 'pointer-events-none absolute inset-x-0 top-0 z-1'
 export const Y_LABEL =
-  'measured absolute text-xs text-muted max-sm:left-0 max-sm:-translate-y-full max-sm:rounded-chip max-sm:bg-paper-2/85 max-sm:pr-1 sm:right-0 sm:-translate-y-1/2'
-export const X_LABELS = 'relative mt-2 h-5 sm:col-start-2'
+  'measured absolute left-0 -translate-y-full rounded-chip bg-paper-2/85 pr-1 text-xs text-muted'
+export const X_LABELS = 'relative mt-2 h-5'
 
 /** Between the readout and the card or crosshair it's placed by, and the viewport's edges. */
 const READOUT_GAP = 12
@@ -189,6 +189,7 @@ export const Chart = ({
   view,
   caption,
   className = '',
+  markers = [],
 }: {
   metric: Metric
   wide: boolean
@@ -196,6 +197,8 @@ export const Chart = ({
   /** What the values are, beside the title; by default the unit and the memory size. */
   caption?: string
   className?: string
+  /** Runs to mark with a dashed line and a label above the plot, such as a deploy's new builds. */
+  markers?: { index: number; label: string }[]
 }) => {
   const { runs, memoryMb, shown, scaled, hover, focus, agg, baseline } = view
   // Every chart follows the hovered run; only the one under the pointer reads it out.
@@ -216,6 +219,20 @@ export const Chart = ({
   const best = shown
     .filter((f) => agg(f, m.key) !== undefined)
     .sort((a, b) => agg(a, m.key)! - agg(b, m.key)!)[0]
+  // Each marker's label grows into the wider gap beside it, back towards the start when that's the
+  // one before it; two that grow into the same gap halve it, so no label runs into another.
+  const marked = markers
+    .map((mk) => ({ ...mk, at: x(mk.index) }))
+    .sort((a, b) => a.at - b.at)
+    .map((mk, i, all) => {
+      const before = mk.at - (all[i - 1]?.at ?? 0)
+      const after = (all[i + 1]?.at ?? 100) - mk.at
+      return { ...mk, before, after, back: before > after }
+    })
+  const labels = marked.map((mk, i) => {
+    const shared = mk.back ? marked[i - 1]?.back === false : marked[i + 1]?.back === true
+    return { ...mk, room: (mk.back ? mk.before : mk.after) / (shared ? 2 : 1) }
+  })
   // Three dates fit under a narrow chart without touching; a date shows once, however many runs fall on it.
   const ticks = dateTicks(n, wide ? 4 : 2).filter(
     (i, k, all) => k === 0 || day(runs[i]!.date) !== day(runs[all[k - 1]!]!.date)
@@ -246,8 +263,27 @@ export const Chart = ({
           </span>
         )}
       </div>
+      {labels.length > 0 && (
+        <div className="@container relative -mb-3 h-12" aria-hidden="true">
+          {labels.map((l) => (
+            <span
+              key={l.index}
+              title={l.label}
+              className={`absolute bottom-0 line-clamp-3 text-xs text-ink-2 ${l.back ? 'text-right' : ''}`}
+              style={{
+                [l.back ? 'right' : 'left']: `${l.back ? 100 - l.at : l.at}%`,
+                maxWidth: `calc(${l.room}cqw - 8px)`,
+                // No room for a word, as between two markers on a phone: the label goes, its line stays.
+                maxHeight: `clamp(0px, calc((${l.room}cqw - 4.5rem) * 999), 3rem)`,
+              }}
+            >
+              {l.label}
+            </span>
+          ))}
+        </div>
+      )}
       <div className={AXES}>
-        <div className={`relative ${Y_LABELS}`} style={{ height: m.height }}>
+        <div className={Y_LABELS} style={{ height: m.height }}>
           {grid.map((g) => (
             <span key={g.top} className={Y_LABEL} style={{ top: `${g.top}%` }}>
               {g.label}
@@ -291,6 +327,14 @@ export const Chart = ({
               />
             ))}
           </svg>
+          {markers.map((mk) => (
+            <div
+              key={mk.index}
+              aria-hidden="true"
+              className="absolute inset-y-0 border-l border-dashed border-ink-2/70"
+              style={{ left: `${x(mk.index)}%` }}
+            />
+          ))}
           {/* A run with no run beside it to draw a line to, such as a function's first, is a dot. */}
           {ordered.flatMap((s) =>
             s.values.flatMap((v, i) =>

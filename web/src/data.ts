@@ -1,6 +1,6 @@
 import type { HistoryFunction } from '../../src/perf/history'
 
-/** What PerfApi's `/runs/history` returns per run. */
+/** What PerfApi's `/runs/latest` and `/runs/history` return per run. */
 export type Run = {
   runId: string
   finishedAt: string
@@ -44,21 +44,24 @@ type Variant = {
   build: string
   /** Built by the Bun build that `--trim` and `--aot` need rather than a release. */
   canary?: boolean
+  /** On a Lambda runtime in preview: in the runs before `ga`, or in every run without one. */
   preview?: boolean
+  /** The day its runtime reached general availability, e.g. `2026-11-20`. */
+  ga?: string
   /**
-   * A Lambda Web Function, which has a section of its own rather than a place among the others,
-   * where it's compared with `counterpart`: the same runtime as a function.
+   * A Lambda Web Function, which has a tab of its own rather than a place among the others, where
+   * it's compared with `counterpart`: the same runtime as a function.
    */
   web?: { counterpart: string }
   /**
-   * A Lambda MicroVM, which has a section of its own too, against `counterpart`. It has no init, so
+   * A Lambda MicroVM, which has a tab of its own too, against `counterpart`. It has no init, so
    * it's measured by its round trips instead, and shows nowhere else.
    */
   microvm?: { counterpart: string }
   /**
-   * An Event Function on a customer-managed runtime, which has a section of its own too, where
-   * it's compared with `counterpart`: the same runtime on Lambda's or in its .zip. It has both
-   * architectures and every size, and charts and ranks with the others too.
+   * An Event Function on a customer-managed runtime, which the Deployment tab compares with
+   * `counterpart`: the same runtime on Lambda's or in its .zip. It has both architectures and every
+   * size, and ranks with the others in All results too.
    */
   cmr?: { counterpart: string }
   /** Its kind within its family, e.g. "AOT executable", which the Functions picker shows or hides together. */
@@ -159,7 +162,9 @@ export const VARIANTS: Record<string, Variant> = {
     family: 'Node',
     build: SST_BUNDLE,
     preview: true,
-    about: 'SST’s default bundle, on a runtime still in preview',
+    // https://aws.amazon.com/about-aws/whats-new/2026/11/aws-lambda-nodejs-26/
+    ga: '2026-11-20',
+    about: 'SST’s default bundle',
   },
   Node24Web: {
     name: 'Node.js 24, Web Function',
@@ -168,6 +173,13 @@ export const VARIANTS: Record<string, Variant> = {
     web: { counterpart: 'Node24' },
     about:
       'A node:http server on Lambda Web Functions, with the 2 GB and 2 vCPUs every environment gets',
+  },
+  Node26Web: {
+    name: 'Node.js 26, Web Function',
+    family: 'Node',
+    build: 'bun build --target=node --format=esm --minify',
+    web: { counterpart: 'Node26' },
+    about: 'The same node:http server on the Node.js 26 Web Function runtime',
   },
   Node24MicroVm: {
     name: 'Node.js 24, MicroVM',
@@ -220,7 +232,7 @@ export const VARIANTS: Record<string, Variant> = {
     build: LLRT_BUNDLE,
     cmr: { counterpart: 'Llrt' },
     about:
-      'The bundle alone, on a customer-managed runtime: LLRT’s no-SDK Lambda build on Lambda’s OS-only image',
+      'The bundle alone, on a customer-managed runtime: LLRT’s no-SDK Lambda build on Lambda’s OS-only image, started by its entrypoint script',
   },
   BunRuntimeCmrAlpine: {
     name: 'Bun runtime, Custom Runtime on Alpine',
@@ -300,7 +312,8 @@ export type RunPoints = {
   points: Map<string, Point>
 }
 
-const describe = (f: HistoryFunction): Fn => {
+/** `f` as of the run that finished at `date`. */
+const describe = (f: HistoryFunction, date: Date): Fn => {
   // With a single architecture or memory size, ids go without that suffix; see infra/functions.ts.
   const base = f.functionId.replace(/M\d+$/, '').replace(/(Arm64|X64)$/, '')
   const variant = VARIANTS[base] ?? {
@@ -311,6 +324,7 @@ const describe = (f: HistoryFunction): Fn => {
   }
   return {
     ...variant,
+    preview: variant.preview && !(variant.ga && date >= new Date(variant.ga)),
     // The MicroVMs' section shows every size at once, each its own line, so each says which it is.
     ...(variant.microvm && { name: `${variant.name} · ${f.memoryMb / 1024} GB` }),
     id: `${base}/${f.arch}/${f.memoryMb}`,
@@ -324,9 +338,10 @@ const describe = (f: HistoryFunction): Fn => {
 }
 
 export const toPoints = (run: Run): RunPoints => {
-  const functions = run.functions.map(describe)
+  const date = new Date(run.finishedAt)
+  const functions = run.functions.map((f) => describe(f, date))
   return {
-    date: new Date(run.finishedAt),
+    date,
     finishedAt: run.finishedAt,
     rounds: run.rounds,
     warmInvocations: run.warmInvocations,
@@ -424,9 +439,190 @@ export type View = {
   focus?: string
   /** The function every other is compared with, from `fns`; none when the picked variant isn't there. */
   baseline?: Fn
-  /** The hovered or picked run's value, or the mean over the range. */
+  /** The hovered or picked run's value, or the mean over the runs picked. */
   agg: (f: Fn, key: Stat) => number | undefined
   setHover: (i: number | undefined) => void
   setFocus: (base: string | undefined) => void
   toggle: (base: string) => void
 }
+
+const DAY_MS = 864e5
+
+/**
+ * Which runs a function's figures are the mean of: those on the build it runs now, or those of the
+ * last 7 or 14 days. /runs/history holds 15 days.
+ */
+export const WINDOWS = ['current', '7', '14'] as const
+export type Window = (typeof WINDOWS)[number]
+export const WINDOW_NAMES: Record<Window, string> = {
+  current: 'Current builds',
+  '7': '7 days',
+  '14': '14 days',
+}
+export const isWindow = (value: unknown): value is Window => WINDOWS.includes(value as Window)
+
+/**
+ * The runs of `runs` within `window`, which the charts over time span: the last 7 or 14 days', or
+ * every run for the current builds, as each function's began on a day of its own.
+ */
+export const runsIn = (runs: RunPoints[], window: Window) => {
+  const latest = runs.at(-1)
+  if (!latest || window === 'current') return runs
+  const since = latest.date.getTime() - Number(window) * DAY_MS
+  return runs.filter((r) => r.date.getTime() > since)
+}
+
+/**
+ * The runs of `runs`, oldest first, that measured function `id` within `window`. Its current
+ * build's are those since its version last changed, so a mean never mixes two builds: Bun 1.4.5
+ * nearly doubled the released executable's cold start. A run that's missing the function, as when
+ * its rounds failed, doesn't end the series.
+ */
+export const runsOf = (runs: RunPoints[], id: string, window: Window) => {
+  const measured = runsIn(runs, window).filter((r) => r.points.has(id))
+  if (window !== 'current') return measured
+  const version = measured.at(-1)?.points.get(id)!.version
+  let first = measured.length
+  while (first > 0 && measured[first - 1]!.points.get(id)!.version === version) first--
+  return measured.slice(first)
+}
+
+/** The `p`th percentile of ascending `sorted`, interpolated like summary.ts's; none for none. */
+export const percentile = (sorted: number[], p: number) => {
+  if (!sorted.length) return undefined
+  const rank = (p / 100) * (sorted.length - 1)
+  const below = sorted[Math.floor(rank)]!
+  const above = sorted[Math.ceil(rank)]!
+  return below + (above - below) * (rank - Math.floor(rank))
+}
+
+/** A function's figures over the runs of a window, as the page shows them. */
+export type Figures = {
+  /** How many runs they're over, and the first of them. */
+  runs: number
+  since: Date
+  /** How many cold starts those runs measured: what the percentiles are over. */
+  starts: number
+  /**
+   * Lambda's init duration: the mean of each run's, and the fastest and percentiles of every cold
+   * start.
+   */
+  cold?: number
+  min?: number
+  p50?: number
+  p90?: number
+  p99?: number
+  startup?: number
+  warm?: number
+  warmP90?: number
+  trip?: number
+  firstRequest?: number
+  mem?: number
+  /** The cold invocation's duration: the first call after the cold start. */
+  dur?: number
+  /**
+   * What the first answer spent outside the init and the first call: fetching the code, placing
+   * the environment and the Invoke API itself.
+   */
+  load?: number
+  /** USD per million cold starts, see `coldStartCost`; none for a Web Function or a MicroVM. */
+  cost?: number
+  size: number
+  runtime: string
+  version?: string
+}
+
+/** `f`'s figures over the runs of `window`; undefined when no run has it. */
+export const figuresOf = (runs: RunPoints[], f: Fn, window: Window): Figures | undefined => {
+  const counted = runsOf(runs, f.id, window)
+  if (!counted.length) return undefined
+  const points = counted.map((r) => r.points.get(f.id)!)
+  const avg = (key: Stat) => mean(points.map((p) => p[key]))
+  const durations = points.flatMap((p) => p.initDurations).sort((a, b) => a - b)
+  const latest = points.at(-1)!
+  const cold = avg('cold')
+  const dur = avg('dur')
+  const trip = avg('trip')
+  return {
+    runs: counted.length,
+    since: counted[0]!.date,
+    starts: durations.length,
+    cold,
+    min: durations[0],
+    p50: percentile(durations, 50),
+    p90: percentile(durations, 90),
+    p99: percentile(durations, 99),
+    startup: avg('startup'),
+    warm: avg('warm'),
+    warmP90: avg('warmP90'),
+    trip,
+    firstRequest: avg('firstRequest'),
+    mem: avg('mem'),
+    dur,
+    load:
+      trip !== undefined && cold !== undefined && dur !== undefined ? trip - cold - dur : undefined,
+    // A Web Function bills CPU time, a MicroVM by the second; neither as duration times memory.
+    cost: f.web || f.microvm ? undefined : coldStartCost(f, cold, dur),
+    size: latest.size,
+    runtime: latest.runtime,
+    version: latest.version,
+  }
+}
+
+/** `figuresOf` every function of the latest run, by id. */
+export const figuresFor = (runs: RunPoints[], window: Window) =>
+  new Map(
+    (runs.at(-1)?.functions ?? []).flatMap((f) => {
+      const figures = figuresOf(runs, f, window)
+      return figures ? [[f.id, figures] as const] : []
+    })
+  )
+
+/** What a cold call waits for, in the order it happens; the last is what's left of its first answer. */
+export const SEGMENTS = [
+  { key: 'cold', name: 'Init', color: 'var(--color-icon-cold)' },
+  { key: 'dur', name: 'First invocation', color: 'var(--color-icon-warm)' },
+  { key: 'load', name: 'Loading & API', color: 'var(--color-rule-2)' },
+] as const
+
+/** The geometric mean of `value` over `fns`, leaving out those without one. */
+export const geomeanOf = (fns: Fn[], value: (f: Fn) => number | undefined) =>
+  geomean(
+    fns.flatMap((f) => {
+      const v = value(f)
+      return v !== undefined && v > 0 ? [v] : []
+    })
+  )
+
+/** An Event Function on Lambda's runtime or with the runtime in its .zip: what most tabs show. */
+export const isEvent = (f: Fn) => !f.web && !f.microvm && !f.cmr
+
+/**
+ * A build's version as its release: `Bun 1.4.5`, `Bun 1.4.6-canary.1`, `LLRT 0.10.0-beta`,
+ * `Node.js 24.22.3`; anything else as it is.
+ */
+export const versionName = (version: string) => {
+  const bun = version.match(/^bun (\d[^+]*)/)
+  if (bun) return `Bun ${bun[1]}`
+  const llrt = version.match(/^llrt-.*@v(.+)$/)
+  if (llrt) return `LLRT ${llrt[1]}`
+  const node = version.match(/^node (.+)$/)
+  if (node) return `Node.js ${node[1]}`
+  return version
+}
+
+/** Each time one of `fns` changed build within `runs`: the run that first had the new version. */
+export const buildChanges = (runs: RunPoints[], fns: Fn[]) =>
+  fns.flatMap((f) => {
+    const changes: { index: number; f: Fn; from: string; to: string }[] = []
+    let previous: string | undefined
+    runs.forEach((r, index) => {
+      const version = r.points.get(f.id)?.version
+      if (version === undefined) return
+      if (previous !== undefined && version !== previous) {
+        changes.push({ index, f, from: previous, to: version })
+      }
+      previous = version
+    })
+    return changes
+  })

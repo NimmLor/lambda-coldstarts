@@ -2,8 +2,8 @@
  * A step near the end of a run of the PerfRun state machine (infra/perf.ts): summarizes the run's
  * samples once and stores the run with its per-function statistics under `summaries`, so PerfApi
  * reads a run as one item instead of every cold start. PerfRun's next step, Invalidate, clears
- * PerfApi's /runs/history from PerfRouter's cache. scripts/perf-summarize.ts calls it for runs
- * recorded before this step existed.
+ * PerfApi's /runs/latest and /runs/history from PerfRouter's cache. scripts/perf-summarize.ts calls
+ * it for runs recorded before this step existed.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'

@@ -1,14 +1,10 @@
 import { track } from './analytics'
-import type { Metric } from './Chart'
-import type { View } from './data'
-import { REPO, WRAP } from './layout'
-import { Board, Differences, Explainer, SectionHead } from './Section'
+import { type Fn, niceMax, ORDER, VARIANTS } from './data'
+import { REPO } from './layout'
+import { Differences, Explainer } from './Section'
+import type { TabProps } from './tabs'
+import { Card, Swatch, TabHead } from './ui'
 
-const DOCS = 'https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html'
-const CONCEPTS = 'https://docs.aws.amazon.com/lambda/latest/dg/microvms-how-it-works.html'
-const PRICING = 'https://aws.amazon.com/lambda/pricing/'
-
-/** What sets a MicroVM apart from the functions above, as of October 2026. */
 const DIFFERENCES = [
   [
     'Code',
@@ -42,86 +38,164 @@ const DIFFERENCES = [
   ],
 ] as const
 
-/** The round trips this section shows instead of the init, which a MicroVM doesn't have. */
-const TRIPS: Metric[] = [
-  {
-    key: 'trip',
-    digits: 0,
-    title: 'First answer',
-    unit: 'ms',
-    height: 200,
-    leader: 'Fastest',
-    icon: 'cold',
-  },
-  // The part of the first answer spent waiting for the MicroVM; an Event Function has no such part.
-  {
-    key: 'firstRequest',
-    digits: 0,
-    title: 'First request',
-    unit: 'ms',
-    height: 200,
-    leader: 'Fastest',
-    icon: 'dur',
-  },
-]
+/** Lambda's default MicroVM size, which each is compared at: the Event Function nearest it. */
+const COMPARE_AT_MB = 2048
 
-/** What a MicroVM is, how it differs, and what's measured here instead of a cold start. */
-const About = () => (
-  <Explainer title="What is a Lambda MicroVM?" onOpen={() => track('microvm_explainer_opened', {})}>
-    <p className="max-w-prose text-pretty">
-      A MicroVM is a Firecracker virtual machine of its own, for one user, session or job, meant for
-      running code you don’t trust, such as an AI agent’s. Lambda builds an image from a Dockerfile,
-      starts the program in it and snapshots it running. Every MicroVM resumes from that snapshot.
-    </p>
-    <Differences kind="MicroVM" rows={DIFFERENCES} />
-    <p className="max-w-prose text-pretty">
-      A MicroVM has no init to compare: its server started once, when the image was built. So each
-      round times what a caller waits for instead, from PerfMeasure in the same region. First answer
-      runs from calling RunMicrovm, through getting a token to reach the MicroVM, until its first
-      response. First request is the last part alone: the endpoint holds a request for about a
-      second while the MicroVM resumes, then turns it away, and the round asks again. The Event
-      Function’s first answer is its cold invocation, from calling Invoke until the response.
-      Neither is the init duration above. <a href={`${REPO}#-the-microvm`}>How it’s measured</a>
-    </p>
-    <nav aria-label="About MicroVMs" className="flex flex-wrap gap-x-6 gap-y-2">
-      <a href={DOCS}>MicroVMs in the Lambda docs</a>
-      <a href={CONCEPTS}>How they work</a>
-      <a href={PRICING}>Pricing</a>
-    </nav>
-  </Explainer>
-)
+/** A MicroVM size's vCPUs: one per 2 GB. */
+const vcpus = (mb: number) => {
+  const n = mb / 2048
+  return n === 0.25 ? '¼ vCPU' : n === 0.5 ? '½ vCPU' : `${n} vCPU${n === 1 ? '' : 's'}`
+}
+
+type Row = {
+  key: string
+  name: string
+  sub: string
+  total: number
+  api: number
+  first: number
+  color: string
+}
 
 /**
- * The Lambda MicroVMs, apart from everything above: a figure for each of the first answer, the
- * first request and memory at every size, and the first answer over time, against their
- * counterparts unless turned off: the same runtime as an Event Function on arm64 at the memory size
- * picked above. With no init, they're in neither the charts above nor the result list.
+ * Each MicroVM's first answer, split into the API calls and its first request, and after each
+ * runtime's MicroVMs its cold call as an Event Function on arm64 at the size nearest 2 GB.
  */
-export const MicroVms = ({
-  view,
-  metrics,
-  compared,
-  onCompare,
-}: {
-  /** The MicroVMs at every size, smallest first, and their counterparts when `compared`. */
-  view: View
-  /** The page's metrics; the section shows memory after its own round trips. */
-  metrics: Metric[]
-  compared: boolean
-  onCompare: (on: boolean) => void
-}) => (
-  <section className={`${WRAP} flex flex-col gap-6 pt-16 sm:pt-20`}>
-    <SectionHead title="Lambda MicroVMs" compared={compared} onCompare={onCompare}>
-      Node.js 24 in a MicroVM, on arm64 at each baseline Lambda offers, from 0.5 GB and a quarter of
-      a vCPU to 8 GB and 4 vCPUs, and Bun’s trimmed AOT executable at 2 GB, without the shim it
-      needs on Lambda. Timed by how long a caller waits for an answer, as it has no cold start in
-      the sense above.
-    </SectionHead>
-    <About />
-    <Board
-      view={view}
-      figures={[...TRIPS, ...metrics.filter((m) => m.key === 'mem')]}
-      compared={compared}
-    />
-  </section>
-)
+export const MicroVms = ({ figures, functions }: TabProps) => {
+  const vms = functions
+    .filter((f) => f.microvm && figures.get(f.id)?.trip !== undefined)
+    .sort((a, b) => ORDER.indexOf(a.base) - ORDER.indexOf(b.base) || a.memoryMb - b.memoryMb)
+  if (!vms.length) {
+    return <TabHead title="MicroVMs">No MicroVM in the latest run.</TabHead>
+  }
+  /** The runtime a MicroVM runs, as an Event Function on arm64 at the size nearest 2 GB. */
+  const eventOf = (vm: Fn) =>
+    functions
+      .filter(
+        (f) =>
+          f.base === vm.microvm!.counterpart &&
+          f.arch === 'arm64' &&
+          figures.get(f.id)?.trip !== undefined
+      )
+      .sort(
+        (a, b) => Math.abs(a.memoryMb - COMPARE_AT_MB) - Math.abs(b.memoryMb - COMPARE_AT_MB)
+      )[0]
+  const groups = [...new Set(vms.map((f) => f.base))].map((base) => {
+    const members = vms.filter((f) => f.base === base)
+    return { base, members, event: eventOf(members[0]!) }
+  })
+  const trip = (f: Fn) => figures.get(f.id)!.trip!
+  const trips = vms.map(trip)
+  const max = niceMax(
+    Math.max(...trips, ...groups.flatMap((g) => (g.event ? [trip(g.event)] : [])))
+  )
+  const rows: Row[] = groups.flatMap((g) => [
+    ...g.members.map((f) => {
+      const x = figures.get(f.id)!
+      const first = x.firstRequest ?? 0
+      return {
+        key: f.id,
+        name: f.name.replace(/ · .*$/, ''),
+        sub: `${f.memoryMb / 1024} GB · ${vcpus(f.memoryMb)}`,
+        total: x.trip!,
+        api: x.trip! - first,
+        first,
+        color: 'var(--color-rule-2)',
+      }
+    }),
+    ...(g.event
+      ? [
+          {
+            key: g.event.id,
+            name: g.event.name,
+            sub: `Event Function at ${g.event.memoryMb} MB, for scale`,
+            total: trip(g.event),
+            api: trip(g.event),
+            first: 0,
+            color: g.event.color,
+          },
+        ]
+      : []),
+  ])
+  return (
+    <div className="flex flex-col gap-6">
+      <TabHead title="MicroVMs" />
+      <Explainer
+        title="What is a Lambda MicroVM?"
+        onOpen={() => track('microvm_explainer_opened', {})}
+      >
+        <p className="max-w-prose text-pretty">
+          A MicroVM is a Firecracker virtual machine of its own, for one user, session or job, meant
+          for running code you don’t trust, such as an AI agent’s. Lambda builds an image from a
+          Dockerfile, starts the program in it and snapshots it running. Every MicroVM resumes from
+          that snapshot.
+        </p>
+        <Differences kind="MicroVM" rows={DIFFERENCES} />
+        <p className="max-w-prose text-pretty">
+          A MicroVM has no init to compare: its server started once, when the image was built. So
+          each round times what a caller waits for instead, from PerfMeasure in the same region:
+          from calling RunMicrovm, through getting a token, until its first response. The endpoint
+          holds a request for about a second while the MicroVM resumes, then turns it away, and the
+          round asks again. <a href={`${REPO}#-the-microvm`}>How it’s measured</a>
+        </p>
+      </Explainer>
+      <Card
+        title="First answer"
+        caption="From calling RunMicrovm until the first response; 4 and 8 GB often outlast the endpoint’s first wait, so their answers come in two modes. After each runtime, its cold call as an Event Function, from calling Invoke."
+      >
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+          <Swatch color="var(--color-rule-2)">RunMicrovm and token</Swatch>
+          <Swatch color="var(--color-line-Node24MicroVm)">
+            First request, retried while it resumes
+          </Swatch>
+          <Swatch color="var(--color-ink-2)">
+            Event Function’s whole cold call, in its colour
+          </Swatch>
+        </div>
+        <ol className="m-0 flex list-none flex-col p-0">
+          {rows.map((r) => (
+            <li
+              key={r.key}
+              className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-rule py-2.5"
+            >
+              <span className="flex min-w-0 flex-[1_1_13rem] flex-col leading-tight">
+                <span className="text-sm text-ink">{r.name}</span>
+                <span className="text-xs text-muted">{r.sub}</span>
+              </span>
+              <span
+                aria-hidden="true"
+                className="flex h-3.5 min-w-0 flex-[999_1_8rem] overflow-hidden rounded-[3px] bg-paper-3"
+              >
+                <span
+                  className="mark h-full"
+                  style={{ width: `${(r.api / max) * 100}%`, background: r.color }}
+                />
+                <span
+                  className="mark h-full"
+                  style={{
+                    width: `${(r.first / max) * 100}%`,
+                    background: 'var(--color-line-Node24MicroVm)',
+                  }}
+                />
+              </span>
+              <span className="measured flex-[0_0_5rem] text-right text-md text-ink">
+                {r.total.toFixed(0)}
+                <span className="ml-0.5 text-xs text-muted">ms</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="m-0 text-sm text-muted">
+          Server memory, by its own account:{' '}
+          {groups
+            .map(
+              (g) =>
+                `${VARIANTS[g.base]?.name.replace(/, MicroVM$/, '') ?? g.base} ${figures.get(g.members[0]!.id)?.mem?.toFixed(1) ?? '—'} MB`
+            )
+            .join(', ')}
+          .
+        </p>
+      </Card>
+    </div>
+  )
+}

@@ -36,8 +36,8 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🪶  | `LlrtBytecode`                 | the bundle as `llrt compile` bytecode, run by LLRT's CLI build                           |
 | 🪶  | `LlrtStdSdk`                   | `Llrt` on LLRT's default Lambda build, with the common AWS SDK clients built in          |
 | 🪶  | `LlrtFullSdk`                  | `Llrt` on LLRT's full-sdk Lambda build, with every AWS SDK client built in               |
-| 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (preview)               |
-| 🌐  | `Node24Web`                    | a `node:http` server on a [Lambda Web Function](#-the-web-function)                      |
+| 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (GA since 2026-11-20)   |
+| 🌐  | `Node24Web` · `Node26Web`      | a `node:http` server on a [Lambda Web Function](#-the-web-function), on Node.js 24 or 26 |
 | 📦  | `Node24MicroVm`                | the same server in a [Lambda MicroVM](#-the-microvm), resumed from a snapshot            |
 | 📦  | `BunCompileAotTrimMicroVm`     | that server as an `--aot --trim` executable in a MicroVM, without the AOT shim           |
 | 🧱  | `Node24Cmr`                    | `Node24` on a [customer-managed runtime](#-the-customer-managed-runtimes) of `nodejs:24` |
@@ -46,7 +46,7 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🧱  | `LlrtCmr`                      | `Llrt`'s `index.mjs` alone, LLRT's no-sdk Lambda build in the runtime image              |
 | 🧱  | `BunRuntimeCmrAlpine`          | `BunRuntimeCmr` on Bun's Alpine image, with the musl build of Bun                        |
 
-Everything runs in **eu-central-1**, `Node24Web` and the MicroVMs included.
+Everything runs in **eu-central-1**, the Web Functions and the MicroVMs included.
 
 Bun and LLRT run on `provided.al2023`. Bun serves invocations through a small runtime loop
 ([`src/runtime.ts`](src/runtime.ts)), LLRT through its own ([`src/llrt.ts`](src/llrt.ts)), and Node
@@ -159,14 +159,15 @@ Function and the MicroVM are measured by the scheduled runs.
 
 [Lambda Web Functions](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html) run an
 HTTP server rather than a handler, and serve many requests per environment.
-[`infra/web-function.ts`](infra/web-function.ts) deploys `Node24Web` with `aws-native`, since SST
-has no component for them yet. Their API differs, and so does how it's measured
-([`src/perf/web.ts`](src/perf/web.ts)):
+[`infra/web-function.ts`](infra/web-function.ts) deploys `Node24Web` and `Node26Web`, on the
+`nodejs24.x` and `nodejs26.x` Web Function runtimes, with `aws-native`, since SST has no component
+for them yet. Their API differs, and so does how it's measured ([`src/perf/web.ts`](src/perf/web.ts)):
 
 - 🪣 **The code** sits in a versioned bucket, which Lambda reads on behalf of the function's
   revisions.
-- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site gives it a
-  section of its own, against `Node24` on arm64 at whichever memory size you pick.
+- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site's Web Function tab
+  sets each against its runtime's Event Function, `Node24` or `Node26`, on arm64 at the nearest
+  size, 1769 MB.
 - 🔄 **A cold start** is a new revision that differs in `BENCH_NONCE`, which the endpoint is then
   pointed at. For a second or two after the endpoint says it's updated, requests still reach the old
   revision's environment, so the round keeps asking until a server answers its first request.
@@ -192,8 +193,9 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
   1.3 s while the MicroVM resumes, then answers 502 with `x-aws-proxy-error: MICROVM_CONNECT_FAILED`,
   which the 4 and 8 GB sizes often outlast; the round asks again until one is answered. A
   turned-away first request costs about 2 s more, so those sizes' first answers come in two modes.
-  `firstRequestMs` is the last part alone. The site sets it against an Event Function's cold invoke
-  round trip (`roundTripMs`, which every round now records), from the same PerfMeasure.
+  `firstRequestMs` is the last part alone. The site's MicroVMs tab sets it against its runtime's
+  cold invoke round trip as an Event Function at the size nearest 2 GB (`roundTripMs`, which every
+  round now records), from the same PerfMeasure.
 - 🐢 **No warm round trips.** At 128 MB, PerfMeasure gets CPU in 20 ms slices, and a warm request
   of ~5 ms comes back as 20, 40 or 60. The cold ones barely move: a MicroVM's first answer took
   1.34–1.36 s from a 1769 MB PerfMeasure and 1.32–1.43 s from the 128 MB one.
@@ -230,9 +232,10 @@ aws provider has none yet) and `docker-build`.
 - ⚖️ **The same runtime as before, moved:** `Node24Cmr` is Lambda's `nodejs:24` image as it is,
   against `Node24`. `BunRuntimeCmr` and `LlrtCmr` put the very `bun` executable and LLRT build
   `BunRuntime` and `Llrt` ship in their .zip on Lambda's OS-only `provided:al2023` image, the OS
-  `provided.al2023` runs, and start them the same way: Bun through the same shell, LLRT directly.
-  LLRT reads its handler from `_HANDLER`, which only Lambda's entrypoint script sets, so its image
-  names it.
+  `provided.al2023` runs. Bun starts through the same shell as `BunRuntime`. LLRT starts through
+  the image's own `/lambda-entrypoint.sh`, a shell `Llrt` doesn't have: Lambda starts a runtime
+  image with the handler as an argument, which LLRT takes for a CLI command, and sets no
+  `_HANDLER`, which LLRT needs. Lambda ignores the image's `ENV`, so only the script can set it.
 - 🔭 **A Node.js no Lambda runtime has:** `Node27Cmr` is `Node24Cmr`'s image with nodejs.org's
   Node.js 27 alpha, pinned in `cmr-build.ts`, as `/var/lang/bin/node`. Lambda's entrypoint script
   and Runtime API client stay: the client's native part is Node-API, so it loads on any Node.js.
@@ -264,7 +267,7 @@ flowchart LR
   R -- an Express child per function,<br>40 at a time --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm]
   M --> D[(PerfResults<br>DynamoDB, 120 days)]
   R -- at the end --> Z[PerfSummarize] --> D
-  R -- then invalidates /api/runs/history --> C
+  R -- then invalidates /api/runs/* --> C
   E[⏰ on the 1st] --> X[PerfExport] -- the month before --> B[(PerfArchive<br>S3)]
   D --> X
   D --> A[PerfApi]
@@ -272,21 +275,21 @@ flowchart LR
   W[PerfSite<br>React + Tailwind] --> C
 ```
 
-| Piece           | Source                                           | Job                                                                     |
-| --------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
-| `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm invokes |
-| `PerfSummarize` | [`src/perf/summarize.ts`](src/perf/summarize.ts) | Per-function p50/p90/avg/min/max, stored with the run                   |
-| `PerfExport`    | [`src/perf/export.ts`](src/perf/export.ts)       | A month of runs and samples, as gzipped NDJSON in `PerfArchive`         |
-| `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs/history`: the latest 90 runs, the one request the site makes |
-| `PerfSite`      | [`web/`](web/)                                   | The charts at [coldstarts.github.nimmervoll.work][site]                 |
+| Piece           | Source                                           | Job                                                                                               |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm invokes                           |
+| `PerfSummarize` | [`src/perf/summarize.ts`](src/perf/summarize.ts) | Per-function p50/p90/avg/min/max, stored with the run                                             |
+| `PerfExport`    | [`src/perf/export.ts`](src/perf/export.ts)       | A month of runs and samples, as gzipped NDJSON in `PerfArchive`                                   |
+| `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs/latest`, the newest run the site paints first, then `GET /runs/history`, the latest 90 |
+| `PerfSite`      | [`web/`](web/)                                   | The charts at [coldstarts.github.nimmervoll.work][site]                                           |
 
 - 🧒 Each function's rounds run as an **Express child workflow**, which bills by duration instead of
   by state transition. A child gets 5 minutes; one that runs out loses its remaining rounds, like
   one whose rounds keep failing, and the run goes on without it.
-- 🗃️ CloudFront keeps `/api/runs/history` for 4 hours and, past that, serves its copy while it
-  fetches a new one. PerfRun's last step, `Invalidate`, invalidates it as soon as the run's summary
-  is stored, under both `/api/runs/history` and `/runs/history`, the path PerfRouter rewrites it to
-  before its cache.
+- 🗃️ CloudFront keeps `/api/runs/latest` and `/api/runs/history` for 4 hours and, past that, serves
+  its copy while it fetches a new one. PerfRun's last step, `Invalidate`, invalidates both as soon
+  as the run's summary is stored, each under `/api/runs/…` and `/runs/…`, the path PerfRouter
+  rewrites it to before its cache.
 - 🗄️ Every item of a run expires 120 days after the run started (`expiresAt`, DynamoDB's TTL). The
   archive holds `<yyyy>/<mm>/runs.ndjson.gz`, each run with its per-function statistics, and
   `<yyyy>/<mm>/samples.ndjson.gz`, every cold start. A run belongs to the month it started in.

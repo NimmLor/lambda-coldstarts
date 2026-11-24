@@ -42,9 +42,7 @@ export default $config({
     const { createMicrovm } = await import('./infra/microvm')
     const { createPerf } = await import('./infra/perf')
     const functions = createFunctions()
-    const webFunctions = selected()
-      .filter((v) => v.kind === 'web')
-      .map((v) => createWebFunction(v.id))
+    const webFunctions = selected().flatMap((v) => (v.kind === 'web' ? createWebFunction(v) : []))
     const microvms = selected().flatMap((v) =>
       v.kind === 'microvm' ? (createMicrovm(v) ?? []) : []
     )

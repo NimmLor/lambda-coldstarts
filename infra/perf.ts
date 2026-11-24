@@ -175,7 +175,8 @@ export const createPerf = (
       },
       // Neither the site nor PerfApi reads a query string, so one can't make a request miss the cache.
       // SST's TTLs stay: 0 by default and at least, a year at most, so each response's own
-      // Cache-Control decides, such as /runs/history's s-maxage and stale-while-revalidate.
+      // Cache-Control decides, such as the s-maxage and stale-while-revalidate of /runs/latest and
+      // /runs/history.
       cachePolicy: (args) => {
         args.parametersInCacheKeyAndForwardedToOrigin = $output(
           args.parametersInCacheKeyAndForwardedToOrigin
@@ -305,11 +306,11 @@ export const createPerf = (
     payload: { runId },
   }).retry({ interval: '10 seconds', maxAttempts: 3, backoffRate: 2 })
 
-  // CloudFront keeps /api/runs/history for hours (src/perf/api.ts), so the site shows the run right
-  // away only once it's invalidated. PerfRouter's viewer request function rewrites the path to
-  // /runs/history before CloudFront looks in its cache, and CloudFront's docs say to invalidate
-  // both the path the viewer asked for and the rewritten one.
-  const historyPaths = ['/api/runs/history', '/runs/history']
+  // CloudFront keeps /api/runs/latest and /api/runs/history for hours (src/perf/api.ts), so the
+  // site shows the run right away only once they're invalidated. PerfRouter's viewer request
+  // function rewrites each path to /runs/… before CloudFront looks in its cache, and CloudFront's
+  // docs say to invalidate both the path the viewer asked for and the rewritten one.
+  const runPaths = ['/runs/latest', '/runs/history'].flatMap((path) => [`/api${path}`, path])
   const invalidate = sst.aws.StepFunctions.task({
     name: 'Invalidate',
     resource: 'arn:aws:states:::aws-sdk:cloudfront:createInvalidation',
@@ -318,7 +319,7 @@ export const createPerf = (
       InvalidationBatch: {
         // A reused reference returns the earlier invalidation instead of making a new one.
         CallerReference: '{% $uuid() %}',
-        Paths: { Quantity: historyPaths.length, Items: historyPaths },
+        Paths: { Quantity: runPaths.length, Items: runPaths },
       },
     },
     output: {},

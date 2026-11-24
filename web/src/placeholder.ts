@@ -52,6 +52,8 @@ const TYPICAL: Record<string, number[]> = {
   Node24: [110, 2.2, 75, 254, 12, 0, 86],
   Node26: [166, 2.3, 78, 282, 9.3, 0, 128],
   Node24Web: [239, 1, 138, 532, 16, 0, 128],
+  // Before its first run, Node24Web's.
+  Node26Web: [239, 1, 138, 532, 16, 0, 128],
   'Node24MicroVm/512': [59, 1640, 1230],
   'Node24MicroVm/1024': [58, 1570, 1240],
   'Node24MicroVm/2048': [59, 1550, 1240],
@@ -61,7 +63,8 @@ const TYPICAL: Record<string, number[]> = {
   // Not measured yet: the variant each repackages, with only its handler in the .zip.
   Node24Cmr: [110, 2.2, 75, 254, 12, 0, 86],
   Node27Cmr: [166, 2.3, 78, 282, 9.3, 0, 128],
-  BunRuntimeCmr: [162, 2.2, 41, 646, 109, 0, 79],
+  // Measured: the glance's board ranks it and its findings compare it, as they will production's.
+  BunRuntimeCmr: [99, 1.8, 43, 252, 7.4, 0, 37],
   LlrtCmr: [50, 1.3, 31, 207, 1.6, 0, 2.2],
   BunRuntimeCmrAlpine: [162, 2.2, 41, 646, 109, 0, 79],
 }

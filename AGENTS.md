@@ -18,7 +18,7 @@ Benchmarks Lambda cold starts across Bun, LLRT and Node. Layout, commands and en
   `src/perf/web.ts`; give it `web` in `web/src/data.ts`.
 - A MicroVM variant (`kind: 'microvm'`) is deployed by `infra/microvm.ts` and measured by
   `src/perf/microvm.ts`; give it `microvm` in `web/src/data.ts`. It resumes a snapshot, so its
-  samples have no `initMs`: the site shows it only in its own section, by `roundTripMs`.
+  samples have no `initMs`: the site shows it only in its MicroVMs tab, by `roundTripMs`.
 - A customer-managed runtime variant (`kind: 'cmr'`) is built by `infra/cmr-build.ts` and deployed
   by `infra/cmr.ts`; give it `cmr` with the variant it repackages in `web/src/data.ts`. Its
   Dockerfile runs nothing on the target architecture: it copies files, and `RUN`s only in a
