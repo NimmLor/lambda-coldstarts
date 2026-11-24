@@ -17,6 +17,7 @@ import {
   ORDER,
   type Run,
   type RunPoints,
+  runsIn,
   STACK_REGION,
   toPoints,
   type View,
@@ -171,6 +172,8 @@ export const App = ({ now }: { now: number }) => {
     () => (period === 'current' ? figures : figuresFor(runs, 'current')),
     [runs, period, figures]
   )
+  // What the charts over time span: the last 7 or 14 days when those are picked, else every run.
+  const charted = useMemo(() => runsIn(runs, period), [runs, period])
   const findings = useMemo(() => findingsOf(runs.at(-1)?.functions ?? [], current), [runs, current])
 
   const open = (next: TabId, from: 'tab' | 'finding') => {
@@ -217,10 +220,10 @@ export const App = ({ now }: { now: number }) => {
     const visible = fns.filter((f) => !hidden.has(f.base))
     const shown = visible.length ? visible : fns
     const shownBases = new Set(shown.map((f) => f.base))
-    const hovered = runs.findIndex((r) => r.finishedAt === hoverAt)
+    const hovered = charted.findIndex((r) => r.finishedAt === hoverAt)
     const hover = hovered >= 0 ? hovered : undefined
     const view: View = {
-      runs,
+      runs: charted,
       latest: latestRun,
       memoryMb: shownMemory,
       fns,
@@ -232,8 +235,8 @@ export const App = ({ now }: { now: number }) => {
       focus,
       baseline: fns.find((f) => f.base === 'Node24'),
       agg: (f, key) =>
-        hover !== undefined ? runs[hover]!.points.get(f.id)?.[key] : figures.get(f.id)?.[key],
-      setHover: (i) => setHoverAt(i === undefined ? undefined : runs[i]?.finishedAt),
+        hover !== undefined ? charted[hover]!.points.get(f.id)?.[key] : figures.get(f.id)?.[key],
+      setHover: (i) => setHoverAt(i === undefined ? undefined : charted[i]?.finishedAt),
       setFocus,
       toggle: (base) => {
         const next = new Set(hidden)

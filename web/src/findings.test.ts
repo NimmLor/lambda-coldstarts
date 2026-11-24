@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import type { HistoryFunction } from '../../src/perf/history'
-import { figuresFor, figuresOf, runsOf, toPoints, versionName } from './data'
+import { figuresFor, figuresOf, runsIn, runsOf, toPoints, versionName } from './data'
 import { archFinding, findings, memoryFinding, runtimeFinding } from './findings'
 import { tabOf } from './tabs'
 
@@ -60,6 +60,11 @@ test('a window of days counts back from the latest run', () => {
   expect(runsOf(runs, 'BunCompile/arm64/256', '7')).toEqual(runs.slice(2))
   expect(runsOf(runs, 'BunCompile/arm64/256', '14')).toEqual(runs)
   expect(runsOf([], 'BunCompile/arm64/256', 'current')).toEqual([])
+  // The charts over time span the same days, and every run for the current builds.
+  expect(runsIn(runs, '7')).toEqual(runs.slice(2))
+  expect(runsIn(runs, '14')).toEqual(runs)
+  expect(runsIn(runs, 'current')).toEqual(runs)
+  expect(runsIn([], '7')).toEqual([])
 })
 
 test('figures pool every cold start for percentiles and leave the rest to the first answer', () => {

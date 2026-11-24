@@ -439,7 +439,7 @@ export type View = {
   focus?: string
   /** The function every other is compared with, from `fns`; none when the picked variant isn't there. */
   baseline?: Fn
-  /** The hovered or picked run's value, or the mean over the range. */
+  /** The hovered or picked run's value, or the mean over the runs picked. */
   agg: (f: Fn, key: Stat) => number | undefined
   setHover: (i: number | undefined) => void
   setFocus: (base: string | undefined) => void
@@ -462,19 +462,25 @@ export const WINDOW_NAMES: Record<Window, string> = {
 export const isWindow = (value: unknown): value is Window => WINDOWS.includes(value as Window)
 
 /**
+ * The runs of `runs` within `window`, which the charts over time span: the last 7 or 14 days', or
+ * every run for the current builds, as each function's began on a day of its own.
+ */
+export const runsIn = (runs: RunPoints[], window: Window) => {
+  const latest = runs.at(-1)
+  if (!latest || window === 'current') return runs
+  const since = latest.date.getTime() - Number(window) * DAY_MS
+  return runs.filter((r) => r.date.getTime() > since)
+}
+
+/**
  * The runs of `runs`, oldest first, that measured function `id` within `window`. Its current
  * build's are those since its version last changed, so a mean never mixes two builds: Bun 1.4.5
  * nearly doubled the released executable's cold start. A run that's missing the function, as when
  * its rounds failed, doesn't end the series.
  */
 export const runsOf = (runs: RunPoints[], id: string, window: Window) => {
-  const latest = runs.at(-1)
-  if (!latest) return []
-  const measured = runs.filter((r) => r.points.has(id))
-  if (window !== 'current') {
-    const since = latest.date.getTime() - Number(window) * DAY_MS
-    return measured.filter((r) => r.date.getTime() > since)
-  }
+  const measured = runsIn(runs, window).filter((r) => r.points.has(id))
+  if (window !== 'current') return measured
   const version = measured.at(-1)?.points.get(id)!.version
   let first = measured.length
   while (first > 0 && measured[first - 1]!.points.get(id)!.version === version) first--
