@@ -10,18 +10,12 @@ import {
   isEvent,
   niceMax,
   type RunPoints,
+  SEGMENTS,
   shortName,
   versionName,
 } from './data'
 import type { TabProps } from './tabs'
 import { Badges, Card, Figure, FnLabel, Reading, Swatch, TabHead, Waiting } from './ui'
-
-/** What a cold call waits for, in the order it happens. */
-const SEGMENTS = [
-  { key: 'cold', name: 'Init', color: 'var(--color-icon-cold)' },
-  { key: 'dur', name: 'First invocation', color: 'var(--color-icon-warm)' },
-  { key: 'load', name: 'Loading & API', color: 'var(--color-rule-2)' },
-] as const
 
 const TREND: Metric = {
   key: 'cold',

@@ -171,7 +171,7 @@ export const App = ({ now }: { now: number }) => {
     () => (period === 'current' ? figures : figuresFor(runs, 'current')),
     [runs, period, figures]
   )
-  const findings = useMemo(() => findingsOf(runs, current), [runs, current])
+  const findings = useMemo(() => findingsOf(runs.at(-1)?.functions ?? [], current), [runs, current])
 
   const open = (next: TabId, from: 'tab' | 'finding') => {
     track('tab_opened', { tab: next, from })
@@ -444,7 +444,7 @@ export const App = ({ now }: { now: number }) => {
             Lambda’s init duration, from starting the runtime until it asks for its first event; for
             the Web Function, its environment’s initialization until the server listens
           </dd>
-          <dt className="font-medium text-ink">Slowest 1%</dt>
+          <dt className="font-medium text-ink">Slowest 1%, p99</dt>
           <dd className="m-0">
             the 99th percentile over every cold start in view, not a mean of each run’s
           </dd>

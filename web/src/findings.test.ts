@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { HistoryFunction } from '../../src/perf/history'
 import { figuresFor, figuresOf, runsOf, toPoints, versionName } from './data'
-import { archFinding, buildFinding, findings, memoryFinding, runtimeFinding } from './findings'
+import { archFinding, findings, memoryFinding, runtimeFinding } from './findings'
 import { tabOf } from './tabs'
 
 const stats = (avg: number) => ({ p50: avg, p90: avg, avg })
@@ -69,6 +69,7 @@ test('figures pool every cold start for percentiles and leave the rest to the fi
   const f = runs[1]!.functions[0]!
   const figures = figuresOf(runs, f, 'current')!
   expect(figures.runs).toBe(2)
+  expect(figures.starts).toBe(5)
   expect(figures.cold).toBe(37.5)
   expect(figures.p50).toBe(30)
   expect(figures.p99).toBeCloseTo(49.6)
@@ -96,25 +97,6 @@ test('a URL fragment opens its tab, and the old arm64 anchor opens that one', ()
   expect(tabOf('#%')).toBeUndefined()
 })
 
-test('the build finding names the change that moved a cold start most', () => {
-  const runs = [
-    run(5, [bun(119, 'bun 1.4.4+38afee6c8')]),
-    run(4, [bun(119, 'bun 1.4.4+38afee6c8')]),
-    run(1, [bun(217, 'bun 1.4.5+a7733435c')]),
-  ]
-  expect(buildFinding(runs)).toEqual({
-    tab: 'cold',
-    title: 'Bun executable got 82% slower to cold-start on Bun 1.4.5',
-    figure: '119 → 217 ms',
-    sub: 'Since Nov 23, on arm64 at 256 MB.',
-  })
-  // Within run-to-run noise: nothing to say.
-  expect(buildFinding([run(2, [bun(119, 'a')]), run(1, [bun(125, 'b')])])).toBeUndefined()
-  // A run without a version is no build to compare with.
-  const unknown = summary('BunCompileArm64M256', 'arm64', 256, { cold: 119 })
-  expect(buildFinding([run(2, [unknown]), run(1, [bun(217, 'bun 1.4.5')])])).toBeUndefined()
-})
-
 test('the architecture finding compares cold start, cost and warm start', () => {
   const pair = (mb: number, arm: number, x86: number, armWarm: number, x86Warm: number) => [
     summary(`LlrtArm64M${mb}`, 'arm64', mb, { cold: arm, warm: armWarm }),
@@ -125,6 +107,13 @@ test('the architecture finding compares cold start, cost and warm start', () => 
   expect(finding.title).toStartWith('arm64 cold-starts 1.5× as fast and costs')
   expect(finding.figure).toBe('1.5×')
   expect(finding.sub).toBe('But x86_64 has the faster warm start at 128 MB.')
+  expect(finding.mark).toMatchObject({
+    kind: 'bars',
+    bars: [
+      { name: 'arm64', value: 1 },
+      { name: 'x86_64', value: 1.5 },
+    ],
+  })
 })
 
 test('the runtime finding compares a custom runtime with the variant it repackages', () => {
@@ -132,6 +121,9 @@ test('the runtime finding compares a custom runtime with the variant it repackag
     run(1, [
       summary('BunRuntimeArm64M256', 'arm64', 256, { cold: 243, trip: 721 }),
       summary('BunRuntimeCmrArm64M256', 'arm64', 256, { cold: 95, trip: 245, runtime: 'custom' }),
+      summary('BunCompileAotTrimArm64M256', 'arm64', 256, { cold: 147, trip: 378 }),
+      // Not at the glance's size.
+      summary('BunCompileAotTrimArm64M128', 'arm64', 128, { cold: 147, trip: 444 }),
     ]),
   ]
   expect(runtimeFinding(runs[0]!.functions, figuresFor(runs, 'current'))).toEqual({
@@ -139,6 +131,28 @@ test('the runtime finding compares a custom runtime with the variant it repackag
     title: 'Bun runtime answers 2.9× sooner on a custom runtime',
     figure: '721 → 245 ms',
     sub: 'Its first answer at 256 MB, against the same Bun with the runtime in its .zip.',
+    mark: {
+      kind: 'bars',
+      label:
+        'First answer: 721 ms with the runtime in its .zip, 245 ms on a custom runtime, 378 ms as a trimmed AOT executable',
+      bars: [
+        {
+          name: 'in the .zip',
+          value: 721,
+          color: 'var(--color-line-BunRuntime, var(--color-line-other))',
+        },
+        {
+          name: 'custom runtime',
+          value: 245,
+          color: 'var(--color-line-BunRuntimeCmr, var(--color-line-other))',
+        },
+        {
+          name: 'trimmed AOT',
+          value: 378,
+          color: 'var(--color-line-BunCompileAotTrim, var(--color-line-other))',
+        },
+      ],
+    },
   })
 })
 
@@ -152,6 +166,8 @@ test('the runtime finding names a custom runtime that runs another version than 
   expect(runtimeFinding(runs[0]!.functions, figuresFor(runs, 'current'))).toMatchObject({
     title: 'Node.js 27 alpha answers 2.8× later on a custom runtime',
     sub: 'Its first answer at 256 MB, against Node.js 24 on Lambda’s nodejs24.x.',
+    // Node.js has no AOT executable to set beside it.
+    mark: { bars: [{ name: 'nodejs24.x' }, { name: 'custom runtime' }] },
   })
 })
 
@@ -169,7 +185,16 @@ test('the memory finding reports how little memory moves the cold start', () => 
   expect(finding.sub).toBe(
     'From 128 to 1769 MB. It does cut warm starts: Node.js’s from 5.4 to 1.6 ms.'
   )
-  expect(findings(runs, figuresFor(runs, 'current')).map((f) => f.tab)).toEqual(['memory'])
+  expect(finding.mark).toMatchObject({
+    kind: 'lines',
+    label: 'Each family’s cold start at every memory size from 128 to 1769 MB',
+    from: '128 MB',
+    to: '1769 MB',
+    lines: [{ name: 'Node.js', values: [expect.closeTo(110), expect.closeTo(105)] }],
+  })
+  expect(findings(runs[0]!.functions, figuresFor(runs, 'current')).map((f) => f.tab)).toEqual([
+    'memory',
+  ])
   // No family at every size: no spread to report.
   const apart = [
     run(1, [at(128, 110, 5.4), summary('LlrtArm64M1769', 'arm64', 1769, { cold: 50 })]),

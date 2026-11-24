@@ -488,6 +488,8 @@ export type Figures = {
   /** How many runs they're over, and the first of them. */
   runs: number
   since: Date
+  /** How many cold starts those runs measured: what the percentiles are over. */
+  starts: number
   /**
    * Lambda's init duration: the mean of each run's, and the fastest and percentiles of every cold
    * start.
@@ -531,6 +533,7 @@ export const figuresOf = (runs: RunPoints[], f: Fn, window: Window): Figures | u
   return {
     runs: counted.length,
     since: counted[0]!.date,
+    starts: durations.length,
     cold,
     min: durations[0],
     p50: percentile(durations, 50),
@@ -561,6 +564,13 @@ export const figuresFor = (runs: RunPoints[], window: Window) =>
       return figures ? [[f.id, figures] as const] : []
     })
   )
+
+/** What a cold call waits for, in the order it happens; the last is what's left of its first answer. */
+export const SEGMENTS = [
+  { key: 'cold', name: 'Init', color: 'var(--color-icon-cold)' },
+  { key: 'dur', name: 'First invocation', color: 'var(--color-icon-warm)' },
+  { key: 'load', name: 'Loading & API', color: 'var(--color-rule-2)' },
+] as const
 
 /** The geometric mean of `value` over `fns`, leaving out those without one. */
 export const geomeanOf = (fns: Fn[], value: (f: Fn) => number | undefined) =>
