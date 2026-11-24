@@ -1,5 +1,6 @@
 /**
- * What PerfApi's /runs/history sends of each stored summary: what the site in web/ reads of it,
+ * What PerfApi's /runs/latest and /runs/history send of each stored summary: what the site in web/
+ * reads of it,
  * which is about four fifths. PerfResults and the archive keep the summaries whole.
  */
 import type { FunctionSummary } from './summary'
