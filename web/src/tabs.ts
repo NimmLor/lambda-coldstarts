@@ -7,12 +7,20 @@ export const TABS = [
   { id: 'arch', label: 'arm64 vs x86_64' },
   { id: 'memory', label: 'Memory & cost' },
   { id: 'deployment', label: 'Deployment' },
+  { id: 'web-function', label: 'Web Function' },
+  { id: 'microvms', label: 'MicroVMs' },
   { id: 'results', label: 'All results' },
 ] as const
 export type TabId = (typeof TABS)[number]['id']
 
-/** Fragments that open a tab without being its id: the arm64 section's anchor from before tabs. */
-const ALIASES: Record<string, TabId> = { 'arm64-vs-x86_64': 'arch' }
+/**
+ * Fragments that open a tab without being its id: the arm64 section's anchor from before tabs, and
+ * the custom runtimes' section from before they had the Deployment tab to themselves.
+ */
+const ALIASES: Record<string, TabId> = {
+  'arm64-vs-x86_64': 'arch',
+  'custom-runtimes': 'deployment',
+}
 
 /** The tab a URL fragment opens, if any. */
 export const tabOf = (hash: string): TabId | undefined => {
@@ -38,11 +46,18 @@ export const FILTERS: Record<
   warm: { functions: true, arch: true, memory: true },
   arch: { functions: true, arch: false, memory: true, note: 'Both architectures side by side' },
   memory: { functions: true, arch: true, memory: true },
-  deployment: {
+  deployment: { functions: false, arch: true, memory: true },
+  'web-function': {
     functions: false,
-    arch: true,
-    memory: true,
-    note: 'Web Function and MicroVMs: arm64 only, at their own sizes',
+    arch: false,
+    memory: false,
+    note: 'arm64 at 2 GB, against the Event Function at the nearest size',
+  },
+  microvms: {
+    functions: false,
+    arch: false,
+    memory: false,
+    note: 'arm64 at each size, against Event Functions at the size nearest 2 GB',
   },
   results: { functions: true, arch: true, memory: true },
 }

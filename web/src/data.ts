@@ -46,19 +46,19 @@ type Variant = {
   canary?: boolean
   preview?: boolean
   /**
-   * A Lambda Web Function, which has a section of its own rather than a place among the others,
-   * where it's compared with `counterpart`: the same runtime as a function.
+   * A Lambda Web Function, which has a tab of its own rather than a place among the others, where
+   * it's compared with `counterpart`: the same runtime as a function.
    */
   web?: { counterpart: string }
   /**
-   * A Lambda MicroVM, which has a section of its own too, against `counterpart`. It has no init, so
+   * A Lambda MicroVM, which has a tab of its own too, against `counterpart`. It has no init, so
    * it's measured by its round trips instead, and shows nowhere else.
    */
   microvm?: { counterpart: string }
   /**
-   * An Event Function on a customer-managed runtime, which has a section of its own too, where
-   * it's compared with `counterpart`: the same runtime on Lambda's or in its .zip. It has both
-   * architectures and every size, and charts and ranks with the others too.
+   * An Event Function on a customer-managed runtime, which the Deployment tab compares with
+   * `counterpart`: the same runtime on Lambda's or in its .zip. It has both architectures and every
+   * size, and ranks with the others in All results too.
    */
   cmr?: { counterpart: string }
   /** Its kind within its family, e.g. "AOT executable", which the Functions picker shows or hides together. */

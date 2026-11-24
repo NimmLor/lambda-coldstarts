@@ -165,7 +165,7 @@ has no component for them yet. Their API differs, and so does how it's measured
 
 - 🪣 **The code** sits in a versioned bucket, which Lambda reads on behalf of the function's
   revisions.
-- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site's Deployment tab
+- 📏 **2 GB and 2 vCPUs on arm64**, the one size every environment gets. The site's Web Function tab
   sets it against `Node24` on arm64 at the nearest size, 1769 MB.
 - 🔄 **A cold start** is a new revision that differs in `BENCH_NONCE`, which the endpoint is then
   pointed at. For a second or two after the endpoint says it's updated, requests still reach the old
@@ -192,8 +192,9 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
   1.3 s while the MicroVM resumes, then answers 502 with `x-aws-proxy-error: MICROVM_CONNECT_FAILED`,
   which the 4 and 8 GB sizes often outlast; the round asks again until one is answered. A
   turned-away first request costs about 2 s more, so those sizes' first answers come in two modes.
-  `firstRequestMs` is the last part alone. The site sets it against an Event Function's cold invoke
-  round trip (`roundTripMs`, which every round now records), from the same PerfMeasure.
+  `firstRequestMs` is the last part alone. The site's MicroVMs tab sets it against its runtime's
+  cold invoke round trip as an Event Function at the size nearest 2 GB (`roundTripMs`, which every
+  round now records), from the same PerfMeasure.
 - 🐢 **No warm round trips.** At 128 MB, PerfMeasure gets CPU in 20 ms slices, and a warm request
   of ~5 ms comes back as 20, 40 or 60. The cold ones barely move: a MicroVM's first answer took
   1.34–1.36 s from a 1769 MB PerfMeasure and 1.32–1.43 s from the 128 MB one.

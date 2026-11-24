@@ -88,6 +88,9 @@ test('versions read as their release', () => {
 test('a URL fragment opens its tab, and the old arm64 anchor opens that one', () => {
   expect(tabOf('#warm')).toBe('warm')
   expect(tabOf('#arm64-vs-x86_64')).toBe('arch')
+  expect(tabOf('#web-function')).toBe('web-function')
+  expect(tabOf('#microvms')).toBe('microvms')
+  expect(tabOf('#custom-runtimes')).toBe('deployment')
   expect(tabOf('')).toBeUndefined()
   expect(tabOf('#constructor')).toBeUndefined()
   expect(tabOf('#%')).toBeUndefined()

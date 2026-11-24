@@ -30,12 +30,14 @@ import { Glance } from './Glance'
 import lambdaIcon from './icons/lambda.svg'
 import { REPO, SiteLinks, WRAP } from './layout'
 import { MemoryCost } from './MemoryCost'
+import { MicroVms } from './MicroVms'
 import { placeholderHistory } from './placeholder'
 import { Results } from './Results'
 import { isNumber, isString, useStored } from './stored'
 import { FILTERS, TABS, type TabId, type TabProps, tabOf } from './tabs'
 import { Segmented } from './ui'
 import { WarmStarts } from './WarmStarts'
+import { WebFunction } from './WebFunction'
 
 /** PerfApi, behind the same CloudFront distribution; see infra/perf.ts and dev.ts. */
 const API = '/api'
@@ -60,6 +62,8 @@ const PANELS: Record<TabId, (props: TabProps & { onPick: (mb: number) => void })
   ),
   memory: (p) => <MemoryCost {...p} />,
   deployment: (p) => <Deployment {...p} />,
+  'web-function': (p) => <WebFunction {...p} />,
+  microvms: (p) => <MicroVms {...p} />,
   results: (p) => <Results {...p} />,
 }
 
