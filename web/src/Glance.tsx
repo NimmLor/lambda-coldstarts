@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react'
 import {
   FAMILY_NAMES,
-  type Family,
   type Figures,
   type Fn,
   fixed,
-  isEvent,
   type RunPoints,
   shortName,
+  versionName,
 } from './data'
 import { type Finding, GLANCE } from './findings'
 import { TABS, type TabId } from './tabs'
 import { FamilyIcon } from './ui'
 
-/** What every panel measures each family's leader against: the newest Node.js out of preview. */
+/** What every panel measures the leader against: the newest Node.js out of preview. */
 const BASELINE = 'Node24'
+
+/** The functions every panel compares, by variant. */
+const COMPARED = ['Llrt', BASELINE, 'BunRuntimeCmr', 'BunCompileAotTrim']
 
 type Key = 'cold' | 'trip' | 'mem' | 'p99'
 const PANELS: { key: Key; title: string; unit: string; digits: number; better: string }[] = [
@@ -26,24 +28,29 @@ const PANELS: { key: Key; title: string; unit: string; digits: number; better: s
   { key: 'p99', title: 'Slowest 1%', unit: 'ms, p99', digits: 1, better: 'faster' },
 ]
 
-/** LLRT and Bun by their best build at each metric; Node.js always by Node.js 24, the baseline. */
-const FAMILIES: Family[] = ['LLRT', 'Bun', 'Node']
-
-type Row = { family: Family; f: Fn; value: number }
+type Row = { f: Fn; value: number }
 
 const rowsOf = (key: Key, fns: Fn[], figures: Map<string, Figures>): Row[] =>
-  FAMILIES.flatMap((family) => {
-    const candidates = fns.filter((f) =>
-      family === 'Node' ? f.base === BASELINE : f.family === family
-    )
-    const best = candidates
-      .flatMap((f) => {
-        const value = figures.get(f.id)?.[key]
-        return value === undefined ? [] : [{ family, f, value }]
-      })
-      .sort((a, b) => a.value - b.value)[0]
-    return best ? [best] : []
-  }).sort((a, b) => a.value - b.value)
+  fns
+    .flatMap((f) => {
+      const value = figures.get(f.id)?.[key]
+      return value === undefined ? [] : [{ f, value }]
+    })
+    .sort((a, b) => a.value - b.value)
+
+/**
+ * Node.js by the exact release it ran, e.g. `Node.js 24.22.3`; anything else by its name, with its
+ * short one when that says more, e.g. `LLRT, no SDK`.
+ */
+const nameOf = (f: Fn, figures: Map<string, Figures>) => {
+  const version = figures.get(f.id)?.version
+  if (f.family === 'Node' && version) return versionName(version)
+  return f.short ? `${f.name}, ${f.short}` : f.name
+}
+
+/** A function under its family's name: Node.js by its release, e.g. `24.22.3`; the rest by build. */
+const subOf = (f: Fn, figures: Map<string, Figures>) =>
+  f.family === 'Node' ? nameOf(f, figures).replace(`${FAMILY_NAMES.Node} `, '') : shortName(f.base)
 
 const Panel = ({
   panel: p,
@@ -66,15 +73,14 @@ const Panel = ({
       </div>
       <dl className="m-0 flex flex-col gap-3.5">
         {rows.map((r) => (
-          <div key={r.family} className="flex flex-col gap-1.5">
+          <div key={r.f.base} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-3">
               <dt className="flex min-w-0 items-center gap-2">
-                <FamilyIcon family={r.family} />
+                <FamilyIcon family={r.f.family} />
                 <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="text-sm font-medium text-ink">{FAMILY_NAMES[r.family]}</span>
+                  <span className="text-sm font-medium text-ink">{FAMILY_NAMES[r.f.family]}</span>
                   <span className="truncate text-xs text-muted" title={r.f.about}>
-                    {shortName(r.f.base)}
-                    {r.f.canary && !shortName(r.f.base).includes('canary') && ' · canary'}
+                    {subOf(r.f, figures)}
                   </span>
                 </span>
               </dt>
@@ -96,14 +102,14 @@ const Panel = ({
       <p className="datum mt-auto text-sm text-muted">
         {leader && baseline && leader !== baseline ? (
           <>
-            <span className="text-ink">{FAMILY_NAMES[leader.family]}</span>{' '}
+            <span className="text-ink">{nameOf(leader.f, figures)}</span>{' '}
             <span className="measured text-ink">{(baseline.value / leader.value).toFixed(1)}×</span>{' '}
-            {p.better} than Node.js 24
+            {p.better} than {nameOf(baseline.f, figures)}
           </>
         ) : (
           leader && (
             <>
-              <span className="text-ink">{FAMILY_NAMES[leader.family]}</span> leads
+              <span className="text-ink">{nameOf(leader.f, figures)}</span> leads
             </>
           )
         )}
@@ -153,9 +159,9 @@ const LastRun = ({ run, from }: { run: RunPoints; from: number }) => {
 }
 
 /**
- * The page's answer before any tab: LLRT, Bun and Node.js side by side on arm64 at 256 MB, over
- * their current builds whatever the toolbar picks, and under them a finding from each tab that
- * opens it.
+ * The page's answer before any tab: LLRT without the SDK, Node.js 24, Bun on a customer-managed
+ * runtime and Bun's trimmed AOT executable side by side on arm64 at 256 MB, over their current
+ * builds whatever the toolbar picks, and under them a finding from each tab that opens it.
  */
 export const Glance = ({
   runs,
@@ -174,7 +180,7 @@ export const Glance = ({
   const latest = runs.at(-1)
   if (!latest) return null
   const fns = latest.functions.filter(
-    (f) => isEvent(f) && f.arch === GLANCE.arch && f.memoryMb === GLANCE.memoryMb
+    (f) => COMPARED.includes(f.base) && f.arch === GLANCE.arch && f.memoryMb === GLANCE.memoryMb
   )
   if (!fns.length) return null
   return (
