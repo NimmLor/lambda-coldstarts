@@ -220,7 +220,7 @@ export const VARIANTS: Record<string, Variant> = {
     build: LLRT_BUNDLE,
     cmr: { counterpart: 'Llrt' },
     about:
-      'The bundle alone, on a customer-managed runtime: LLRT’s no-SDK Lambda build on Lambda’s OS-only image',
+      'The bundle alone, on a customer-managed runtime: LLRT’s no-SDK Lambda build on Lambda’s OS-only image, started by its entrypoint script',
   },
   BunRuntimeCmrAlpine: {
     name: 'Bun runtime, Custom Runtime on Alpine',

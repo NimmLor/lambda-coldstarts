@@ -276,11 +276,11 @@ export const buildCmrBundle = ({
           ONE_AT_A_TIME,
           'COPY --chmod=755 bootstrap /var/runtime/',
           padding,
-          // LLRT reads its handler from _HANDLER, which Lambda only sets through the entrypoint
-          // script of its base images. That script would start LLRT through a shell Llrt doesn't
-          // have, so the image names the handler instead.
-          `ENV _HANDLER=${LLRT_HANDLER}`,
-          ENTRYPOINT,
+          // No ENTRYPOINT: the image's own /lambda-entrypoint.sh starts LLRT. LLRT serves
+          // invocations only with _HANDLER set, and with no arguments: given the handler as one,
+          // it takes it for a CLI command and exits. A customer-managed runtime gets neither the
+          // variable nor the image's ENV; that script sets it from its argument, then execs
+          // /var/runtime/bootstrap without it. So LlrtCmr starts through a shell, which Llrt doesn't.
         ])
       )
       writeFileSync(versionFile(bundle), `${llrtAsset('lambda', arch)}@${LLRT_VERSION}`)

@@ -27,9 +27,29 @@ const dirSize = async (dir: string) => {
 }
 
 /**
+ * What `/lambda-entrypoint.sh` of Lambda's base images does when the Runtime API is there: it sets
+ * `_HANDLER` from its one argument and execs `/var/runtime/bootstrap` without it, here `$0`.
+ */
+const BASE_IMAGE_ENTRYPOINT = 'export _HANDLER="$1"; exec "$0"'
+
+/**
+ * How Lambda starts a customer-managed runtime from `runtimeDir`: its Dockerfile's ENTRYPOINT, or
+ * else the base image's entrypoint script, with the handler as the only argument.
+ */
+const cmrCommand = async (runtimeDir: string, handler: string) => {
+  const bootstrap = path.join(runtimeDir, 'bootstrap')
+  const dockerfile = await Bun.file(path.join(runtimeDir, 'Dockerfile')).text()
+  const entrypoint = dockerfile.match(/^ENTRYPOINT (\[.*\])$/m)?.[1]
+  if (!entrypoint) return ['sh', '-c', BASE_IMAGE_ENTRYPOINT, bootstrap, handler]
+  const [file] = JSON.parse(entrypoint) as string[]
+  if (file !== '/var/runtime/bootstrap') throw new Error(`Can't run ENTRYPOINT ${entrypoint} here`)
+  return [bootstrap, handler]
+}
+
+/**
  * Starts `bootstrap` with the code in `taskRoot`, hands it two events and measures until it asks
- * for the first one. A customer-managed runtime's bootstrap lives in `runtimeDir` and gets the
- * handler as its argument, as Lambda passes it to the image's ENTRYPOINT.
+ * for the first one. A customer-managed runtime's bootstrap lives in `runtimeDir` and starts as
+ * `cmrCommand` says, without the `_HANDLER` Lambda sets for the others.
  */
 const smokeTest = async ({
   bootstrap,
@@ -75,13 +95,15 @@ const smokeTest = async ({
     },
   })
 
-  const child = Bun.spawn(runtimeDir ? [bootstrap, handler] : [bootstrap], {
+  const command = runtimeDir ? await cmrCommand(runtimeDir, handler) : [bootstrap]
+  const child = Bun.spawn(command, {
     env: {
       PATH: process.env.PATH,
       AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${server.port}`,
       AWS_LAMBDA_FUNCTION_MEMORY_SIZE: '1769',
-      // As Lambda sets them. LLRT serves invocations only with `_HANDLER`, and imports it from here.
-      _HANDLER: handler,
+      // As Lambda sets them. LLRT serves invocations only with `_HANDLER`, and imports it from
+      // here; a customer-managed runtime gets none and sets its own.
+      ...(!runtimeDir && { _HANDLER: handler }),
       LAMBDA_TASK_ROOT: taskRoot,
       ...(runtimeDir && { LAMBDA_RUNTIME_DIR: runtimeDir }),
       VARIANT: variant,

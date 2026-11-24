@@ -231,9 +231,10 @@ aws provider has none yet) and `docker-build`.
 - ⚖️ **The same runtime as before, moved:** `Node24Cmr` is Lambda's `nodejs:24` image as it is,
   against `Node24`. `BunRuntimeCmr` and `LlrtCmr` put the very `bun` executable and LLRT build
   `BunRuntime` and `Llrt` ship in their .zip on Lambda's OS-only `provided:al2023` image, the OS
-  `provided.al2023` runs, and start them the same way: Bun through the same shell, LLRT directly.
-  LLRT reads its handler from `_HANDLER`, which only Lambda's entrypoint script sets, so its image
-  names it.
+  `provided.al2023` runs. Bun starts through the same shell as `BunRuntime`. LLRT starts through
+  the image's own `/lambda-entrypoint.sh`, a shell `Llrt` doesn't have: Lambda starts a runtime
+  image with the handler as an argument, which LLRT takes for a CLI command, and sets no
+  `_HANDLER`, which LLRT needs. Lambda ignores the image's `ENV`, so only the script can set it.
 - 🔭 **A Node.js no Lambda runtime has:** `Node27Cmr` is `Node24Cmr`'s image with nodejs.org's
   Node.js 27 alpha, pinned in `cmr-build.ts`, as `/var/lang/bin/node`. Lambda's entrypoint script
   and Runtime API client stay: the client's native part is Node-API, so it loads on any Node.js.
