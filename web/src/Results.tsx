@@ -77,7 +77,7 @@ const Cell = ({ value, digits, lead }: { value?: number; digits: number; lead: b
  * Every shown function on the picked architecture at the picked size, the customer-managed runtimes
  * and the Web Function included, ranked by a column, lowest first; picking it again reverses it.
  */
-export const Results = ({ view, figures, functions, arch, memoryMb, period }: TabProps) => {
+export const Results = ({ view, figures, functions, arch }: TabProps) => {
   const [sort, setSort] = useState<{ key: SortKey; reversed: boolean }>({
     key: 'cold',
     reversed: false,
@@ -110,13 +110,7 @@ export const Results = ({ view, figures, functions, arch, memoryMb, period }: Ta
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2.5">
-        <h2 className="text-2xl">All results</h2>
-        <p className="measured m-0 text-sm text-muted">
-          {arch} · {memoryMb} MB · {period === 'current' ? 'current builds' : `${period} days`}
-          {webs.length > 0 && ` · Web Function at ${webs[0]!.memoryMb / 1024} GB`}
-        </p>
-      </div>
+      <h2 className="text-2xl">All results</h2>
       <div className="overflow-x-auto rounded-card border border-rule bg-paper-2">
         <table className="w-full min-w-[72rem] border-collapse text-sm">
           <thead>

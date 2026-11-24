@@ -94,19 +94,10 @@ export const Segmented = <T extends string | number>({
   </div>
 )
 
-/** A tab's heading: its title, what it shows in the instrument face, and its finding. */
-export const TabHead = ({
-  title,
-  meta,
-  children,
-}: {
-  title: string
-  meta: string
-  children?: ReactNode
-}) => (
+/** A tab's heading, and what it says when it has nothing to show. */
+export const TabHead = ({ title, children }: { title: string; children?: ReactNode }) => (
   <div className="flex flex-col gap-2.5">
     <h2 className="text-2xl">{title}</h2>
-    <p className="measured m-0 text-sm text-muted">{meta}</p>
     {children && (
       <p className="datum m-0 max-w-prose text-lg/normal text-pretty text-ink-2">{children}</p>
     )}

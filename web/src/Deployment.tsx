@@ -3,11 +3,7 @@ import { type Figures, type Fn, niceMax, ORDER, VARIANTS } from './data'
 import { REPO } from './layout'
 import { Differences, Explainer } from './Section'
 import type { TabProps } from './tabs'
-import { Badges, FamilyIcon, Figure, TabHead } from './ui'
-
-/** `a` against `b` as a multiple, and which way: "2.2× as long", "1.6× faster". */
-export const times = (a: number, b: number, more: string, less: string) =>
-  a >= b ? `${(a / b).toFixed(1)}× ${more}` : `${(b / a).toFixed(1)}× ${less}`
+import { Badges, FamilyIcon, TabHead } from './ui'
 
 /** A difference from the first row of a group, green when it's lower. */
 const Delta = ({ value, base }: { value?: number; base?: number }) => {
@@ -122,7 +118,7 @@ const RuntimeRow = ({
 export const Deployment = ({ figures, functions, arch, memoryMb }: TabProps) => {
   if (!functions.some((f) => f.cmr)) {
     return (
-      <TabHead title="Deployment" meta="Customer-managed runtimes">
+      <TabHead title="Deployment">
         No function runs on a customer-managed runtime in the latest run.
       </TabHead>
     )
@@ -149,35 +145,9 @@ export const Deployment = ({ figures, functions, arch, memoryMb }: TabProps) => 
       )
     )
   )
-  // The repackaging that moved the first answer most.
-  const moves = groups.flatMap((g) => {
-    const before = g.against && figures.get(g.against.id)?.trip
-    return g.members.flatMap((m) => {
-      const after = m.f && figures.get(m.f.id)?.trip
-      return before && after ? [{ g, m, before, after }] : []
-    })
-  })
-  const most = moves.sort(
-    (a, b) => Math.abs(Math.log(b.after / b.before)) - Math.abs(Math.log(a.after / a.before))
-  )[0]
   return (
     <div className="flex flex-col gap-6">
-      <TabHead
-        title="Deployment"
-        meta={`Customer-managed runtimes · ${arch} · ${memoryMb} MB · times in ms, memory in MB`}
-      >
-        {most && (
-          <>
-            On a customer-managed runtime, {most.m.name.replace(/, Custom Runtime.*$/, '')} answers
-            a cold call in <Figure>{most.after.toFixed(0)} ms</Figure> against{' '}
-            <Figure>{most.before.toFixed(0)} ms</Figure>{' '}
-            {figures.get(most.g.against!.id)?.runtime === 'provided.al2023'
-              ? 'with the runtime in its .zip'
-              : 'on Lambda’s own runtime'}
-            : {times(most.before, most.after, 'sooner', 'later')}.
-          </>
-        )}
-      </TabHead>
+      <TabHead title="Deployment" />
       <Explainer
         title="What is a customer-managed runtime?"
         onOpen={() => track('cmr_explainer_opened', {})}

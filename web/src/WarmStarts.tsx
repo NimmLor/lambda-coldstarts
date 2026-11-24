@@ -10,7 +10,7 @@ import {
 } from './data'
 import { FAMILY_LINES, SizeChart } from './SizeChart'
 import type { TabProps } from './tabs'
-import { Card, Figure, FnLabel, Swatch, TabHead } from './ui'
+import { Card, FnLabel, Swatch, TabHead } from './ui'
 
 const FAMILIES = Object.keys(FAMILY_NAMES) as Family[]
 
@@ -63,17 +63,6 @@ export const WarmStarts = (props: TabProps) => {
     family,
     values: familyBySize(family, 'warm', { ...props, shown }),
   })).filter((s) => s.values.some((v) => v !== undefined))
-  // The answer in a sentence: how close every runtime is once there's CPU, and how far apart at
-  // the smallest size.
-  const roomy = memories.filter((mb) => mb >= 512)
-  const roomyWarm = functions.flatMap((f) =>
-    isEvent(f) && f.arch === arch && roomy.includes(f.memoryMb) && shown.has(f.base)
-      ? (figures.get(f.id)?.warm ?? [])
-      : []
-  )
-  const smallest = memories[0]
-  // The families measured at the smallest size, which the sentence names.
-  const atSmallest = families.filter((s) => s.values[0] !== undefined)
   const variants = variantsOf(
     functions.filter((f) => isEvent(f) && f.arch === arch && shown.has(f.base))
   )
@@ -90,29 +79,7 @@ export const WarmStarts = (props: TabProps) => {
   )
   return (
     <div className="flex flex-col gap-8">
-      <TabHead title="Warm starts" meta={`Event Functions · ${arch} · every memory size`}>
-        {roomyWarm.length > 0 && (
-          <>
-            From {roomy[0]} MB up, every runtime answers a warm call in{' '}
-            <Figure>
-              {ms(Math.min(...roomyWarm))}–{ms(Math.max(...roomyWarm))} ms
-            </Figure>
-            .{' '}
-          </>
-        )}
-        {smallest !== undefined && atSmallest.length > 1 && (
-          <>
-            At {smallest} MB:{' '}
-            {atSmallest.map((s, i) => (
-              <span key={s.family}>
-                {i > 0 && (i === atSmallest.length - 1 ? ' and ' : ', ')}
-                {FAMILY_NAMES[s.family]} <Figure>{ms(s.values[0])} ms</Figure>
-              </span>
-            ))}
-            .
-          </>
-        )}
-      </TabHead>
+      <TabHead title="Warm starts" />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card

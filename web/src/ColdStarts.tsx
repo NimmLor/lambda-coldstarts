@@ -48,50 +48,6 @@ const withFigure = (fns: Fn[], figures: Map<string, Figures>, key: keyof Figures
     return x?.[key] !== undefined ? [{ f, x }] : []
   })
 
-/** `lo–hi` in `digits` decimals, or one value when they round the same. */
-const range = (values: number[], digits = 0) => {
-  const lo = Math.min(...values).toFixed(digits)
-  const hi = Math.max(...values).toFixed(digits)
-  return lo === hi ? lo : `${lo}–${hi}`
-}
-
-/**
- * The tab's answer: how Bun's builds start against Node.js 24, and what their first answer spends
- * besides; or, without Bun in view, which function answers a cold call first.
- */
-const Lead = ({ fns, figures }: { fns: Fn[]; figures: Map<string, Figures> }) => {
-  const bun = withFigure(
-    fns.filter((f) => f.family === 'Bun'),
-    figures,
-    'load'
-  ).map((r) => r.x)
-  const node = figures.get(fns.find((f) => f.base === 'Node24')?.id ?? '')
-  if (bun.length && node?.cold !== undefined) {
-    return (
-      <>
-        Bun’s builds initialize in <Figure>{range(bun.map((x) => x.cold!))} ms</Figure>, against
-        Node.js 24’s <Figure>{node.cold.toFixed(0)}</Figure>, but answer a cold call in{' '}
-        <Figure>{range(bun.map((x) => x.trip!))} ms</Figure>:{' '}
-        <Figure>{range(bun.map((x) => x.load! + x.dur!))} ms</Figure> of that go to loading a{' '}
-        <Figure>
-          {range(
-            bun.map((x) => x.size),
-            1
-          )}{' '}
-          MB
-        </Figure>{' '}
-        package and running the first invocation.
-      </>
-    )
-  }
-  const first = withFigure(fns, figures, 'trip').sort((a, b) => a.x.trip! - b.x.trip!)[0]
-  return first ? (
-    <>
-      {first.f.name} answers a cold call first, in <Figure>{first.x.trip!.toFixed(0)} ms</Figure>.
-    </>
-  ) : null
-}
-
 /** Each function's cold call as init, first invocation and the rest of its first answer. */
 const Waits = ({ fns, figures }: { fns: Fn[]; figures: Map<string, Figures> }) => {
   const [rank, setRank] = useState<Rank>('trip')
@@ -406,16 +362,14 @@ const markersOf = (runs: RunPoints[], fns: Fn[]) => {
   }))
 }
 
-export const ColdStarts = ({ view, figures, arch, memoryMb, waiting }: TabProps) => {
+export const ColdStarts = ({ view, figures, memoryMb, waiting }: TabProps) => {
   const fns = view.shown.filter(isEvent)
   const days = Math.round(
     (view.latest.date.getTime() - (view.runs[0]?.date.getTime() ?? 0)) / 864e5
   )
   return (
     <div className="flex flex-col gap-8">
-      <TabHead title="Cold starts" meta={`Event Functions · ${arch} · ${memoryMb} MB`}>
-        <Lead fns={fns} figures={figures} />
-      </TabHead>
+      <TabHead title="Cold starts" />
       <Waits fns={fns} figures={figures} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Spread fns={fns} figures={figures} />

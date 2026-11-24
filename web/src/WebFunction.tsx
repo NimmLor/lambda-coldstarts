@@ -1,10 +1,8 @@
 import { track } from './analytics'
-import { VARIANTS } from './data'
-import { times } from './Deployment'
 import { REPO } from './layout'
 import { Differences, Explainer } from './Section'
 import type { TabProps } from './tabs'
-import { Figure, TabHead } from './ui'
+import { TabHead } from './ui'
 
 const DIFFERENCES = [
   [
@@ -43,33 +41,15 @@ export const WebFunction = ({ figures, functions }: TabProps) => {
   const web = functions.find((f) => f.web)
   const x = web && figures.get(web.id)
   if (!web || !x) {
-    return (
-      <TabHead title="Web Function" meta="Lambda Web Functions">
-        No Web Function in the latest run.
-      </TabHead>
-    )
+    return <TabHead title="Web Function">No Web Function in the latest run.</TabHead>
   }
-  const runtime = VARIANTS[web.web!.counterpart]?.name ?? web.name
   const event = functions
     .filter((f) => f.base === web.web!.counterpart && f.arch === web.arch)
     .sort((a, b) => Math.abs(a.memoryMb - web.memoryMb) - Math.abs(b.memoryMb - web.memoryMb))[0]
   const y = event && figures.get(event.id)
   return (
     <div className="flex flex-col gap-6">
-      <TabHead
-        title="Web Function"
-        meta={`${runtime} · ${web.arch} · ${web.memoryMb / 1024} GB${event ? `, against the Event Function at ${event.memoryMb} MB` : ''}`}
-      >
-        {y?.cold !== undefined && x.cold !== undefined && x.trip && y.trip && x.warm && y.warm && (
-          <>
-            As a Web Function, {runtime} takes{' '}
-            <Figure>{times(x.cold, y.cold, 'as long', 'less time')}</Figure> to start and{' '}
-            <Figure>{times(x.trip, y.trip, 'as long', 'less time')}</Figure> to answer its first
-            request, then serves warm requests{' '}
-            <Figure>{times(y.warm, x.warm, 'faster', 'slower')}</Figure>.
-          </>
-        )}
-      </TabHead>
+      <TabHead title="Web Function" />
       <Explainer
         title="What is a Lambda Web Function?"
         onOpen={() => track('web_explainer_opened', {})}

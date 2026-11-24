@@ -1,9 +1,8 @@
-import { type ReactNode, useState } from 'react'
+import { useState } from 'react'
 import { track } from './analytics'
 import { Floating, tone, X_LABELS } from './Chart'
 import { ChartIcon, type ChartIconName } from './ChartIcon'
 import {
-  ARCHS,
   coldStartCost,
   FAMILY_NAMES,
   type Family,
@@ -714,129 +713,6 @@ const ArchTable = ({
   )
 }
 
-/** Within this of each other, two values are even: the headline names no winner. */
-const EVEN = 1.05
-
-/**
- * The largest relative spread of cold start across the memory sizes: per group and
- * architecture, the geometric mean of the cold start of its variants measured at every size,
- * from the lowest size's to the highest's.
- */
-const coldSpread = (functions: Fn[], memories: number[], cold: (f: Fn) => number | undefined) => {
-  const { byId, variants } = indexEvents(functions)
-  let most = 0
-  for (const g of GROUPS) {
-    for (const arch of ARCHS) {
-      const series = variants
-        .filter(g.has)
-        .map((v) =>
-          memories.map((mb) => {
-            const f = byId.get(`${v.base}/${arch}/${mb}`)
-            return f && cold(f)
-          })
-        )
-        .filter((values): values is number[] => values.every((v) => v !== undefined && v > 0))
-      if (!series.length) continue
-      const means = memories.map((_, i) => geomean(series.map((s) => s[i]!))!)
-      most = Math.max(most, Math.max(...means) / Math.min(...means) - 1)
-    }
-  }
-  return most
-}
-
-const Figure = ({ children }: { children: ReactNode }) => (
-  <span className="measured text-ink">{children}</span>
-)
-
-/**
- * The section's answer in a sentence, from the same geometric means as the panels: all Event
- * Functions' cold start and cost at the picked size, where their warm start favours x86_64, and how
- * little memory moves cold start.
- */
-const Headline = ({
-  view,
-  panels,
-  functions,
-  memories,
-}: {
-  view: View
-  panels: Panel[]
-  functions: Fn[]
-  memories: number[]
-}) => {
-  const all = (key: Metric['key']) =>
-    panels.find((p) => p.metric.key === key)?.series.find((s) => s.group.name === 'All')?.values ??
-    []
-  const at = memories.indexOf(view.memoryMb)
-  const cold = all('cold')[at]
-  const cost = all('cost')[at]
-  const warm = all('warm')
-  if (cold === undefined) return null
-
-  const percent = cost === undefined ? undefined : Math.round((1 / cost - 1) * 100)
-  // The sizes where x86_64's warm start is more than even, and by how much at most.
-  const losses = memories.flatMap((_, i) =>
-    warm[i] !== undefined && warm[i]! < 1 / EVEN ? [i] : []
-  )
-  const most = Math.max(...losses.map((i) => 1 / warm[i]!))
-  const prefix = losses.every((i, k) => i === k)
-  const where =
-    losses.length === memories.length
-      ? 'at every size'
-      : prefix
-        ? `below ${memories[losses.length]} MB`
-        : `at ${losses.map((i) => memories[i]).join(', ')} MB`
-  const spread = Math.round(coldSpread(functions, memories, (f) => view.agg(f, 'cold')) * 100)
-
-  return (
-    <p className="max-w-prose text-lg/normal text-pretty text-ink-2">
-      <span className="datum">
-        At {view.memoryMb} MB arm64{' '}
-        {cold >= 1 ? (
-          <>
-            cold-starts <Figure>{cold.toFixed(2)}×</Figure> as fast
-          </>
-        ) : (
-          <>
-            takes <Figure>{(1 / cold).toFixed(2)}×</Figure> as long to cold-start
-          </>
-        )}
-        {percent !== undefined &&
-          (percent === 0 ? (
-            ' and costs the same per cold start'
-          ) : (
-            <>
-              {' '}
-              and costs <Figure>{Math.abs(percent)}%</Figure> {percent < 0 ? 'less' : 'more'} per
-              cold start
-            </>
-          ))}
-        {/* Nothing to say of the warm start when no run in view measured one. */}
-        {!warm.some((r) => r !== undefined) ? (
-          '.'
-        ) : losses.length ? (
-          <>
-            ; warm, x86_64 is up to <Figure>{most.toFixed(2)}×</Figure> faster {where}.
-          </>
-        ) : warm.every((r) => r === undefined || r >= EVEN) ? (
-          '; warm, arm64 is faster too.'
-        ) : (
-          '; warm, x86_64 is nowhere more than 5% faster.'
-        )}{' '}
-        {spread <= 10 ? (
-          <>
-            Memory barely moves cold start: by <Figure>{spread}%</Figure> at most.
-          </>
-        ) : (
-          <>
-            Memory moves cold start by up to <Figure>{spread}%</Figure>.
-          </>
-        )}
-      </span>
-    </p>
-  )
-}
-
 /**
  * arm64 or x86_64, and whether the answer changes with memory, runtime or metric: each family's
  * advantage at every memory size, then each shown Event Function at the picked size. The charts
@@ -871,7 +747,6 @@ export const Architectures = ({
     )
   }
   const discount = Math.round((1 - PRICES.gbSecond.arm64 / PRICES.gbSecond.x86_64) * 100)
-  // Once per render, for the headline and the chart both.
   const panels = metricsOf(view.agg).map((metric) => ({
     metric,
     series: advantage(functions, memories, metric),
@@ -879,10 +754,7 @@ export const Architectures = ({
 
   return (
     <section id={ARCH_SECTION} className="flex scroll-mt-28 flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        <h2 className="text-2xl">arm64 vs x86_64</h2>
-        <Headline view={view} panels={panels} functions={functions} memories={memories} />
-      </div>
+      <h2 className="text-2xl">arm64 vs x86_64</h2>
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-rule bg-rule">
         <AdvantageChart view={view} panels={panels} memories={memories} onPick={onPick} />
         <ArchTable view={view} functions={functions} memories={memories} onPick={onPick} />

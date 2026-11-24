@@ -1,7 +1,7 @@
 import { FAMILY_NAMES, type Family, type Figures, isEvent, PRICES, STACK_REGION } from './data'
 import { FAMILY_LINES, SizeChart } from './SizeChart'
 import type { TabProps } from './tabs'
-import { Card, FamilyIcon, Figure, FnLabel, Swatch, TabHead } from './ui'
+import { Card, FamilyIcon, FnLabel, Swatch, TabHead } from './ui'
 import { familyBySize, variantsOf } from './WarmStarts'
 
 const FAMILIES = Object.keys(FAMILY_NAMES) as Family[]
@@ -23,36 +23,10 @@ export const MemoryCost = (props: TabProps) => {
       values: familyBySize(family, key, { ...props, shown }),
     })).filter((s) => s.values.some((v) => v !== undefined))
   const charts = CHARTS.map((c) => ({ ...c, series: lines(c.key) }))
-  const lowest = memories[0]!
-  const highest = memories.at(-1)!
-  // How far memory moves the cold start, per family, and what a cold start costs at the top size
-  // against the bottom one, per function.
-  const spread = Math.max(
-    0,
-    ...charts[0]!.series.map((s) => {
-      const v = s.values.filter((x) => x !== undefined)
-      return v.length ? Math.max(...v) / Math.min(...v) - 1 : 0
-    })
-  )
-  const bunTrip = charts[1]!.series.find((s) => s.family === 'Bun')?.values
-  const bunFrom = bunTrip?.[0]
-  const bunTo = bunTrip?.at(-1)
-  // Said only when the numbers bear it out: Bun's first answer shorter at the top size, and each
-  // family's warm start too.
-  const bunShorter = bunFrom !== undefined && bunTo !== undefined && bunTo < bunFrom
-  const warmShorter = charts[2]!.series.every((s) => {
-    const [from, to] = [s.values[0], s.values.at(-1)]
-    return from !== undefined && to !== undefined && to < from
-  })
   const variants = variantsOf(
     functions.filter((f) => isEvent(f) && f.arch === arch && shown.has(f.base))
   )
   const costAt = (base: string, mb: number) => figures.get(`${base}/${arch}/${mb}`)?.cost
-  const multiples = variants.flatMap((v) => {
-    const a = costAt(v.base, lowest)
-    const b = costAt(v.base, highest)
-    return a && b ? [b / a] : []
-  })
   const cheapest = memories.map((mb) =>
     Math.min(...variants.flatMap((v) => costAt(v.base, mb) ?? []))
   )
@@ -68,31 +42,7 @@ export const MemoryCost = (props: TabProps) => {
 
   return (
     <div className="flex flex-col gap-8">
-      <TabHead title="Memory & cost" meta={`Event Functions · ${arch} · every memory size`}>
-        Memory size {spread <= 0.1 ? 'leaves the cold start alone' : 'moves the cold start'}: each
-        family stays within <Figure>{Math.max(1, Math.round(spread * 100))}%</Figure> from {lowest}{' '}
-        to {highest} MB.
-        {bunShorter && (
-          <>
-            {' '}
-            It does shorten Bun’s first answer, from{' '}
-            <Figure>
-              {bunFrom.toFixed(0)} to {bunTo.toFixed(0)} ms
-            </Figure>
-            {warmShorter && ', and every warm start'}
-          </>
-        )}
-        {multiples.length > 0 && (
-          <>
-            {bunShorter ? ', while' : ' And'} a cold start costs{' '}
-            <Figure>
-              {Math.min(...multiples).toFixed(0)}–{Math.max(...multiples).toFixed(0)}×
-            </Figure>{' '}
-            as much at {highest} MB as at {lowest} MB
-          </>
-        )}
-        {(bunShorter || multiples.length > 0) && '.'}
-      </TabHead>
+      <TabHead title="Memory & cost" />
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-x-5 gap-y-1.5">

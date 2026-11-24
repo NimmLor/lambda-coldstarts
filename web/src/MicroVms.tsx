@@ -3,7 +3,7 @@ import { type Fn, niceMax, ORDER, VARIANTS } from './data'
 import { REPO } from './layout'
 import { Differences, Explainer } from './Section'
 import type { TabProps } from './tabs'
-import { Card, Figure, Swatch, TabHead } from './ui'
+import { Card, Swatch, TabHead } from './ui'
 
 const DIFFERENCES = [
   [
@@ -66,11 +66,7 @@ export const MicroVms = ({ figures, functions }: TabProps) => {
     .filter((f) => f.microvm && figures.get(f.id)?.trip !== undefined)
     .sort((a, b) => ORDER.indexOf(a.base) - ORDER.indexOf(b.base) || a.memoryMb - b.memoryMb)
   if (!vms.length) {
-    return (
-      <TabHead title="MicroVMs" meta="Lambda MicroVMs">
-        No MicroVM in the latest run.
-      </TabHead>
-    )
+    return <TabHead title="MicroVMs">No MicroVM in the latest run.</TabHead>
   }
   /** The runtime a MicroVM runs, as an Event Function on arm64 at the size nearest 2 GB. */
   const eventOf = (vm: Fn) =>
@@ -90,18 +86,9 @@ export const MicroVms = ({ figures, functions }: TabProps) => {
   })
   const trip = (f: Fn) => figures.get(f.id)!.trip!
   const trips = vms.map(trip)
-  const ratios = groups.flatMap((g) =>
-    g.event ? g.members.map((f) => trip(f) / trip(g.event!)) : []
-  )
-  const sizes = [...new Set(groups.flatMap((g) => (g.event ? [g.event.memoryMb] : [])))]
   const max = niceMax(
     Math.max(...trips, ...groups.flatMap((g) => (g.event ? [trip(g.event)] : [])))
   )
-  // The runtime measured at the most sizes, whose largest is the one the sentence speaks of.
-  const widest = groups.toSorted((a, b) => b.members.length - a.members.length)[0]!
-  const largestSlowest =
-    widest.members.length > 2 &&
-    trip(widest.members.at(-1)!) === Math.max(...widest.members.map(trip))
   const rows: Row[] = groups.flatMap((g) => [
     ...g.members.map((f) => {
       const x = figures.get(f.id)!
@@ -132,26 +119,7 @@ export const MicroVms = ({ figures, functions }: TabProps) => {
   ])
   return (
     <div className="flex flex-col gap-6">
-      <TabHead
-        title="MicroVMs"
-        meta="arm64 · each size Lambda offers · resumed from a snapshot, so no init"
-      >
-        A MicroVM answers its first request in{' '}
-        <Figure>
-          {(Math.min(...trips) / 1000).toFixed(1)}–{(Math.max(...trips) / 1000).toFixed(1)} s
-        </Figure>
-        {ratios.length > 0 && (
-          <>
-            ,{' '}
-            <Figure>
-              {Math.min(...ratios).toFixed(0)}–{Math.max(...ratios).toFixed(0)}×
-            </Figure>{' '}
-            its runtime’s cold call as an Event Function
-            {sizes.length === 1 ? ` at ${sizes[0]} MB` : ''}
-          </>
-        )}
-        {largestSlowest && ', and the largest size is the slowest'}.
-      </TabHead>
+      <TabHead title="MicroVMs" />
       <Explainer
         title="What is a Lambda MicroVM?"
         onOpen={() => track('microvm_explainer_opened', {})}
