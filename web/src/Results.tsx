@@ -87,11 +87,9 @@ export const Results = ({ view, figures, functions, arch, memoryMb, period }: Ta
     track('list_sorted', { column: next.reversed ? `${key}:reversed` : key })
     setSort(next)
   }
-  const fns: Fn[] = [
-    ...view.shown,
-    // The Web Function has one size, on arm64.
-    ...functions.filter((f) => f.web && f.arch === arch),
-  ]
+  // The Web Function has one size, on arm64.
+  const webs = functions.filter((f) => f.web && f.arch === arch)
+  const fns: Fn[] = [...view.shown, ...webs]
   const rows = fns.flatMap((f) => {
     const x = figures.get(f.id)
     return x ? [{ f, x }] : []
@@ -115,8 +113,8 @@ export const Results = ({ view, figures, functions, arch, memoryMb, period }: Ta
       <div className="flex flex-col gap-2.5">
         <h2 className="text-2xl">All results</h2>
         <p className="measured m-0 text-sm text-muted">
-          {arch} · {memoryMb} MB · {period === 'current' ? 'current builds' : `${period} days`} ·
-          Web Function at 2 GB
+          {arch} · {memoryMb} MB · {period === 'current' ? 'current builds' : `${period} days`}
+          {webs.length > 0 && ` · Web Function at ${webs[0]!.memoryMb / 1024} GB`}
         </p>
       </div>
       <div className="overflow-x-auto rounded-card border border-rule bg-paper-2">

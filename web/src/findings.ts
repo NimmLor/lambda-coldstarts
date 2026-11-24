@@ -39,7 +39,8 @@ export const buildFinding = (runs: RunPoints[]): Finding | undefined => {
     const start = runs.indexOf(current[0]!)
     const earlier = runs.slice(0, Math.max(0, start)).filter((r) => r.points.has(f.id))
     const previous = earlier.at(-1)?.points.get(f.id)!.version
-    if (!earlier.length || !current.length) continue
+    // A run without a version is no build to compare with, as buildChanges has it.
+    if (!earlier.length || !current.length || previous === undefined) continue
     let from = earlier.length
     while (from > 0 && earlier[from - 1]!.points.get(f.id)!.version === previous) from--
     const before = mean(earlier.slice(from).map((r) => r.points.get(f.id)!.cold))
@@ -151,17 +152,20 @@ export const runtimeFinding = (
       most = { f, against, before, after }
   }
   if (!most || Math.abs(Math.log(most.after / most.before)) < Math.log(NOTABLE)) return undefined
-  const { against, before, after } = most
+  const { f, against, before, after } = most
   const times = before / after
+  // The custom runtime's own name, which can name another version than its counterpart: Node.js
+  // 27 alpha against Node.js 24.
+  const name = f.name.replace(/, Custom Runtime.*$/, '')
   const where =
     figures.get(against.id)?.runtime === 'provided.al2023'
       ? 'with the runtime in its .zip'
       : `on Lambda’s ${figures.get(against.id)?.runtime}`
   return {
     tab: 'deployment',
-    title: `${against.name} answers ${(times >= 1 ? times : 1 / times).toFixed(1)}× ${times >= 1 ? 'sooner' : 'later'} on a custom runtime`,
+    title: `${name} answers ${(times >= 1 ? times : 1 / times).toFixed(1)}× ${times >= 1 ? 'sooner' : 'later'} on a custom runtime`,
     figure: `${before.toFixed(0)} → ${after.toFixed(0)} ms`,
-    sub: `Its first answer at ${GLANCE.memoryMb} MB, against the same ${FAMILY_NAMES[against.family]} ${where}.`,
+    sub: `Its first answer at ${GLANCE.memoryMb} MB, against ${name === against.name ? `the same ${FAMILY_NAMES[against.family]}` : against.name} ${where}.`,
   }
 }
 
@@ -179,6 +183,8 @@ export const memoryFinding = (
   const lowest = memories[0]!
   const highest = memories.at(-1)!
   let spread = 0
+  /** Whether any family has a cold start at every size, without which there's no spread to tell. */
+  let compared = false
   let warmest: { family: Fn['family']; from: number; to: number } | undefined
   for (const family of Object.keys(FAMILY_NAMES) as Fn['family'][]) {
     const members = events.filter((f) => f.family === family)
@@ -189,6 +195,7 @@ export const memoryFinding = (
       )
     const colds = memories.flatMap((mb) => at(mb, 'cold') ?? [])
     if (colds.length === memories.length) {
+      compared = true
       spread = Math.max(spread, Math.max(...colds) / Math.min(...colds) - 1)
     }
     const from = at(lowest, 'warm')
@@ -200,6 +207,7 @@ export const memoryFinding = (
     )
       warmest = { family, from, to }
   }
+  if (!compared) return undefined
   const percent = Math.max(1, Math.round(spread * 100))
   return {
     tab: 'memory',

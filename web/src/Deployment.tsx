@@ -24,7 +24,7 @@ const Delta = ({ value, base }: { value?: number; base?: number }) => {
     <dd
       className={`measured m-0 self-start rounded-chip px-1 text-xs ${d <= 0 ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-bad'}`}
     >
-      {d <= 0 ? `−${Math.abs(d)}` : `+${d}`}
+      {d < 0 ? `−${Math.abs(d)}` : d > 0 ? `+${d}` : '±0'}
     </dd>
   )
 }

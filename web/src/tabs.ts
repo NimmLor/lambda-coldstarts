@@ -16,7 +16,13 @@ const ALIASES: Record<string, TabId> = { 'arm64-vs-x86_64': 'arch' }
 
 /** The tab a URL fragment opens, if any. */
 export const tabOf = (hash: string): TabId | undefined => {
-  const id = decodeURIComponent(hash.replace(/^#/, ''))
+  let id: string
+  try {
+    id = decodeURIComponent(hash.replace(/^#/, ''))
+  } catch {
+    // A malformed escape, such as a lone %, names no tab; thrown, it would take the page down.
+    return undefined
+  }
   return TABS.find((t) => t.id === id)?.id ?? (Object.hasOwn(ALIASES, id) ? ALIASES[id] : undefined)
 }
 

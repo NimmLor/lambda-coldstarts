@@ -859,7 +859,17 @@ export const Architectures = ({
   // Nothing to compare without a variant on both architectures.
   const archs = new Map<string, Set<string>>()
   for (const f of functions) archs.set(f.base, (archs.get(f.base) ?? new Set()).add(f.arch))
-  if (![...archs.values()].some((a) => a.has('arm64') && a.has('x86_64'))) return null
+  // Said rather than left blank, as the tab stays: a stage can deploy a single architecture.
+  if (![...archs.values()].some((a) => a.has('arm64') && a.has('x86_64'))) {
+    return (
+      <section id={ARCH_SECTION} className="flex scroll-mt-28 flex-col gap-3">
+        <h2 className="text-2xl">arm64 vs x86_64</h2>
+        <p className="max-w-prose text-pretty text-ink-2">
+          No function runs on both architectures in the latest run, so there’s nothing to compare.
+        </p>
+      </section>
+    )
+  }
   const discount = Math.round((1 - PRICES.gbSecond.arm64 / PRICES.gbSecond.x86_64) * 100)
   // Once per render, for the headline and the chart both.
   const panels = metricsOf(view.agg).map((metric) => ({

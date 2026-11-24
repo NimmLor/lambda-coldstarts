@@ -87,7 +87,7 @@ const Panel = ({
             <div aria-hidden="true" className="h-1.5 rounded-full bg-paper-3">
               <div
                 className="mark h-full rounded-full"
-                style={{ width: `${(r.value / max) * 100}%`, background: r.f.color }}
+                style={{ width: `${max > 0 ? (r.value / max) * 100 : 0}%`, background: r.f.color }}
               />
             </div>
           </div>

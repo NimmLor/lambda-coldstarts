@@ -422,9 +422,12 @@ export const App = ({ now }: { now: number }) => {
           Every function runs the same tiny handler,{' '}
           <a href={`${REPO}/blob/main/src/report.ts`}>src/report.ts</a>, which returns its own
           startup time and memory use as JSON. No packages, no network calls: the numbers are the
-          runtime’s, not the code’s. Every 4 hours each one is cold started 10 times in{' '}
-          {STACK_REGION}, Frankfurt, with 5 warm calls after each.{' '}
-          <a href={`${REPO}#-scheduled-runs`}>How the runs work</a>
+          runtime’s, not the code’s. Every 4 hours each one is cold started
+          {latestRun ? ` ${latestRun.rounds} times` : ''} in {STACK_REGION}, Frankfurt
+          {latestRun?.warmInvocations === undefined
+            ? ''
+            : `, with ${latestRun.warmInvocations} warm calls after each`}
+          . <a href={`${REPO}#-scheduled-runs`}>How the runs work</a>
         </p>
         <dl className="m-0 grid gap-x-8 gap-y-3 sm:grid-cols-[max-content_minmax(0,1fr)]">
           <dt className="font-medium text-ink">Current builds</dt>
@@ -455,7 +458,7 @@ export const App = ({ now }: { now: number }) => {
           </dd>
           <dt className="font-medium text-ink">Warm start</dt>
           <dd className="m-0">
-            handler time on an instance that’s already up, the mean of the 5 calls after each cold
+            handler time on an instance that’s already up, the mean of the calls after each cold
             start
           </dd>
           <dt className="font-medium text-ink">Memory used</dt>

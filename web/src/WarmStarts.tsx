@@ -52,8 +52,8 @@ export const familyBySize = (
     )
   )
 
-/** `n` in two decimals, or one past 10. */
-const ms = (n: number) => n.toFixed(n >= 10 ? 1 : 2)
+/** `n` in two decimals, or one past 10; a dash for none. */
+const ms = (n: number | undefined) => (n === undefined ? '—' : n.toFixed(n >= 10 ? 1 : 2))
 
 export const WarmStarts = (props: TabProps) => {
   const { view, figures, functions, arch, memoryMb, memories } = props
@@ -72,6 +72,8 @@ export const WarmStarts = (props: TabProps) => {
       : []
   )
   const smallest = memories[0]
+  // The families measured at the smallest size, which the sentence names.
+  const atSmallest = families.filter((s) => s.values[0] !== undefined)
   const variants = variantsOf(
     functions.filter((f) => isEvent(f) && f.arch === arch && shown.has(f.base))
   )
@@ -98,13 +100,13 @@ export const WarmStarts = (props: TabProps) => {
             .{' '}
           </>
         )}
-        {smallest !== undefined && families.length > 1 && (
+        {smallest !== undefined && atSmallest.length > 1 && (
           <>
             At {smallest} MB:{' '}
-            {families.map((s, i) => (
+            {atSmallest.map((s, i) => (
               <span key={s.family}>
-                {i > 0 && (i === families.length - 1 ? ' and ' : ', ')}
-                {FAMILY_NAMES[s.family]} <Figure>{ms(s.values[0] ?? 0)} ms</Figure>
+                {i > 0 && (i === atSmallest.length - 1 ? ' and ' : ', ')}
+                {FAMILY_NAMES[s.family]} <Figure>{ms(s.values[0])} ms</Figure>
               </span>
             ))}
             .
@@ -119,7 +121,7 @@ export const WarmStarts = (props: TabProps) => {
           caption={`Each family’s geometric mean on ${arch}, in ms; ${memoryMb} MB shaded.`}
         >
           <SizeChart
-            label={`Warm start by memory size: ${families.map((s) => `${FAMILY_NAMES[s.family]} from ${ms(s.values[0] ?? 0)} to ${ms(s.values.at(-1) ?? 0)} ms`).join('; ')}`}
+            label={`Warm start by memory size: ${families.map((s) => `${FAMILY_NAMES[s.family]} from ${ms(s.values[0])} to ${ms(s.values.at(-1))} ms`).join('; ')}`}
             memories={memories}
             highlight={memoryMb}
             height={220}
@@ -172,7 +174,7 @@ export const WarmStarts = (props: TabProps) => {
       <Card
         id="warm-table"
         title="Every function at every size"
-        caption={`Mean of the 5 warm calls after each cold start on ${arch}, in ms; darker is slower.`}
+        caption={`Mean of the ${view.latest.warmInvocations === undefined ? '' : `${view.latest.warmInvocations} `}warm calls after each cold start on ${arch}, in ms; darker is slower.`}
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] border-separate border-spacing-[3px] text-sm">

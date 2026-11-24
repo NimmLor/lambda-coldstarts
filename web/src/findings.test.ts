@@ -90,6 +90,7 @@ test('a URL fragment opens its tab, and the old arm64 anchor opens that one', ()
   expect(tabOf('#arm64-vs-x86_64')).toBe('arch')
   expect(tabOf('')).toBeUndefined()
   expect(tabOf('#constructor')).toBeUndefined()
+  expect(tabOf('#%')).toBeUndefined()
 })
 
 test('the build finding names the change that moved a cold start most', () => {
@@ -106,6 +107,9 @@ test('the build finding names the change that moved a cold start most', () => {
   })
   // Within run-to-run noise: nothing to say.
   expect(buildFinding([run(2, [bun(119, 'a')]), run(1, [bun(125, 'b')])])).toBeUndefined()
+  // A run without a version is no build to compare with.
+  const unknown = summary('BunCompileArm64M256', 'arm64', 256, { cold: 119 })
+  expect(buildFinding([run(2, [unknown]), run(1, [bun(217, 'bun 1.4.5')])])).toBeUndefined()
 })
 
 test('the architecture finding compares cold start, cost and warm start', () => {
@@ -135,6 +139,19 @@ test('the runtime finding compares a custom runtime with the variant it repackag
   })
 })
 
+test('the runtime finding names a custom runtime that runs another version than its counterpart', () => {
+  const runs = [
+    run(1, [
+      summary('Node24Arm64M256', 'arm64', 256, { cold: 110, trip: 254, runtime: 'nodejs24.x' }),
+      summary('Node27CmrArm64M256', 'arm64', 256, { cold: 166, trip: 700, runtime: 'custom' }),
+    ]),
+  ]
+  expect(runtimeFinding(runs[0]!.functions, figuresFor(runs, 'current'))).toMatchObject({
+    title: 'Node.js 27 alpha answers 2.8× later on a custom runtime',
+    sub: 'Its first answer at 256 MB, against Node.js 24 on Lambda’s nodejs24.x.',
+  })
+})
+
 test('the memory finding reports how little memory moves the cold start', () => {
   const at = (mb: number, cold: number, warm: number) =>
     summary(`NodeArm64M${mb}`.replace('Node', 'Node24'), 'arm64', mb, {
@@ -150,4 +167,9 @@ test('the memory finding reports how little memory moves the cold start', () => 
     'From 128 to 1769 MB. It does cut warm starts: Node.js’s from 5.4 to 1.6 ms.'
   )
   expect(findings(runs, figuresFor(runs, 'current')).map((f) => f.tab)).toEqual(['memory'])
+  // No family at every size: no spread to report.
+  const apart = [
+    run(1, [at(128, 110, 5.4), summary('LlrtArm64M1769', 'arm64', 1769, { cold: 50 })]),
+  ]
+  expect(memoryFinding(apart[0]!.functions, figuresFor(apart, 'current'))).toBeUndefined()
 })

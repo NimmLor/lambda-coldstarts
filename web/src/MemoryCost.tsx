@@ -1,4 +1,4 @@
-import { FAMILY_NAMES, type Family, type Figures, isEvent, PRICES } from './data'
+import { FAMILY_NAMES, type Family, type Figures, isEvent, PRICES, STACK_REGION } from './data'
 import { FAMILY_LINES, SizeChart } from './SizeChart'
 import type { TabProps } from './tabs'
 import { Card, FamilyIcon, Figure, FnLabel, Swatch, TabHead } from './ui'
@@ -35,6 +35,15 @@ export const MemoryCost = (props: TabProps) => {
     })
   )
   const bunTrip = charts[1]!.series.find((s) => s.family === 'Bun')?.values
+  const bunFrom = bunTrip?.[0]
+  const bunTo = bunTrip?.at(-1)
+  // Said only when the numbers bear it out: Bun's first answer shorter at the top size, and each
+  // family's warm start too.
+  const bunShorter = bunFrom !== undefined && bunTo !== undefined && bunTo < bunFrom
+  const warmShorter = charts[2]!.series.every((s) => {
+    const [from, to] = [s.values[0], s.values.at(-1)]
+    return from !== undefined && to !== undefined && to < from
+  })
   const variants = variantsOf(
     functions.filter((f) => isEvent(f) && f.arch === arch && shown.has(f.base))
   )
@@ -63,26 +72,26 @@ export const MemoryCost = (props: TabProps) => {
         Memory size {spread <= 0.1 ? 'leaves the cold start alone' : 'moves the cold start'}: each
         family stays within <Figure>{Math.max(1, Math.round(spread * 100))}%</Figure> from {lowest}{' '}
         to {highest} MB.
-        {bunTrip?.[0] !== undefined && bunTrip.at(-1) !== undefined && (
+        {bunShorter && (
           <>
             {' '}
             It does shorten Bun’s first answer, from{' '}
             <Figure>
-              {bunTrip[0].toFixed(0)} to {bunTrip.at(-1)!.toFixed(0)} ms
+              {bunFrom.toFixed(0)} to {bunTo.toFixed(0)} ms
             </Figure>
-            , and every warm start
+            {warmShorter && ', and every warm start'}
           </>
         )}
         {multiples.length > 0 && (
           <>
-            {bunTrip ? ', while' : ' And'} a cold start costs{' '}
+            {bunShorter ? ', while' : ' And'} a cold start costs{' '}
             <Figure>
               {Math.min(...multiples).toFixed(0)}–{Math.max(...multiples).toFixed(0)}×
             </Figure>{' '}
             as much at {highest} MB as at {lowest} MB
           </>
         )}
-        .
+        {(bunShorter || multiples.length > 0) && '.'}
       </TabHead>
 
       <div className="flex flex-col gap-4">
@@ -104,7 +113,7 @@ export const MemoryCost = (props: TabProps) => {
                 <span className="text-sm font-normal text-muted">{c.unit}</span>
               </h3>
               <SizeChart
-                label={`${c.title} by memory size: ${c.series.map((s) => `${FAMILY_NAMES[s.family]} from ${s.values[0]?.toFixed(c.digits)} to ${s.values.at(-1)?.toFixed(c.digits)}`).join('; ')}`}
+                label={`${c.title} by memory size: ${c.series.map((s) => `${FAMILY_NAMES[s.family]} from ${s.values[0]?.toFixed(c.digits) ?? '—'} to ${s.values.at(-1)?.toFixed(c.digits) ?? '—'}`).join('; ')}`}
                 memories={memories}
                 highlight={memoryMb}
                 series={c.series.map((s) => ({
@@ -117,7 +126,7 @@ export const MemoryCost = (props: TabProps) => {
                 {c.series
                   .map(
                     (s) =>
-                      `${FAMILY_NAMES[s.family]} ${s.values[0]?.toFixed(c.digits)} → ${s.values.at(-1)?.toFixed(c.digits)}`
+                      `${FAMILY_NAMES[s.family]} ${s.values[0]?.toFixed(c.digits) ?? '—'} → ${s.values.at(-1)?.toFixed(c.digits) ?? '—'}`
                   )
                   .join(' · ')}
               </p>
@@ -134,7 +143,7 @@ export const MemoryCost = (props: TabProps) => {
               Cost per million cold starts <span className="text-sm text-muted">USD</span>
             </>
           }
-          caption={`On ${arch}: init plus the first invocation, times memory, at first-tier GB-second prices in eu-central-1, plus the request. arm64’s GB-second is ${discount}% cheaper. Cheapest at each size highlighted.`}
+          caption={`On ${arch}: init plus the first invocation, times memory, at first-tier GB-second prices in ${STACK_REGION}, plus the request. arm64’s GB-second is ${discount}% cheaper. Cheapest at each size highlighted.`}
         >
           <div className="overflow-x-auto">
             <table className="w-full min-w-[34rem] border-collapse text-sm">
