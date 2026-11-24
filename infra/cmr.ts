@@ -234,7 +234,12 @@ export const createCmrFunctions = ({
       imageUri: $interpolate`${repository.repositoryUrl}@${image.digest}`,
       releaseNotes: version,
     },
-    { dependsOn: [repositoryPolicy] }
+    {
+      dependsOn: [repositoryPolicy],
+      // aws-native asks to delete before replacing whatever it replaces, and Lambda doesn't delete
+      // the version the alias points to: Cloud Control waits for it until it gives up.
+      deleteBeforeReplace: false,
+    }
   )
   const alias = new awsnative.lambda.RuntimeAlias(`${name}RuntimeAlias`, {
     runtimeName: runtime.name,
