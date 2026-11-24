@@ -13,6 +13,8 @@ import { buildCmrBundle, type CmrSpec, cmrHandler } from './cmr-build'
 import { buildLlrtBundle, LLRT_HANDLER, type LlrtVariant, llrtUnavailableReason } from './llrt'
 
 type NodeRuntime = 'nodejs22.x' | 'nodejs24.x' | 'nodejs26.x'
+/** The runtimes Lambda Web Functions offer. */
+export type WebRuntime = 'nodejs24.x' | 'nodejs26.x'
 
 /**
  * A variant whose bundle this repo builds: one that runs on `provided.al2023`, or, with `cmr`, on a
@@ -28,7 +30,7 @@ export type Variant =
   | BuiltVariant
   | { id: string; kind: 'node'; runtime: NodeRuntime }
   // A Lambda Web Function rather than a function, deployed by infra/web-function.ts.
-  | { id: string; kind: 'web' }
+  | { id: string; kind: 'web'; runtime: WebRuntime }
   // Lambda MicroVM images, deployed by infra/microvm.ts: Lambda's Node.js 24 container, or with
   // `bun`, src/microvm.ts as that Bun executable. At `sizes` in MB, or at every size Lambda offers.
   | { id: string; kind: 'microvm'; bun?: 'aot-trim'; sizes?: number[] }
@@ -50,11 +52,12 @@ export const VARIANTS: Variant[] = [
   { id: 'LlrtFullSdk', kind: 'llrt', variant: 'llrt-full-sdk' },
   { id: 'Node22', kind: 'node', runtime: 'nodejs22.x' },
   { id: 'Node24', kind: 'node', runtime: 'nodejs24.x' },
-  // A public preview since August 2026. The aws provider pinned in sst.config.ts is the first
-  // SST can use that accepts it.
+  // Generally available since 2026-11-20, after a public preview from August 2026. The aws provider
+  // pinned in sst.config.ts is the first SST can use that accepts it.
   { id: 'Node26', kind: 'node', runtime: 'nodejs26.x' },
   // Only on arm64, with the 2 GB every Web Function gets.
-  { id: 'Node24Web', kind: 'web' },
+  { id: 'Node24Web', kind: 'web', runtime: 'nodejs24.x' },
+  { id: 'Node26Web', kind: 'web', runtime: 'nodejs26.x' },
   // Only on arm64, at every size Lambda offers; see infra/microvm.ts.
   { id: 'Node24MicroVm', kind: 'microvm' },
   // The same server as a trimmed --aot executable, without the AOT shim, at Lambda's default size.

@@ -1,7 +1,7 @@
 /**
  * Entry point of the Lambda Web Function variant: a plain `node:http` server on the address Lambda
  * gives it, answering every request with the report the other variants return. infra/web-function.ts
- * bundles it as the `index.js` that the `nodejs24.x` Web Function runtime loads.
+ * bundles it as the `index.js` that the `nodejs24.x` and `nodejs26.x` Web Function runtimes load.
  */
 import { statSync } from 'node:fs'
 import { createServer } from 'node:http'

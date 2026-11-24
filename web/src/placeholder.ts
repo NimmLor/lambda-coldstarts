@@ -52,6 +52,8 @@ const TYPICAL: Record<string, number[]> = {
   Node24: [110, 2.2, 75, 254, 12, 0, 86],
   Node26: [166, 2.3, 78, 282, 9.3, 0, 128],
   Node24Web: [239, 1, 138, 532, 16, 0, 128],
+  // Before its first run, Node24Web's.
+  Node26Web: [239, 1, 138, 532, 16, 0, 128],
   'Node24MicroVm/512': [59, 1640, 1230],
   'Node24MicroVm/1024': [58, 1570, 1240],
   'Node24MicroVm/2048': [59, 1550, 1240],

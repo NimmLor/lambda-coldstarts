@@ -174,6 +174,13 @@ export const VARIANTS: Record<string, Variant> = {
     about:
       'A node:http server on Lambda Web Functions, with the 2 GB and 2 vCPUs every environment gets',
   },
+  Node26Web: {
+    name: 'Node.js 26, Web Function',
+    family: 'Node',
+    build: 'bun build --target=node --format=esm --minify',
+    web: { counterpart: 'Node26' },
+    about: 'The same node:http server on the Node.js 26 Web Function runtime',
+  },
   Node24MicroVm: {
     name: 'Node.js 24, MicroVM',
     family: 'Node',

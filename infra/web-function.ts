@@ -1,6 +1,6 @@
 /**
- * The Lambda Web Function variant: src/web.ts as an HTTP server on the `nodejs24.x` Web Function
- * runtime, in the stack's region like everything else. Its code is a zip in a versioned bucket,
+ * A Lambda Web Function variant: src/web.ts as an HTTP server on a Node.js Web Function runtime,
+ * in the stack's region like everything else. Its code is a zip in a versioned bucket,
  * which every revision points at; PerfMeasure forces each cold start by creating a revision of its
  * own (src/perf/web.ts).
  */
@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process'
 import { statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { bunBin } from './build'
+import type { WebRuntime } from './functions'
 
 /** The endpoint PerfMeasure sends its requests to. */
 const ENDPOINT = 'bench'
@@ -26,7 +27,7 @@ const bundle = (dir: string) => {
 
 export type WebFunction = ReturnType<typeof createWebFunction>
 
-export const createWebFunction = (id: string) => {
+export const createWebFunction = ({ id, runtime }: { id: string; runtime: WebRuntime }) => {
   const name = `${$app.name}-${$app.stage}-${id}`
   const region = aws.getRegionOutput().region
   const account = aws.getCallerIdentityOutput().accountId
@@ -102,7 +103,7 @@ export const createWebFunction = (id: string) => {
   // What every revision is made of, PerfMeasure's included.
   const buildConfig = {
     codeConfig: { s3Object: { bucket: bucket.id, key: code.key, versionId: code.versionId } },
-    runtimeConfig: { runtime: 'nodejs24.x' },
+    runtimeConfig: { runtime },
   }
   const serviceConfig = {
     executionRoleArn: role.arn,
