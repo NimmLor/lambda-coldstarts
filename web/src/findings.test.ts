@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { HistoryFunction } from '../../src/perf/history'
 import { figuresFor, figuresOf, runsIn, runsOf, toPoints, versionName } from './data'
-import { archFinding, findings, memoryFinding, runtimeFinding } from './findings'
+import { archFinding, findings, memoryFinding, runtimeFinding, workloadFinding } from './findings'
 import { tabOf } from './tabs'
 
 const stats = (avg: number) => ({ p50: avg, p90: avg, avg })
@@ -227,4 +227,43 @@ test('the workload’s figures come only from runs of the latest run’s size', 
   expect(figures.workDur).toBe(18.5)
   // The cold starts are the hello world's in every run, so all three count.
   expect(figures.cold).toBe(110)
+})
+
+test('the workload finding sets the fastest first run of the four against Node.js 24', () => {
+  const worked = (functionId: string, cold: number, first: number, warm: number) =>
+    ({
+      ...summary(functionId, 'arm64', 256, { cold }),
+      workFirstMs: stats(first),
+      workWarmMs: stats(warm),
+      workSize: 20_000,
+    }) as HistoryFunction
+  const runs = [
+    run(1, [
+      worked('LlrtArm64M256', 44, 726, 691),
+      worked('Node24Arm64M256', 106, 415, 173),
+      worked('BunCompileAotTrimArm64M256', 149, 104, 60),
+      // Not one of the four.
+      worked('BunCompileAotArm64M256', 150, 90, 50),
+    ]),
+  ]
+  const finding = workloadFinding(runs[0]!.functions, figuresFor(runs, 'current'))!
+  expect(finding.tab).toBe('work')
+  expect(finding.title).toBe(
+    'Bun AOT executable, trimmed runs the workload 4.0× as fast as Node.js 24'
+  )
+  expect(finding.figure).toBe('415 → 104 ms')
+  expect(finding.sub).toEndWith('Once warm, 60 against 173 ms.')
+  expect(finding.mark).toMatchObject({
+    kind: 'bars',
+    bars: [
+      { name: 'LLRT', value: 726 },
+      { name: 'Node.js 24', value: 415 },
+      { name: 'Bun AOT', value: 104 },
+    ],
+  })
+})
+
+test('the workload finding waits for runs that measured it', () => {
+  const runs = [run(1, [summary('Node24Arm64M256', 'arm64', 256, { cold: 106 })])]
+  expect(workloadFinding(runs[0]!.functions, figuresFor(runs, 'current'))).toBeUndefined()
 })
