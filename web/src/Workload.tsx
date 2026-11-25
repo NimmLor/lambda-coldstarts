@@ -6,8 +6,9 @@ import { familyBySize, variantsOf } from './WarmStarts'
 
 const FAMILIES = Object.keys(FAMILY_NAMES) as Family[]
 
-/** `n` in two decimals, or one past 10; a dash for none. */
-const ms = (n: number | undefined) => (n === undefined ? '—' : n.toFixed(n >= 10 ? 1 : 2))
+/** `n` in two decimals, one past 10 and none past 100, so 128 MB's seconds fit; a dash for none. */
+const ms = (n: number | undefined) =>
+  n === undefined ? '—' : n.toFixed(n >= 100 ? 0 : n >= 10 ? 1 : 2)
 
 export const Workload = (props: TabProps) => {
   const { view, figures, functions, arch, memoryMb, memories } = props
@@ -85,7 +86,7 @@ export const Workload = (props: TabProps) => {
               {runs.map(({ f, first, warm }) => (
                 <li
                   key={f.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-rule py-1.5 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_9rem]"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-rule py-1.5 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_10.5rem]"
                 >
                   <FnLabel f={f} className="text-sm" />
                   <span

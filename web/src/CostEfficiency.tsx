@@ -17,7 +17,7 @@ import {
   type WorkloadKind,
 } from './data'
 import type { TabProps } from './tabs'
-import { Card, FnLabel, Segmented } from './ui'
+import { Card, Dot, Segmented } from './ui'
 import { variantsOf } from './WarmStarts'
 
 /** Steps of 1, 2 and 5 across `[min, max]`, or only powers of ten where those would crowd. */
@@ -164,10 +164,10 @@ const Pick = ({ p, onMemory }: { p: SizePoint; onMemory: (mb: number) => void })
     title={`Show ${p.memoryMb} MB`}
     className="measured flex cursor-pointer flex-col items-end text-right hover:text-cool"
   >
-    <span className="text-ink">{p.memoryMb} MB</span>
-    <span className="text-xs whitespace-nowrap text-muted">
-      {usd(p.cost)} · {ms(p.ms)}
-    </span>
+    <span className="whitespace-nowrap text-ink">{p.memoryMb} MB</span>
+    {/* One under the other, as two panels side by side leave each column little room. */}
+    <span className="text-xs whitespace-nowrap text-muted">{usd(p.cost)}</span>
+    <span className="text-xs whitespace-nowrap text-muted">{ms(p.ms)}</span>
   </button>
 )
 
@@ -240,7 +240,11 @@ const Panel = ({
                 {rows.map((r) => (
                   <tr key={r.f.base} className="border-b border-rule">
                     <th scope="row" className="px-1.5 py-2 text-left font-normal">
-                      <FnLabel f={r.f} className="text-sm" />
+                      {/* Wrapping rather than cut short: the panels leave this column little room. */}
+                      <span className="flex items-start gap-2 text-ink" title={r.f.about}>
+                        <Dot color={r.f.color} className="mt-1.5 size-2" />
+                        <span>{r.f.name}</span>
+                      </span>
                       {!every && r.f.family !== 'Node' && builds(r) > 1 && (
                         <span className="block pl-4 text-xs text-muted">
                           best of {builds(r)} {FAMILY_NAMES[r.f.family]} builds
