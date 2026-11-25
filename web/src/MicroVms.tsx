@@ -141,7 +141,7 @@ export const MicroVms = ({ figures, functions }: TabProps) => {
       </Explainer>
       <Card
         title="First answer"
-        caption="From calling RunMicrovm until the first response; 4 and 8 GB often outlast the endpoint’s first wait, so their answers come in two modes. After each runtime, its cold call as an Event Function, from calling Invoke."
+        caption="From calling RunMicrovm until the first response. After each runtime, its cold call as an Event Function, from calling Invoke."
       >
         <div className="flex flex-wrap gap-x-5 gap-y-1.5">
           <Swatch color="var(--color-rule-2)">RunMicrovm and token</Swatch>

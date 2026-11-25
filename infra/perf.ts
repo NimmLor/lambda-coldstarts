@@ -1,8 +1,8 @@
 /**
  * A scheduled cold-start benchmark in the style of maxday/lambda-perf. The PerfRun state machine
  * goes through every function, `CONCURRENCY` at a time, and beside them every MicroVM, one at a
- * time, each in an Express child workflow that forces `PERF_ROUNDS` cold starts one after another,
- * each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs in
+ * time, each in an Express child workflow that forces `PERF_ROUNDS` cold starts one after another
+ * (a MicroVM `PERF_MICROVM_ROUNDS`), each followed by `PERF_WARM` warm invocations (src/perf/measure.ts stores their REPORTs in
  * PerfResults), then records the run, stores its summary (src/perf/summarize.ts) and invalidates
  * the run history in CloudFront. PerfResults keeps a run for `RETENTION_DAYS`; on the 1st,
  * PerfExport (src/perf/export.ts) copies the month before to the PerfArchive bucket. PerfApi
@@ -16,11 +16,16 @@ import type { Microvm } from './microvm'
 import type { WebFunction } from './web-function'
 
 const ROUNDS = Number(process.env.PERF_ROUNDS ?? 10)
+/**
+ * Each MicroVM's rounds: its first answers barely vary, and every round reads its snapshot again,
+ * which costs more than the rest of a run together.
+ */
+const MICROVM_ROUNDS = Number(process.env.PERF_MICROVM_ROUNDS ?? 3)
 /** Invocations after each round's cold start, which find its environment warm. */
 const WARM = Number(process.env.PERF_WARM ?? 5)
 
 /** How often EventBridge Scheduler starts PerfRun. Other stages than production run when asked. */
-const SCHEDULE = 'rate(4 hours)'
+const SCHEDULE = 'rate(1 day)'
 /** When PerfExport exports the month before: on the 1st, well after that month's last run. */
 const EXPORT_SCHEDULE = 'cron(17 5 1 * ? *)'
 
@@ -215,7 +220,7 @@ export const createPerf = (
   const runId = '{% $states.context.Execution.StartTime %}'
 
   /**
-   * A Map over `targets`, `maxConcurrency` at a time. Each target's rounds run as an Express child
+   * A Map over `targets`, `maxConcurrency` at a time. Each target's `count` rounds run as an Express child
    * workflow, billed by duration instead of by state transition. A child that runs out of its 5
    * minutes loses its remaining rounds, like a Skipped one, through ToleratedFailurePercentage on
    * PerfRun below. `prefix` keeps the state names unique, as Step Functions wants.
@@ -224,7 +229,8 @@ export const createPerf = (
     name: string,
     prefix: string,
     targets: unknown[],
-    maxConcurrency: number
+    maxConcurrency: number,
+    count: number
   ) => {
     const measureRound = sst.aws.StepFunctions.lambdaInvoke({
       name: `${prefix}Measure`,
@@ -241,7 +247,7 @@ export const createPerf = (
     // One round after another: each one changes the function's configuration, which can't overlap.
     const rounds = sst.aws.StepFunctions.map({
       name: `${prefix}Rounds`,
-      items: Array.from({ length: ROUNDS }, (_, i) => i + 1),
+      items: Array.from({ length: count }, (_, i) => i + 1),
       itemSelector: {
         runId: '{% $states.input.runId %}',
         target: '{% $states.input.target %}',
@@ -269,9 +275,9 @@ export const createPerf = (
     })
   }
 
-  const runFunctions = measureEach('Functions', '', functionTargets, CONCURRENCY)
-  // One size at a time: the account may run 8 GB of MicroVMs at once, all of it the largest size's.
-  const runMicrovms = measureEach('Microvms', 'Microvm', microvmTargets, 1)
+  const runFunctions = measureEach('Functions', '', functionTargets, CONCURRENCY, ROUNDS)
+  // One size at a time, so a round doesn't wait for another's memory under the account's 8 GB quota.
+  const runMicrovms = measureEach('Microvms', 'Microvm', microvmTargets, 1, MICROVM_ROUNDS)
   // The MicroVMs beside the functions, so a run takes as long as the longer of the two. Their
   // rounds call RunMicrovm and TerminateMicrovm, not UpdateFunctionConfiguration, so they don't
   // slow the functions' rounds down.

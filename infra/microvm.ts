@@ -37,10 +37,11 @@ const NODE_IMAGE = 'public.ecr.aws/lambda/nodejs:24'
 const MINIMAL_IMAGE = 'public.ecr.aws/lambda/microvms:al2023-minimal'
 
 /**
- * The baselines Lambda offers, an image each: a vCPU per 2 GB, and up to four times both while
- * busy. The memory is the image's, so every size needs its own.
+ * The baselines measured, an image each: a vCPU per 2 GB, and up to four times both while busy. The
+ * memory is the image's, so every size needs its own. Lambda offers 4 and 8 GB too, but every
+ * MicroVM reads its snapshot, which is most of what a MicroVM costs, and theirs are the largest.
  */
-const MEMORY_SIZES = [512, 1024, 2048, 4096, 8192]
+const MEMORY_SIZES = [512, 1024, 2048]
 
 /** The port src/microvm.ts listens on, where Lambda sends requests and its build hooks. */
 const PORT = 8080

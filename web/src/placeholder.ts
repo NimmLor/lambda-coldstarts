@@ -3,9 +3,9 @@ import { ARCHS, type RunPoints, toPoints, VARIANTS } from './data'
 
 /** The sizes infra/functions.ts deploys every Event Function at by default. */
 const MEMORIES = [128, 256, 512, 1024, 1769]
-/** infra/microvm.ts's: every size Lambda offers a MicroVM at, unless the variant names its own. */
-const MICROVM_SIZES: Record<string, number[]> = { BunCompileAotTrimMicroVm: [2048] }
-const MICROVM_DEFAULT_SIZES = [512, 1024, 2048, 4096, 8192]
+/** infra/microvm.ts's sizes, unless the variant names its own. */
+const MICROVM_SIZES: Record<string, number[]> = {}
+const MICROVM_DEFAULT_SIZES = [512, 1024, 2048]
 /** The one size every Web Function has. */
 const WEB_MB = 2048
 /** What PerfSchedule measures each function with. */
@@ -57,9 +57,6 @@ const TYPICAL: Record<string, number[]> = {
   'Node24MicroVm/512': [59, 1640, 1230],
   'Node24MicroVm/1024': [58, 1570, 1240],
   'Node24MicroVm/2048': [59, 1550, 1240],
-  'Node24MicroVm/4096': [60, 1960, 1650],
-  'Node24MicroVm/8192': [59, 3060, 2790],
-  'BunCompileAotTrimMicroVm/2048': [25, 1590, 1280],
   // Not measured yet: the variant each repackages, with only its handler in the .zip.
   Node24Cmr: [110, 2.2, 75, 254, 12, 0, 86],
   Node27Cmr: [166, 2.3, 78, 282, 9.3, 0, 128],
@@ -152,14 +149,14 @@ const summary = (base: string, arch: string, memoryMb: number): HistoryFunction 
 }
 
 /** How often PerfSchedule starts a run. */
-const RUN_EVERY_MS = 4 * 36e5
-/** Half of that, as on average: "Last run 2 hours ago" is as wide as most. */
+const RUN_EVERY_MS = 24 * 36e5
+/** Half of that, as on average: "Last run 12 hours ago" is as wide as most. */
 const AGE_MS = RUN_EVERY_MS / 2
 /** Enough for the charts' dates to spread along their axes, short of a second range to pick. */
-const RUNS = 25
+const RUNS = 6
 
 /**
- * Four days of runs of every function production deploys, oldest first, which the dashboard lays
+ * Six days of runs of every function production deploys, oldest first, which the dashboard lays
  * out until the first load, its readings veiled: the page loads into the layout it then keeps.
  */
 export const placeholderHistory = (now = Date.now()): RunPoints[] => {

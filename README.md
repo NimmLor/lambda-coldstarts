@@ -5,7 +5,7 @@
 # ⚡ lambda-coldstarts
 
 **How fast do Bun, LLRT and Node.js cold-start on AWS Lambda?**<br>
-180 real Lambdas, benchmarked every 4 hours.
+180 real Lambdas, benchmarked every day.
 
 [🌐 Live results](https://coldstarts.github.nimmervoll.work) ·
 [🚀 Deploy](#-deploy) ·
@@ -39,7 +39,6 @@ public Function URL, on **x86_64 and arm64** at **128, 256, 512, 1024 and 1769 M
 | 🟢  | `Node22` · `Node24` · `Node26` | SST's esbuild bundle on `nodejs22.x`, `nodejs24.x`, `nodejs26.x` (GA since 2026-11-20)   |
 | 🌐  | `Node24Web` · `Node26Web`      | a `node:http` server on a [Lambda Web Function](#-the-web-function), on Node.js 24 or 26 |
 | 📦  | `Node24MicroVm`                | the same server in a [Lambda MicroVM](#-the-microvm), resumed from a snapshot            |
-| 📦  | `BunCompileAotTrimMicroVm`     | that server as an `--aot --trim` executable in a MicroVM, without the AOT shim           |
 | 🧱  | `Node24Cmr`                    | `Node24` on a [customer-managed runtime](#-the-customer-managed-runtimes) of `nodejs:24` |
 | 🧱  | `Node27Cmr`                    | `Node24Cmr`'s image with the Node.js 27 alpha in place of Node.js 24                     |
 | 🧱  | `BunRuntimeCmr`                | `BunRuntime`'s `index.js` alone, the `bun` executable in the runtime image               |
@@ -220,31 +219,33 @@ snapshot. [`infra/microvm.ts`](infra/microvm.ts) builds `Node24MicroVm` from
 - ⏱️ **First answer instead**: each round runs a new MicroVM and times, from PerfMeasure, calling
   RunMicrovm, getting an auth token and its first response. The endpoint holds a request for about
   1.3 s while the MicroVM resumes, then answers 502 with `x-aws-proxy-error: MICROVM_CONNECT_FAILED`,
-  which the 4 and 8 GB sizes often outlast; the round asks again until one is answered. A
-  turned-away first request costs about 2 s more, so those sizes' first answers come in two modes.
-  `firstRequestMs` is the last part alone. The site's MicroVMs tab sets it against its runtime's
+  and the round asks again until one is answered. `firstRequestMs` is the last part alone. The site's MicroVMs tab sets it against its runtime's
   cold invoke round trip as an Event Function at the size nearest 2 GB (`roundTripMs`, which every
   round now records), from the same PerfMeasure.
 - 🐢 **No warm round trips.** At 128 MB, PerfMeasure gets CPU in 20 ms slices, and a warm request
   of ~5 ms comes back as 20, 40 or 60. The cold ones barely move: a MicroVM's first answer took
   1.34–1.36 s from a 1769 MB PerfMeasure and 1.32–1.43 s from the 128 MB one.
-- 📏 **Every size Lambda offers, on arm64**: baselines of 0.5, 1, 2, 4 and 8 GB with a vCPU per 2 GB,
-  each bursting to four times both, as `Node24MicroVmM512` to `Node24MicroVmM8192`. The memory is
-  the image's, so each size is an image of its own. Lambda builds a snapshot for Graviton3 and one
+- 📏 **0.5, 1 and 2 GB, on arm64**: baselines with a vCPU per 2 GB, each bursting to four times
+  both, as `Node24MicroVmM512` to `Node24MicroVmM2048`. Lambda offers 4 and 8 GB too, but theirs
+  are the largest snapshots to read, see below. The memory is the image's, so each size is an
+  image of its own. Lambda builds a snapshot for Graviton3 and one
   for Graviton4 and picks either per MicroVM; `graviton` says which. An account builds 5 images
   at once, so a deploy builds at most 4, about 2 minutes each, and leaves one for another stage.
-- 🥟 **`BunCompileAotTrimMicroVm`** runs src/microvm.ts as an `--aot --trim` executable, which
-  `bun run build` builds into `dist/arm64` beside the Lambda variants, on Lambda's minimal
-  `al2023-minimal` container at 2 GB. It needs no [AOT shim](#-the-aot-shim): a MicroVM is a whole VM
-  with 512 MB at least, so neither `mincore` nor the 256 MB map fails. It answers as fast as
-  Node.js, as both resume a snapshot of a server that's already up, in less than half the memory.
-- 🧮 **One size at a time**, beside the functions: an account may run 8 GB of MicroVMs at once
-  unless the quota is raised, all of it the largest size's. A round that finds the quota taken, by
-  another stage's MicroVM say, waits up to 90 s before it starts its clock.
+- 🥟 **A Bun server too:** a `microvm` variant with `bun: 'aot-trim'` runs src/microvm.ts as an
+  `--aot --trim` executable, which `bun run build` builds into `dist/arm64`, on Lambda's minimal
+  `al2023-minimal` container. It needs no [AOT shim](#-the-aot-shim): a MicroVM is a whole VM with
+  512 MB at least, so neither `mincore` nor the 256 MB map fails. `BunCompileAotTrimMicroVm` did
+  until November 2026, at 2 GB: it answered as fast as Node.js, as both resume a snapshot of a
+  server that's already up, in less than half the memory.
+- 🧮 **One size at a time**, beside the functions, under the account's 8 GB of MicroVMs at once
+  unless the quota is raised. A round that finds the quota taken, by another stage's MicroVM say,
+  waits up to 90 s before it starts its clock.
 - 🧹 **Every MicroVM is terminated** at the end of its round, and lives 2 minutes at most should
-  that fail. A round costs a few seconds of compute plus the snapshot it resumes from, 0.4 GB at
-  0.5 GB up to 1.1 GB at 8 GB: all five sizes come to about half a cent a round at us-east-1's
-  prices, at most ~$11 a month on the 4-hour schedule.
+  that fail.
+- 💸 **Reading the snapshot is most of the cost.** Every MicroVM reads the one it resumes from,
+  0.4 GB at 0.5 GB up to 1.1 GB at 8 GB: about $0.0024 a round in eu-central-1, far more than its
+  seconds of compute. Six images at 10 rounds every 4 hours came to $0.85 a day, three quarters of
+  the stack's bill, so each image now runs `PERF_MICROVM_ROUNDS` rounds a day, 3 by default.
 - 📌 **The base image is pinned** (`al2023-1` version 2). Lambda stops running a version 90 days
   after the next one comes out; `ListManagedMicrovmImageVersions` lists them.
 
@@ -286,13 +287,13 @@ aws provider has none yet) and `docker-build`.
 
 ## 🕐 Scheduled runs
 
-In production the stack also benchmarks itself every 4 hours, the way
+In production the stack also benchmarks itself every day, the way
 [maxday/lambda-perf](https://github.com/maxday/lambda-perf) does. DynamoDB keeps each run for 120
 days; on the 1st, the month before goes to S3 for good.
 
 ```mermaid
 flowchart LR
-  S[⏰ EventBridge Scheduler<br>every 4 hours] --> R[PerfRun<br>Step Functions, Standard]
+  S[⏰ EventBridge Scheduler<br>every day] --> R[PerfRun<br>Step Functions, Standard]
   R -- an Express child per function,<br>40 at a time --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm + 5 /work]
   M --> D[(PerfResults<br>DynamoDB, 120 days)]
   R -- at the end --> Z[PerfSummarize] --> D
@@ -315,7 +316,7 @@ flowchart LR
 - 🧒 Each function's rounds run as an **Express child workflow**, which bills by duration instead of
   by state transition. A child gets 5 minutes; one that runs out loses its remaining rounds, like
   one whose rounds keep failing, and the run goes on without it.
-- 🗃️ CloudFront keeps `/api/runs/latest` and `/api/runs/history` for 4 hours and, past that, serves
+- 🗃️ CloudFront keeps `/api/runs/latest` and `/api/runs/history` for a day and, past that, serves
   its copy while it fetches a new one. PerfRun's last step, `Invalidate`, invalidates both as soon
   as the run's summary is stored, each under `/api/runs/…` and `/runs/…`, the path PerfRouter
   rewrites it to before its cache.
@@ -339,6 +340,7 @@ up on the 1st. Run `perf-export --all` first.
 | Variable                | Default |                                                                                                   |
 | ----------------------- | ------- | ------------------------------------------------------------------------------------------------- |
 | `PERF_ROUNDS`           | `10`    | Cold starts per function and run                                                                  |
+| `PERF_MICROVM_ROUNDS`   | `3`     | Cold starts per MicroVM image and run                                                             |
 | `PERF_WARM`             | `5`     | Warm invocations after each cold start                                                            |
 | `PERF_ADMIN_SECRET`     | unset   | Turns on the admin routes (URL-safe characters only)                                              |
 | `POSTHOG_PROJECT_TOKEN` | unset   | Turns on the site's PostHog analytics in production, sent through `/ingest` to PostHog's EU cloud |
