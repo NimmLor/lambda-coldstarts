@@ -239,9 +239,57 @@ export const memoryFinding = (
   }
 }
 
+/** The compared functions' names on a finding's bars, short enough to leave the bars room. */
+const SHORT: Record<string, string> = {
+  Llrt: 'LLRT',
+  [BASELINE]: 'Node.js 24',
+  BunRuntimeCmr: 'Bun',
+  [AOT]: 'Bun AOT',
+}
+
+/**
+ * Which of the glance's functions runs src/work.ts's workload fastest the first time, at the
+ * glance's size, against the baseline; and the two once the engine has seen the code.
+ */
+export const workloadFinding = (
+  functions: Fn[],
+  figures: Map<string, Figures>
+): Finding | undefined => {
+  const runs = compared(functions).flatMap((f) => {
+    const x = figures.get(f.id)
+    return x?.workFirst === undefined ? [] : [{ f, first: x.workFirst, warm: x.workWarm }]
+  })
+  const base = runs.find((r) => r.f.base === BASELINE)
+  if (!base || runs.length < 2) return undefined
+  const lead = runs.reduce((best, r) => (r.first < best.first ? r : best))
+  const times = base.first / lead.first
+  const ms = (n: number) => n.toFixed(n >= 10 ? 0 : 1)
+  return {
+    tab: 'work',
+    title:
+      lead === base || times < NOTABLE
+        ? `${base.f.name} runs the workload about as fast as any`
+        : `${lead.f.name} runs the workload ${times.toFixed(1)}× as fast as ${base.f.name}`,
+    figure: `${ms(base.first)} → ${ms(lead.first)} ms`,
+    sub:
+      `Its first run at ${GLANCE.memoryMb} MB: 2,000 orders ranked and serialized ten times over.` +
+      (lead !== base && lead.warm !== undefined && base.warm !== undefined
+        ? ` Once warm, ${ms(lead.warm)} against ${ms(base.warm)} ms.`
+        : ''),
+    mark: {
+      kind: 'bars',
+      label: `The workload’s first run at ${GLANCE.memoryMb} MB: ${runs.map((r) => `${r.f.name} ${ms(r.first)} ms`).join(', ')}`,
+      bars: runs
+        .toSorted((a, b) => b.first - a.first)
+        .map((r) => ({ name: SHORT[r.f.base] ?? r.f.name, value: r.first, color: r.f.color })),
+    },
+  }
+}
+
 /** Every finding the figures support, in the tabs' order. */
 export const findings = (functions: Fn[], figures: Map<string, Figures>) =>
   [
+    workloadFinding(functions, figures),
     archFinding(functions, figures),
     runtimeFinding(functions, figures),
     memoryFinding(functions, figures),

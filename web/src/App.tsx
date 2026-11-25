@@ -39,6 +39,7 @@ import { FILTERS, TABS, type TabId, type TabProps, tabOf } from './tabs'
 import { Segmented } from './ui'
 import { WarmStarts } from './WarmStarts'
 import { WebFunction } from './WebFunction'
+import { Workload } from './Workload'
 
 /** PerfApi, behind the same CloudFront distribution; see infra/perf.ts and dev.ts. */
 const API = '/api'
@@ -53,6 +54,7 @@ const fetchJson = async <T,>(path: string): Promise<T> => {
 const PANELS: Record<TabId, (props: TabProps & { onPick: (mb: number) => void }) => ReactNode> = {
   cold: (p) => <ColdStarts {...p} />,
   warm: (p) => <WarmStarts {...p} />,
+  work: (p) => <Workload {...p} />,
   arch: (p) => (
     <Architectures
       view={p.view}

@@ -18,14 +18,15 @@ import { FamilyIcon } from './ui'
 type Row = { f: Fn; x: Figures }
 
 /** What the board ranks a column's leader by: less is better in each. */
-const LED = ['cold', 'trip', 'p99', 'warm', 'mem'] as const
+const LED = ['cold', 'trip', 'p99', 'warm', 'workFirst', 'mem'] as const
 
 /** Past this many times its median, a function's slowest 1% is a tail worth flagging. */
 const TAIL = 2
 
 /** The board's columns from `xl`; below it a row stacks, each reading under a label of its own. */
-const COLUMNS = 'xl:grid-cols-[232px_216px_minmax(0,1fr)_136px_64px_64px]'
-const HALF = 'col-span-full md:col-span-3 xl:col-span-1'
+// Narrower than before the workload's column, so the first answer's bar keeps its width.
+const COLUMNS = 'xl:grid-cols-[208px_188px_minmax(0,1fr)_128px_56px_76px_56px] xl:gap-x-6'
+const HALF = 'col-span-full md:col-span-4 xl:col-span-1'
 const STAT = 'flex flex-col gap-1 md:col-span-2 xl:col-span-1 xl:-mr-1 xl:items-end'
 
 /** A column's name over a reading, where the board has no header row. */
@@ -72,7 +73,7 @@ const Head = ({ title, unit, end }: { title: string; unit?: string; end?: boolea
 /**
  * The compared functions, fastest cold start first, each with every measure of the glance: its
  * init against the baseline's, its first answer by what it waited for, its median and slowest 1%,
- * its warm start and its memory.
+ * its warm start, the workload's first run and its memory.
  */
 const Board = ({
   rows,
@@ -125,6 +126,7 @@ const Board = ({
           </div>
           <Head title="Spread" unit="median → p99, ms" end />
           <Head title="Warm" unit="ms" end />
+          <Head title="Workload" unit="first run, ms" end />
           <Head title="Memory" unit="MB" end />
         </div>
         <Legend className="border-b border-rule px-5 py-3 sm:px-6 xl:hidden" />
@@ -139,7 +141,7 @@ const Board = ({
             <div
               key={f.base}
               role="row"
-              className={`grid grid-cols-2 items-center gap-x-7 gap-y-4 border-b border-rule px-5 py-4.5 sm:px-6 md:grid-cols-6 ${COLUMNS}`}
+              className={`grid grid-cols-2 items-center gap-x-7 gap-y-4 border-b border-rule px-5 py-4.5 sm:px-6 md:grid-cols-8 ${COLUMNS}`}
             >
               <div role="rowheader" className={`${HALF} flex min-w-0 items-center gap-3`}>
                 <FamilyIcon family={f.family} size={20} />
@@ -253,6 +255,15 @@ const Board = ({
                 <Label>Warm, ms</Label>
                 <span className="measured max-xl:-ml-1">
                   <Lead on={x.warm !== undefined && x.warm === least.warm}>{fixed(x.warm, 2)}</Lead>
+                </span>
+              </div>
+
+              <div role="cell" className={STAT}>
+                <Label>Workload, first run, ms</Label>
+                <span className="measured max-xl:-ml-1">
+                  <Lead on={x.workFirst !== undefined && x.workFirst === least.workFirst}>
+                    {fixed(x.workFirst, x.workFirst !== undefined && x.workFirst >= 100 ? 0 : 1)}
+                  </Lead>
                 </span>
               </div>
 
@@ -464,7 +475,7 @@ export const Glance = ({
       </div>
       <Board rows={rows} total={total} onOpen={onOpen} />
       {findings.length > 0 && (
-        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] gap-3 p-0">
+        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(16rem,100%),1fr))] gap-3 p-0">
           {findings.map((f) => (
             <li key={f.tab} className="flex">
               <button

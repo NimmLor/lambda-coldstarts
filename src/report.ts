@@ -3,6 +3,8 @@
  * Kept free of `node:fs` and other heavy imports: whatever this module pulls in stays in a
  * `--trim` build.
  */
+import { passesOf, recordsOf, runWork } from './work'
+
 const round = (value: number) => Math.round(value * 100) / 100
 const toMb = (bytes: number) => round(bytes / 1024 / 1024)
 
@@ -31,6 +33,7 @@ const vcpus = Number(navigator.hardwareConcurrency)
 
 type UrlEventLike = {
   rawPath?: unknown
+  queryStringParameters?: { records?: unknown; passes?: unknown }
   requestContext?: { http?: { method?: unknown } }
 }
 
@@ -39,12 +42,27 @@ type UrlEventLike = {
  * parsed JSON, so its fields are checked here, once, and the report gets plain strings.
  */
 const readRequest = (event: unknown) => {
-  const { rawPath, requestContext } = (event ?? {}) as UrlEventLike
+  const { rawPath, queryStringParameters, requestContext } = (event ?? {}) as UrlEventLike
   const method = requestContext?.http?.method
   return {
     method: typeof method === 'string' ? method : 'INVOKE',
     path: typeof rawPath === 'string' ? rawPath : null,
+    query: queryStringParameters,
   }
+}
+
+/**
+ * src/work.ts's workload, for a request to `/work` (`?records=` and `?passes=` set its size), timed
+ * on its own; `null` for every other request, which stays the hello world the cold starts are
+ * measured with.
+ */
+const doWork = (path: string | null, query: UrlEventLike['queryStringParameters']) => {
+  if (path !== '/work') return null
+  const records = recordsOf(query?.records)
+  const passes = passesOf(query?.passes)
+  const start = performance.now()
+  const digest = runWork(records, passes)
+  return { records, passes, digest, workMs: round(performance.now() - start) }
 }
 
 export type ReportInput = {
@@ -56,14 +74,18 @@ export type ReportInput = {
 }
 
 export const buildReport = ({ event, remainingTimeMs, executableBytes }: ReportInput) => {
-  const handlerStart = performance.now()
   invocations += 1
+  const { query, ...request } = readRequest(event)
+  // Before the report, so `handlerMs` stays the report's own time and the memory includes the work.
+  const work = doWork(request.path, query)
+  const handlerStart = performance.now()
   const memory = process.memoryUsage()
 
   const body = {
     variant,
     runtime,
-    request: readRequest(event),
+    request,
+    work,
     lambda: {
       functionName,
       region,

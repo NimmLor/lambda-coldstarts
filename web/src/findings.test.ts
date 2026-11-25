@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { HistoryFunction } from '../../src/perf/history'
 import { figuresFor, figuresOf, runsIn, runsOf, toPoints, versionName } from './data'
-import { archFinding, findings, memoryFinding, runtimeFinding } from './findings'
+import { archFinding, findings, memoryFinding, runtimeFinding, workloadFinding } from './findings'
 import { tabOf } from './tabs'
 
 const stats = (avg: number) => ({ p50: avg, p90: avg, avg })
@@ -205,4 +205,65 @@ test('the memory finding reports how little memory moves the cold start', () => 
     run(1, [at(128, 110, 5.4), summary('LlrtArm64M1769', 'arm64', 1769, { cold: 50 })]),
   ]
   expect(memoryFinding(apart[0]!.functions, figuresFor(apart, 'current'))).toBeUndefined()
+})
+
+test('the workload’s figures come only from runs of the latest run’s size', () => {
+  const worked = (cold: number, workFirst: number, workSize?: number) =>
+    ({
+      ...bun(cold, 'bun 1.4.5'),
+      workFirstMs: stats(workFirst),
+      workWarmMs: stats(workFirst / 2),
+      workDurationMs: stats(workFirst / 2 + 1),
+      workSize: workSize ?? null,
+    }) as HistoryFunction
+  const runs = [
+    run(3, [worked(100, 3)]),
+    run(2, [worked(110, 30, 20_000)]),
+    run(1, [worked(120, 40, 20_000)]),
+  ]
+  const f = runs.at(-1)!.functions[0]!
+  const figures = figuresOf(runs, f, '7')!
+  expect(figures.workFirst).toBe(35)
+  expect(figures.workDur).toBe(18.5)
+  // The cold starts are the hello world's in every run, so all three count.
+  expect(figures.cold).toBe(110)
+})
+
+test('the workload finding sets the fastest first run of the four against Node.js 24', () => {
+  const worked = (functionId: string, cold: number, first: number, warm: number) =>
+    ({
+      ...summary(functionId, 'arm64', 256, { cold }),
+      workFirstMs: stats(first),
+      workWarmMs: stats(warm),
+      workSize: 20_000,
+    }) as HistoryFunction
+  const runs = [
+    run(1, [
+      worked('LlrtArm64M256', 44, 726, 691),
+      worked('Node24Arm64M256', 106, 415, 173),
+      worked('BunCompileAotTrimArm64M256', 149, 104, 60),
+      // Not one of the four.
+      worked('BunCompileAotArm64M256', 150, 90, 50),
+    ]),
+  ]
+  const finding = workloadFinding(runs[0]!.functions, figuresFor(runs, 'current'))!
+  expect(finding.tab).toBe('work')
+  expect(finding.title).toBe(
+    'Bun AOT executable, trimmed runs the workload 4.0× as fast as Node.js 24'
+  )
+  expect(finding.figure).toBe('415 → 104 ms')
+  expect(finding.sub).toEndWith('Once warm, 60 against 173 ms.')
+  expect(finding.mark).toMatchObject({
+    kind: 'bars',
+    bars: [
+      { name: 'LLRT', value: 726 },
+      { name: 'Node.js 24', value: 415 },
+      { name: 'Bun AOT', value: 104 },
+    ],
+  })
+})
+
+test('the workload finding waits for runs that measured it', () => {
+  const runs = [run(1, [summary('Node24Arm64M256', 'arm64', 256, { cold: 106 })])]
+  expect(workloadFinding(runs[0]!.functions, figuresFor(runs, 'current'))).toBeUndefined()
 })

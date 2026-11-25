@@ -14,6 +14,7 @@ import {
   waitUntilFunctionUpdatedV2,
 } from '@aws-sdk/client-lambda'
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb'
+import { WORK_DIGEST, WORK_PASSES, WORK_RECORDS } from '../work'
 import { expiresAt, type Sample, sampleSk, samplesPk } from './keys'
 import { type MicrovmTarget, measureMicrovm } from './microvm'
 import { parseReport } from './report-line'
@@ -41,12 +42,25 @@ const EVENT = new TextEncoder().encode(
   JSON.stringify({ rawPath: '/perf', requestContext: { http: { method: 'GET' } } })
 )
 
+// The same, to `/work`: src/work.ts's workload, with its size in the request rather than a
+// constant an --aot build could fold.
+const WORK_EVENT = new TextEncoder().encode(
+  JSON.stringify({
+    rawPath: '/work',
+    queryStringParameters: { records: String(WORK_RECORDS), passes: String(WORK_PASSES) },
+    requestContext: { http: { method: 'GET' } },
+  })
+)
+
+/** `/work` invocations after the warm ones; the first runs the workload's code for the first time. */
+const WORK_RUNS = 5
+
 const round2 = (value: number) => Math.round(value * 100) / 100
 
-const invoke = async (target: FunctionTarget) => {
+const invoke = async (target: FunctionTarget, event = EVENT) => {
   const start = performance.now()
   const result = await lambda.send(
-    new InvokeCommand({ FunctionName: target.name, LogType: 'Tail', Payload: EVENT })
+    new InvokeCommand({ FunctionName: target.name, LogType: 'Tail', Payload: event })
   )
   const roundTripMs = round2(performance.now() - start)
   const payload = new TextDecoder().decode(result.Payload)
@@ -55,6 +69,27 @@ const invoke = async (target: FunctionTarget) => {
   }
   const report = parseReport(Buffer.from(result.LogResult ?? '', 'base64').toString('utf8'))
   return { report, payload, roundTripMs }
+}
+
+/**
+ * One `/work` invocation: how long the workload took by the handler's account, and Lambda's
+ * Duration of the invocation. `undefined` when it found a new environment, had no workload to run,
+ * or got a wrong digest from it, which a build that skipped the work would.
+ */
+const invokeWork = async (target: FunctionTarget) => {
+  const { report, payload } = await invoke(target, WORK_EVENT)
+  if (report.initMs !== undefined) return undefined
+  const { work } = JSON.parse(JSON.parse(payload).body)
+  if (!work) return undefined
+  if (work.digest !== WORK_DIGEST) {
+    console.error(`${target.id} answered /work with digest ${work.digest}, not ${WORK_DIGEST}`)
+    return undefined
+  }
+  return {
+    workMs: Number(work.workMs),
+    durationMs: report.durationMs,
+    size: Number(work.records) * Number(work.passes),
+  }
 }
 
 const measureFunction = async (
@@ -96,6 +131,20 @@ const measureFunction = async (
     if (warmReport.initMs === undefined) warmMs.push(warmReport.durationMs)
   }
 
+  // After the warm ones, so those stay the hello world's alone. The handler's own timing of the
+  // workload, which Lambda's Duration would round and add the runtime loop to.
+  const workMs: number[] = []
+  const workDurationMs: number[] = []
+  let workSize: number | undefined
+  for (let i = 0; i < WORK_RUNS; i++) {
+    const work = await invokeWork(target)
+    // A new environment's would be a cold start's; a function deployed before `/work` has none.
+    if (work === undefined) break
+    workMs.push(work.workMs)
+    workDurationMs.push(work.durationMs)
+    workSize = work.size
+  }
+
   const body = JSON.parse(JSON.parse(payload).body)
   return {
     functionId: target.id,
@@ -110,6 +159,9 @@ const measureFunction = async (
     maxMemoryMb: report.maxMemoryMb,
     warmMs,
     startupMs: body.container?.startupMs,
+    workMs: workMs.length ? workMs : undefined,
+    workDurationMs: workDurationMs.length ? workDurationMs : undefined,
+    workSize,
     roundTripMs,
     // What the function was built with, see infra/functions.ts; the Node ones say which Node they are.
     version: config.Description || body.runtime,

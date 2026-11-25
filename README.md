@@ -155,6 +155,35 @@ then fires concurrent cold invocations. The numbers come from Lambda's own `REPO
 Results land in `bench-results/` as Markdown and JSON. `bench` measures functions only; the Web
 Function and the MicroVM are measured by the scheduled runs.
 
+### 🏋️ The workload
+
+A request to `/work` makes the handler do some work before it answers:
+[`src/work.ts`](src/work.ts) builds 2,000 orders from a seeded PRNG, keeps the larger ones, ranks
+and groups them, and serializes the result, in 10 passes of fresh orders. That measures the engines rather than their startup:
+V8's and JavaScriptCore's JITs, an `--aot` build's native code, QuickJS's interpreter.
+
+- 🧊 **Cold starts stay the hello world's.** The workload is a few dozen lines of plain JS with no
+  imports and no data, so it adds nothing to a package or a `--trim` build, and it never runs while
+  the module is evaluated.
+- 🔁 **Measured after the warm calls**: each scheduled round sends `/work` 5 more times. The first
+  runs code the process has never run, which is where a JIT is slowest; the others show how far it
+  catches up. The Workload tab shows the first run, and the later ones beside it.
+- ⏱️ **Timed by the handler** (`workMs`), around the workload alone: Lambda's `Duration` would round
+  it to the millisecond and add the runtime's loop.
+- ✅ **Checked**: the size comes in the request (`?records=` up to 20,000, `?passes=` up to 20), so
+  no build can fold it, and PerfMeasure leaves out any answer whose digest isn't `WORK_DIGEST`.
+- 🏋️ **Passes, not more orders**: each pass takes CPU time but no more memory. Node.js keeps ~75 MB
+  of 128 MB for itself; 20,000 orders at once would measure its garbage collector, or run out.
+- 🐢 **CPU scales with memory**: one pass took 2–10 ms at 1769 MB, so short that the request fee
+  and Lambda's rounding up to the millisecond made most of a call's cost; 10 passes take ~20–100 ms
+  there, and about 14× that at 128 MB. Runs store the size (`workSize`), and the site averages only
+  runs of the latest one.
+- 💸 **Priced at every size**: PerfMeasure keeps Lambda's `Duration` of each `/work` call too. The
+  Memory & cost tab's Cost efficiency card sets the hello world and the workload side by side,
+  cold or warm, bills each call as Lambda would at every size, and picks each function's cheapest
+  size, its fastest, and the best balance: the least cost × time. A cold workload call isn't
+  measured as one: it's the hello world's cold start plus the workload's first run.
+
 ### 🌐 The Web Function
 
 [Lambda Web Functions](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html) run an
@@ -264,7 +293,7 @@ days; on the 1st, the month before goes to S3 for good.
 ```mermaid
 flowchart LR
   S[⏰ EventBridge Scheduler<br>every 4 hours] --> R[PerfRun<br>Step Functions, Standard]
-  R -- an Express child per function,<br>40 at a time --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm]
+  R -- an Express child per function,<br>40 at a time --> M[PerfMeasure<br>PERF_ROUNDS × cold + PERF_WARM warm + 5 /work]
   M --> D[(PerfResults<br>DynamoDB, 120 days)]
   R -- at the end --> Z[PerfSummarize] --> D
   R -- then invalidates /api/runs/* --> C
@@ -277,7 +306,7 @@ flowchart LR
 
 | Piece           | Source                                           | Job                                                                                               |
 | --------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm invokes                           |
+| `PerfMeasure`   | [`src/perf/measure.ts`](src/perf/measure.ts)     | One round: retire warm environments, one cold invoke, then warm and `/work` invokes               |
 | `PerfSummarize` | [`src/perf/summarize.ts`](src/perf/summarize.ts) | Per-function p50/p90/avg/min/max, stored with the run                                             |
 | `PerfExport`    | [`src/perf/export.ts`](src/perf/export.ts)       | A month of runs and samples, as gzipped NDJSON in `PerfArchive`                                   |
 | `PerfApi`       | [`src/perf/api.ts`](src/perf/api.ts)             | `GET /runs/latest`, the newest run the site paints first, then `GET /runs/history`, the latest 90 |

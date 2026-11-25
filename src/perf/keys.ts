@@ -60,6 +60,19 @@ export type Sample = {
   /** The handler's own `startupMs`, see src/report.ts. */
   startupMs?: number
   /**
+   * The handler's own timing of src/work.ts's workload in each `/work` invocation after the warm
+   * ones, in order: the first ran its code for the first time in the process. Missing for a Web
+   * Function, a MicroVM, and runs from before it was measured.
+   */
+  workMs?: number[]
+  /** Lambda's Duration of the same invocations, in the same order: what each was billed for. */
+  workDurationMs?: number[]
+  /**
+   * How many orders each `/work` call processed: records per pass times passes. Runs of another
+   * size aren't comparable. Missing from runs from before it was recorded, of 2,000.
+   */
+  workSize?: number
+  /**
    * What it ran on: the function's description, which infra/functions.ts sets to what built it, e.g.
    * `bun 1.4.4-canary.1+72ab4f530`, or else the handler's own `runtime`, e.g. `node 24.11.1`.
    * Missing from older runs.

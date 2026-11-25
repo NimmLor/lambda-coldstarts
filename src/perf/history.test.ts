@@ -17,6 +17,10 @@ const summary: FunctionSummary = {
   startupMs: stats,
   roundTripMs: null,
   firstRequestMs: null,
+  workFirstMs: stats,
+  workWarmMs: { ...stats, samples: 8 },
+  workDurationMs: { ...stats, samples: 8 },
+  workSize: 20_000,
   durationMsAvg: 2,
   maxMemoryMbAvg: 70,
   initDurations: [40, 20],
@@ -47,6 +51,10 @@ it('drops the keys, the extremes and the sample counts, and keeps the rest', () 
         startupMs: { p50: 30, p90: 38, avg: 30 },
         roundTripMs: null,
         firstRequestMs: null,
+        workFirstMs: { p50: 30, p90: 38, avg: 30 },
+        workSize: 20_000,
+        workWarmMs: { p50: 30, p90: 38, avg: 30 },
+        workDurationMs: { p50: 30, p90: 38, avg: 30 },
         durationMsAvg: 2,
         maxMemoryMbAvg: 70,
         initDurations: [40, 20],
@@ -56,7 +64,15 @@ it('drops the keys, the extremes and the sample counts, and keeps the rest', () 
 })
 
 it('leaves out the statistics an older summary lacks', () => {
-  const { startupMs, roundTripMs, firstRequestMs, ...old } = summary
+  const {
+    startupMs,
+    roundTripMs,
+    firstRequestMs,
+    workFirstMs,
+    workWarmMs,
+    workDurationMs,
+    ...old
+  } = summary
   const [f] = toHistoryRun({ functions: [old] }).functions
   expect(JSON.parse(JSON.stringify(f))).not.toContainKey('startupMs')
   expect(f!.initMs).toEqual({ p50: 30, p90: 38, avg: 30 })
