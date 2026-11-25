@@ -206,3 +206,25 @@ test('the memory finding reports how little memory moves the cold start', () => 
   ]
   expect(memoryFinding(apart[0]!.functions, figuresFor(apart, 'current'))).toBeUndefined()
 })
+
+test('the workload’s figures come only from runs of the latest run’s size', () => {
+  const worked = (cold: number, workFirst: number, workSize?: number) =>
+    ({
+      ...bun(cold, 'bun 1.4.5'),
+      workFirstMs: stats(workFirst),
+      workWarmMs: stats(workFirst / 2),
+      workDurationMs: stats(workFirst / 2 + 1),
+      workSize: workSize ?? null,
+    }) as HistoryFunction
+  const runs = [
+    run(3, [worked(100, 3)]),
+    run(2, [worked(110, 30, 20_000)]),
+    run(1, [worked(120, 40, 20_000)]),
+  ]
+  const f = runs.at(-1)!.functions[0]!
+  const figures = figuresOf(runs, f, '7')!
+  expect(figures.workFirst).toBe(35)
+  expect(figures.workDur).toBe(18.5)
+  // The cold starts are the hello world's in every run, so all three count.
+  expect(figures.cold).toBe(110)
+})

@@ -49,6 +49,19 @@ it('pools the warm durations of every round, and has none for runs without them'
   expect(old!.warmMs).toBeNull()
 })
 
+it('sets the first run of the workload apart from the runs after it', () => {
+  const [measured, old] = summarize([
+    { ...sample('Measured', 1, 10), workMs: [9, 3, 2], workDurationMs: [11, 5, 4] },
+    { ...sample('Measured', 2, 10), workMs: [7, 4, 1], workDurationMs: [9, 6, 3] },
+    sample('Old', 1, 20),
+  ])
+  expect(measured!.workFirstMs).toEqual({ p50: 8, p90: 8.8, avg: 8, min: 7, max: 9 })
+  expect(measured!.workWarmMs).toEqual({ p50: 2.5, p90: 3.7, avg: 2.5, min: 1, max: 4, samples: 4 })
+  expect(measured!.workDurationMs!.avg).toBe(4.5)
+  expect(old!.workFirstMs).toBeNull()
+  expect(old!.workWarmMs).toBeNull()
+})
+
 it('interpolates percentiles, so p90 of ten cold starts is not just the slowest', () => {
   const [f] = summarize(
     [100, 101, 102, 103, 104, 105, 106, 107, 108, 500].map((initMs, i) =>

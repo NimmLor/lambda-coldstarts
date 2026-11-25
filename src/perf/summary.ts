@@ -42,6 +42,8 @@ export const summarize = (samples: Sample[]) => {
     .map((all) => {
       const ordered = all.toSorted((a, b) => a.round - b.round)
       const warm = ordered.flatMap((s) => s.warmMs ?? [])
+      const workWarm = ordered.flatMap((s) => s.workMs?.slice(1) ?? [])
+      const workDurations = ordered.flatMap((s) => s.workDurationMs?.slice(1) ?? [])
       const durations = ordered.flatMap((s) => (s.durationMs === undefined ? [] : [s.durationMs]))
       const { functionId, runtime, arch, memoryMb, codeSizeMb } = ordered[0]!
       return {
@@ -62,6 +64,22 @@ export const summarize = (samples: Sample[]) => {
          * process, before the first event. `null` when no round has it.
          */
         startupMs: statsOf(ordered.map((s) => s.startupMs)),
+        /**
+         * The workload's first run in each round's environment, src/work.ts's code never having
+         * run there before. `null` when no round has it.
+         */
+        workFirstMs: statsOf(ordered.map((s) => s.workMs?.[0])),
+        /** How many orders a `/work` call processed, see `Sample`; `null` when no round says. */
+        workSize: ordered.findLast((s) => s.workSize !== undefined)?.workSize ?? null,
+        /** Its runs after the first, pooled; `null` when there are none. */
+        workWarmMs: workWarm.length ? { ...stats(workWarm), samples: workWarm.length } : null,
+        /**
+         * Lambda's Duration of those runs after the first: what a `/work` call is billed for once
+         * the environment has served one. `null` when there are none.
+         */
+        workDurationMs: workDurations.length
+          ? { ...stats(workDurations), samples: workDurations.length }
+          : null,
         /**
          * How long each cold invocation or request took as PerfMeasure saw it, or, for a MicroVM,
          * its launch until the first response. `null` when no round has it.

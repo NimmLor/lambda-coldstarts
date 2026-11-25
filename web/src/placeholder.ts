@@ -70,6 +70,24 @@ const TYPICAL: Record<string, number[]> = {
 }
 
 /**
+ * src/work.ts's workload, first run and the runs after it, at 1769 MB on arm64, in ms: the first
+ * runs' single pass of 2,000 orders, ten times over. A smaller size gets its share of a vCPU.
+ */
+const WORK: Record<string, [number, number]> = { Bun: [45, 35], LLRT: [105, 100], Node: [70, 50] }
+const WORK_SIZE = 20_000
+const workAt = (family: string, memoryMb: number) => {
+  const [first, warm] = WORK[family]!
+  const share = Math.min(1, memoryMb / 1769)
+  return {
+    workFirstMs: stats(first / share),
+    workWarmMs: stats(warm / share),
+    // About what the runtime's loop adds to the workload, as a warm call's Duration shows.
+    workDurationMs: stats(warm / share + 1.5),
+    workSize: WORK_SIZE,
+  }
+}
+
+/**
  * How x86_64 and the other sizes differ, as in production: a half slower to cold-start at every
  * size, which barely moves it; warm, faster below 512 MB, and everything slower at 128 MB.
  */
@@ -99,6 +117,10 @@ const summary = (base: string, arch: string, memoryMb: number): HistoryFunction 
       startupMs: null,
       roundTripMs: stats(trip!),
       firstRequestMs: stats(first!),
+      workFirstMs: null,
+      workWarmMs: null,
+      workDurationMs: null,
+      workSize: null,
       durationMsAvg: null,
       maxMemoryMbAvg: mem!,
       initDurations: [],
@@ -120,6 +142,9 @@ const summary = (base: string, arch: string, memoryMb: number): HistoryFunction 
     startupMs: stats(startup!),
     roundTripMs: stats(trip!),
     firstRequestMs: null,
+    ...(v.web
+      ? { workFirstMs: null, workWarmMs: null, workDurationMs: null, workSize: null }
+      : workAt(v.family, memoryMb)),
     durationMsAvg: dur!,
     maxMemoryMbAvg: mem!,
     initDurations: Array<number>(ROUNDS).fill(cold),

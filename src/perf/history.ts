@@ -19,6 +19,9 @@ export const toHistoryFunction = ({
   startupMs,
   roundTripMs,
   firstRequestMs,
+  workFirstMs,
+  workWarmMs,
+  workDurationMs,
   ...summary
 }: FunctionSummary) => ({
   ...summary,
@@ -27,6 +30,9 @@ export const toHistoryFunction = ({
   startupMs: typical(startupMs),
   roundTripMs: typical(roundTripMs),
   firstRequestMs: typical(firstRequestMs),
+  workFirstMs: typical(workFirstMs),
+  workWarmMs: typical(workWarmMs),
+  workDurationMs: typical(workDurationMs),
 })
 
 export type HistoryFunction = ReturnType<typeof toHistoryFunction>

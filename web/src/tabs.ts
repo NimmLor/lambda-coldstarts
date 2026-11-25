@@ -4,6 +4,7 @@ import type { Figures, Fn, View, Window } from './data'
 export const TABS = [
   { id: 'cold', label: 'Cold starts' },
   { id: 'warm', label: 'Warm starts' },
+  { id: 'work', label: 'Workload' },
   { id: 'arch', label: 'arm64 vs x86_64' },
   { id: 'memory', label: 'Memory & cost' },
   { id: 'deployment', label: 'Deployment' },
@@ -44,6 +45,7 @@ export const FILTERS: Record<
 > = {
   cold: { functions: true, arch: true, memory: true },
   warm: { functions: true, arch: true, memory: true },
+  work: { functions: true, arch: true, memory: true },
   arch: { functions: true, arch: false, memory: true, note: 'Both architectures side by side' },
   memory: { functions: true, arch: true, memory: true },
   deployment: { functions: false, arch: true, memory: true },

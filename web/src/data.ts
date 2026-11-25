@@ -291,6 +291,16 @@ export type Point = {
   trip?: number
   /** A MicroVM's first request alone, which waited for it to be running. */
   firstRequest?: number
+  /**
+   * src/work.ts's workload by the handler's own timing: its first run in a round's environment, and
+   * the runs after it. Missing from runs before it was measured, and for a Web Function or MicroVM.
+   */
+  workFirst?: number
+  workWarm?: number
+  /** Lambda's Duration of a `/work` call after the first: what one is billed for. */
+  workDur?: number
+  /** How many orders a `/work` call processed; missing from runs of the first size, 2,000. */
+  workSize?: number
   mem: number
   /** Missing for a MicroVM. */
   dur?: number
@@ -301,7 +311,19 @@ export type Point = {
   version?: string
 }
 export type Stat =
-  'cold' | 'p50' | 'p90' | 'startup' | 'warm' | 'warmP90' | 'trip' | 'firstRequest' | 'mem' | 'dur'
+  | 'cold'
+  | 'p50'
+  | 'p90'
+  | 'startup'
+  | 'warm'
+  | 'warmP90'
+  | 'trip'
+  | 'firstRequest'
+  | 'workFirst'
+  | 'workWarm'
+  | 'workDur'
+  | 'mem'
+  | 'dur'
 
 export type RunPoints = {
   date: Date
@@ -360,6 +382,10 @@ export const toPoints = (run: Run): RunPoints => {
           // Summaries from before these were measured lack them.
           trip: f.roundTripMs?.avg,
           firstRequest: f.firstRequestMs?.avg,
+          workFirst: f.workFirstMs?.avg,
+          workWarm: f.workWarmMs?.avg,
+          workDur: f.workDurationMs?.avg,
+          workSize: f.workSize ?? undefined,
           mem: f.maxMemoryMbAvg,
           dur: f.durationMsAvg ?? undefined,
           size: f.codeSizeMb,
@@ -380,10 +406,98 @@ export const mean = (values: (number | undefined)[]) => {
  * What a million cold starts of `f` cost: since August 2025 Lambda bills the init as duration on
  * every runtime, so each is billed for its init plus the invocation, and the request.
  */
-export const coldStartCost = (f: Fn, cold?: number, dur?: number) => {
+export const coldStartCost = (f: Fn, cold?: number, dur?: number) =>
+  cold === undefined || dur === undefined ? undefined : invocationCost(f, cold + dur)
+
+/**
+ * What a million invocations of `f` cost that each run for `ms`: Lambda rounds a duration up to the
+ * millisecond and bills it times the memory size, plus the request. A warm call of 1.2 ms is
+ * billed for 2, which is much of why the smallest calls cost about the same at every size.
+ */
+export const invocationCost = (f: Fn, ms: number) => {
   const price = PRICES.gbSecond[f.arch as Arch]
-  if (cold === undefined || dur === undefined || price === undefined) return undefined
-  return (((cold + dur) / 1e3) * (f.memoryMb / 1024) * price + PRICES.request) * 1e6
+  if (price === undefined) return undefined
+  return ((Math.ceil(ms) / 1e3) * (f.memoryMb / 1024) * price + PRICES.request) * 1e6
+}
+
+/** A cold start or a warm call: the calls whose cost and time at each size are compared. */
+export const CALLS = { cold: 'Cold start', warm: 'Warm call' } as const
+export type Call = keyof typeof CALLS
+
+/**
+ * What the handler does in a call: answer at once, as every cold start is measured, or run
+ * src/work.ts's workload first. Each says how long a call takes, as billed, from a function's
+ * figures; undefined where they're missing.
+ */
+export const WORKLOADS = {
+  hello: {
+    name: 'Hello world',
+    ms: (x: Figures, call: Call) =>
+      call === 'warm'
+        ? x.warm
+        : x.cold === undefined || x.dur === undefined
+          ? undefined
+          : x.cold + x.dur,
+  },
+  work: {
+    name: 'Workload',
+    /**
+     * Warm, Lambda's Duration of a `/work` call. Cold isn't measured as one call: the cold
+     * invocation answers at once, so it's that, init and all, plus the workload's first run.
+     */
+    ms: (x: Figures, call: Call) =>
+      call === 'warm'
+        ? x.workDur
+        : x.cold === undefined || x.dur === undefined || x.workFirst === undefined
+          ? undefined
+          : x.cold + x.dur + x.workFirst,
+  },
+} as const
+export type WorkloadKind = keyof typeof WORKLOADS
+
+/** One function at one memory size: how long a call took, and what a million of them cost. */
+export type SizePoint = { memoryMb: number; ms: number; cost: number }
+
+/**
+ * Which of one variant's sizes pay off: the cheapest, the fastest, and the best balance, which
+ * has the least cost × time, so a size that halves the time is worth up to twice the cost. Ties go
+ * to the smaller size. `frontier` holds the sizes no other size beats on both, ascending: any
+ * other size costs more and is slower than one of them. Undefined for no sizes.
+ */
+export const efficiency = (points: SizePoint[]) => {
+  if (!points.length) return undefined
+  const sorted = points.toSorted((a, b) => a.memoryMb - b.memoryMb)
+  const least = (by: (p: SizePoint) => number) =>
+    sorted.reduce((best, p) => (by(p) < by(best) ? p : best))
+  return {
+    cheapest: least((p) => p.cost),
+    fastest: least((p) => p.ms),
+    balanced: least((p) => p.cost * p.ms),
+    frontier: sorted.filter(
+      (p) =>
+        !sorted.some((q) => q.cost <= p.cost && q.ms <= p.ms && (q.cost < p.cost || q.ms < p.ms))
+    ),
+  }
+}
+
+/** A variant's best balance as one number, lower being better: its cost × time at that size. */
+export const balanceOf = (e: { balanced: SizePoint }) => e.balanced.cost * e.balanced.ms
+
+/**
+ * What a comparison across runtimes keeps of `rows`: every Node.js version, each a runtime to
+ * choose between, but only the Bun build and the LLRT build with the least `score`, as the others
+ * are ways to ship the same runtime. In `rows`' order; the first of a tie.
+ */
+export const bestOfFamilies = <T extends { f: { family: Family } }>(
+  rows: T[],
+  score: (row: T) => number
+) => {
+  const best = new Map<Family, T>()
+  for (const row of rows) {
+    const leader = best.get(row.f.family)
+    if (!leader || score(row) < score(leader)) best.set(row.f.family, row)
+  }
+  return rows.filter((row) => row.f.family === 'Node' || best.get(row.f.family) === row)
 }
 
 /** The geometric mean, which averages ratios as they multiply; undefined for none. */
@@ -517,6 +631,9 @@ export type Figures = {
   warmP90?: number
   trip?: number
   firstRequest?: number
+  workFirst?: number
+  workWarm?: number
+  workDur?: number
   mem?: number
   /** The cold invocation's duration: the first call after the cold start. */
   dur?: number
@@ -538,6 +655,10 @@ export const figuresOf = (runs: RunPoints[], f: Fn, window: Window): Figures | u
   if (!counted.length) return undefined
   const points = counted.map((r) => r.points.get(f.id)!)
   const avg = (key: Stat) => mean(points.map((p) => p[key]))
+  // The workload's figures only from runs of the latest run's size: a bigger one takes longer.
+  const workSize = points.findLast((p) => p.workFirst !== undefined)?.workSize
+  const workAvg = (key: Stat) =>
+    mean(points.filter((p) => p.workSize === workSize).map((p) => p[key]))
   const durations = points.flatMap((p) => p.initDurations).sort((a, b) => a - b)
   const latest = points.at(-1)!
   const cold = avg('cold')
@@ -557,6 +678,9 @@ export const figuresOf = (runs: RunPoints[], f: Fn, window: Window): Figures | u
     warmP90: avg('warmP90'),
     trip,
     firstRequest: avg('firstRequest'),
+    workFirst: workAvg('workFirst'),
+    workWarm: workAvg('workWarm'),
+    workDur: workAvg('workDur'),
     mem: avg('mem'),
     dur,
     load:

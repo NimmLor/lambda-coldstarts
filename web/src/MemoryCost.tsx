@@ -1,3 +1,4 @@
+import { CostEfficiency } from './CostEfficiency'
 import { FAMILY_NAMES, type Family, type Figures, isEvent, PRICES, STACK_REGION } from './data'
 import { FAMILY_LINES, SizeChart } from './SizeChart'
 import type { TabProps } from './tabs'
@@ -84,6 +85,8 @@ export const MemoryCost = (props: TabProps) => {
           ))}
         </div>
       </div>
+
+      <CostEfficiency {...props} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card
