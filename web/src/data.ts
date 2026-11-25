@@ -189,15 +189,6 @@ export const VARIANTS: Record<string, Variant> = {
     about:
       'A node:http server in Lambda’s Node.js 24 image on a Lambda MicroVM, resumed from a snapshot',
   },
-  BunCompileAotTrimMicroVm: {
-    name: 'Bun AOT, trimmed, MicroVM',
-    family: 'Bun',
-    build: 'bun build --compile --aot --trim',
-    canary: true,
-    microvm: { counterpart: 'BunCompileAotTrim' },
-    about:
-      'The same server as a trimmed AOT executable on a Lambda MicroVM, without the AOT shim, resumed from a snapshot',
-  },
   Node24Cmr: {
     name: 'Node.js 24, Custom Runtime',
     family: 'Node',
@@ -518,7 +509,7 @@ export const niceMax = (value: number) => {
   return [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * magnitude >= padded)! * magnitude
 }
 
-/** A run by when it finished, to the minute: there is one every 4 hours. */
+/** A run by when it finished, to the minute: there is one every day. */
 export const when = (date: Date) =>
   date.toLocaleString('en-US', {
     month: 'short',
@@ -564,7 +555,7 @@ const DAY_MS = 864e5
 
 /**
  * Which runs a function's figures are the mean of: those on the build it runs now, or those of the
- * last 7 or 14 days. /runs/history holds 15 days.
+ * last 7 or 14 days. /runs/history holds 90 days.
  */
 export const WINDOWS = ['current', '7', '14'] as const
 export type Window = (typeof WINDOWS)[number]

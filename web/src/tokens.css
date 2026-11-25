@@ -46,10 +46,6 @@
   --color-line-Node24MicroVm-512: oklch(91% 0.09 92);
   --color-line-Node24MicroVm-1024: oklch(86% 0.12 82);
   --color-line-Node24MicroVm-2048: oklch(80% 0.13 70);
-  --color-line-Node24MicroVm-4096: oklch(72% 0.15 58);
-  --color-line-Node24MicroVm-8192: oklch(64% 0.16 46);
-  /* Beside the amber Node.js sizes, Node.js 24's teal and the Bun AOT executable's pink. */
-  --color-line-BunCompileAotTrimMicroVm: oklch(72% 0.14 255);
   /* Each customer-managed runtime, which its section shows beside the variant it repackages: a
      paler shade of that one's hue, and Alpine its own blue. */
   --color-line-Node24Cmr: oklch(90% 0.07 185);

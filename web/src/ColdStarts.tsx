@@ -370,7 +370,7 @@ export const ColdStarts = ({ view, figures, memoryMb, waiting }: TabProps) => {
         <Package fns={fns} figures={figures} />
       </div>
       {waiting ? (
-        <Waiting height={360}>Loading the last 15 days of runs…</Waiting>
+        <Waiting height={360}>Loading the last 90 days of runs…</Waiting>
       ) : (
         <div
           className="overflow-hidden rounded-card border border-rule"

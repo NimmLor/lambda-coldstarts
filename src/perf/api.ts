@@ -13,7 +13,7 @@
  * And, only when PERF_ADMIN_SECRET is set, routes under it that 404 like any other otherwise:
  *
  *   POST /admin/<secret>/run     starts a run of the PerfRun state machine
- *   POST /admin/<secret>/pause   disables the schedule that starts it every 4 hours
+ *   POST /admin/<secret>/pause   disables the schedule that starts it every day
  *   POST /admin/<secret>/resume  enables it again; both answer `{ state, was }`
  *   POST /admin/<secret>/purge   deletes items from PerfResults until about 15 s have passed;
  *                                `done: false` means there are more, call it again
@@ -45,14 +45,14 @@ const TABLE = process.env.PERF_TABLE
 const STATE_MACHINE = process.env.PERF_STATE_MACHINE
 const SCHEDULE = process.env.PERF_SCHEDULE
 const ADMIN_SECRET = process.env.PERF_ADMIN_SECRET
-/** What /runs/history returns: 15 days of runs every 4 hours, the site's longest range. */
+/** What /runs/history returns: 90 days of daily runs, of which the site's ranges pick. */
 export const HISTORY_RUNS = 90
 /**
- * A new run arrives every 4 hours, and PerfRun invalidates both routes when it does, so CloudFront
+ * A new run arrives every day, and PerfRun invalidates both routes when it does, so CloudFront
  * keeps them that long and, past that, answers from its copy while it fetches a new one. Browsers
  * still ask again after a minute, which CloudFront answers.
  */
-const RUNS_CACHE = 'max-age=60, s-maxage=14400, stale-while-revalidate=86400'
+const RUNS_CACHE = 'max-age=60, s-maxage=86400, stale-while-revalidate=86400'
 
 type HistoryRun = ReturnType<typeof toHistoryRun>
 

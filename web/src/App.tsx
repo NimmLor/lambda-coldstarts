@@ -431,7 +431,7 @@ export const App = ({ now }: { now: number }) => {
           Every function runs the same tiny handler,{' '}
           <a href={`${REPO}/blob/main/src/report.ts`}>src/report.ts</a>, which returns its own
           startup time and memory use as JSON. No packages, no network calls: the numbers are the
-          runtime’s, not the code’s. Every 4 hours each one is cold started
+          runtime’s, not the code’s. Every day each one is cold started
           {latestRun ? ` ${latestRun.rounds} times` : ''} in {STACK_REGION}, Frankfurt
           {latestRun?.warmInvocations === undefined
             ? ''
