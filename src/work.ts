@@ -60,11 +60,11 @@ type Order = {
   tags: string[]
 }
 
+/** What a region's orders add up to; `categories` maps each category to its quantity. */
 type Group = {
-  region: string
   orders: number
   totalCents: number
-  categories: Record<string, number>
+  categories: Map<string, number>
 }
 
 /** A whole number from a request, within `[1, max]`; `fallback` for anything else. */
@@ -112,21 +112,27 @@ const runPass = (records: number, seed: number) => {
     })
   }
 
-  const large = orders.filter((o) => o.totalCents >= 5_000 && o.tags.indexOf('express') === -1)
+  const large: Order[] = []
+  for (const order of orders) {
+    if (order.totalCents >= 5_000 && order.tags.indexOf('express') === -1) large.push(order)
+  }
   // By total, then id, so ties come out the same on every engine.
   large.sort((a, b) => b.totalCents - a.totalCents || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 
-  const groups: Record<string, Group> = {}
+  // Maps, not objects with computed keys: an --aot build looks a computed key up by name, and
+  // can't tell the layout of an object that is written through one.
+  const groups = new Map<string, Group>()
   for (const order of large) {
-    const group = (groups[order.region] ??= {
-      region: order.region,
-      orders: 0,
-      totalCents: 0,
-      categories: {},
-    })
+    let group = groups.get(order.region)
+    if (group === undefined) {
+      group = { orders: 0, totalCents: 0, categories: new Map() }
+      groups.set(order.region, group)
+    }
     group.orders += 1
     group.totalCents += order.totalCents
-    group.categories[order.category] = (group.categories[order.category] ?? 0) + order.quantity
+    const categories = group.categories
+    const quantity = categories.get(order.category) ?? 0
+    categories.set(order.category, quantity + order.quantity)
   }
 
   const result = {
@@ -135,9 +141,16 @@ const runPass = (records: number, seed: number) => {
     top: large
       .slice(0, 20)
       .map((o) => ({ id: o.id, totalCents: o.totalCents, tags: o.tags.join(',') })),
-    groups: Object.keys(groups)
-      .sort()
-      .map((region) => groups[region]),
+    groups: [...groups.keys()].sort().map((region) => {
+      const group = groups.get(region)!
+      return {
+        region,
+        orders: group.orders,
+        totalCents: group.totalCents,
+        // In the order the categories first came up, as a Map keeps them.
+        categories: Object.fromEntries(group.categories),
+      }
+    }),
   }
   // The whole result, serialized, so no engine can skip any of the work behind it.
   return fnv1a(JSON.stringify(orders).length + JSON.stringify(result))
